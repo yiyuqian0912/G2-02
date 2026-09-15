@@ -1,0 +1,80 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{microtype}
+\usepackage[round,authoryear]{natbib}
+\usepackage{needspace}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+\hypersetup{pdftitle={G2-02 Literature Review}}
+\urlstyle{same}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\setlength{\bibsep}{5pt}
+\renewcommand{\bibfont}{\small}
+\newcommand{\reviewtitle}[1]{\par\Needspace{10\baselineskip}\vspace{7pt}\textbf{#1}\par}
+\widowpenalty=10000
+\clubpenalty=10000
+
+\begin{document}
+\begin{center}
+    {\Large\bfseries G2-02 Literature Review}
+\end{center}
+
+\reviewtitle{1. Neural Fields in Visual Computing and Beyond}
+
+\citet{xie2022neuralfields} review how neural networks can represent properties such as shape, occupancy, and light as continuous functions. The network takes coordinates as input and predicts a value at that location. For example, an occupancy field indicates whether a point is inside an object, while a signed distance field describes its distance from the surface and which side it lies on. The paper also discusses how information about an entire scene or a local region can be supplied to the network so that it can represent different structures. This is useful for our study because we want to learn a function that identifies where visibility switches between light and shadow. It provides ideas for combining the structure, query position, and light direction in one representation. The connection is the use of a continuous function to describe a boundary, although our boundary concerns changes in visibility rather than the surface of an object.
+
+\reviewtitle{2. Differentiable Rendering: A Survey}
+
+\citet{kato2020differentiablerendering} discuss methods for estimating scene properties from images by making the rendering process differentiable. These methods render an image from an estimated scene, compare it with the observed image, and use gradients to adjust properties such as geometry or lighting. A difficulty is that visibility can change suddenly: a small movement can cause a surface to become hidden or revealed. Ordinary derivatives may provide little guidance between these changes. The survey describes approaches such as approximate gradients and softened rendering, which make it easier to optimize scene parameters. This relates to our study because a small change in light direction can move a shadow boundary and change whether a point is illuminated. The paper helps explain why recovering light directions from shadow observations can be difficult. It also gives us existing approaches for comparison when investigating whether explicitly learning visibility-switching boundaries can improve the recovery of possible light directions.
+
+\reviewtitle{3. Recent Trends in Inverse Rendering}
+
+\citet{ullah2026inverserendering} review methods published between 2020 and 2025 for recovering geometry, materials, and lighting from one or more images. The paper compares how these methods represent scenes and how they estimate the unknown properties, including approaches based on neural fields, Gaussian splatting, and differentiable rendering. A central difficulty is that different combinations of shape, surface reflectance, and illumination can produce similar images. The authors also discuss why accurate image reproduction does not necessarily imply that these individual properties have been recovered correctly. This is useful for our study because we want to recover possible light directions from observed shadows. Since our geometry is known, we can focus on the lighting and visibility parts of these methods. The survey provides recent approaches to consult when designing that recovery process. It also supports checking whether recovered lighting predicts correct shadows under the known geometry, including in unobserved regions, rather than judging it only by its fit to the original observations.
+
+\reviewtitle{4. Domain Generalization: A Survey}
+
+\citet{zhou2023domaingeneralization} review how models can perform well when test data differ from the data used for training. This problem occurs when a model relies on patterns that are common in its training examples but do not hold in a new setting. The survey discusses methods such as increasing the variety of training data, learning features shared across different settings, and using meta-learning to expose the model to distribution changes during training. Domain generalization aims to work on a new domain without requiring data from that domain during training. This connects to our study because the model should predict visibility on structures it has not seen before. The review provides ideas for learning occlusion relationships that can be reused across different geometries. It also explains why evaluation on separate groups of structures matters: success on familiar structures does not establish transfer. This helps distinguish performance on a new structure from improvements obtained after additional training on it.
+
+\reviewtitle{5. Deep Neural Models for Illumination Estimation and Relighting: A Survey}
+
+\citet{einabadi2021illumination} review how neural networks can estimate lighting from images and predict how a scene would look under different lighting. The paper groups methods into lighting estimation, relighting using representations of how surfaces reflect light, and approaches that directly transform one image into another. Some methods predict light directions and intensities, while others estimate a broader description of the surrounding illumination. The review also discusses shadow generation, training datasets, and difficulties with unfamiliar scene content. This is useful for our study because it connects recovering lighting from observations with predicting the effects of changing that lighting. It helps us understand how the choice of lighting representation affects the shadows a model can reproduce. Our study focuses on known geometry and hard visibility changes, so the methods are not identical, but the survey provides relevant examples of lighting estimation and shadow prediction. It also highlights why reproducing a plausible image does not necessarily mean recovering accurate shadow boundaries.
+
+\begin{thebibliography}{5}
+
+\bibitem[Xie et~al.(2022)]{xie2022neuralfields}
+Yiheng Xie, Towaki Takikawa, Shunsuke Saito, Or Litany, Shiqin Yan, Numair Khan, Federico Tombari, James Tompkin, Vincent Sitzmann, and Srinath Sridhar.
+Neural fields in visual computing and beyond.
+\emph{Computer Graphics Forum}, 41(2):641--676, 2022.
+\href{https://doi.org/10.1111/cgf.14505}{doi:10.1111/cgf.14505}.
+
+\bibitem[Kato et~al.(2020)]{kato2020differentiablerendering}
+Hiroharu Kato, Deniz Beker, Mihai Morariu, Takahiro Ando, Toru Matsuoka, Wadim Kehl, and Adrien Gaidon.
+Differentiable rendering: A survey.
+\emph{arXiv preprint arXiv:2006.12057}, 2020.
+\url{https://arxiv.org/abs/2006.12057}.
+
+\bibitem[Ullah et~al.(2026)]{ullah2026inverserendering}
+S. Ullah, F. Pellacini, and A. Giachetti.
+Recent trends in inverse rendering.
+\emph{Computer Graphics Forum}, e70592, 2026. Early View.
+\href{https://doi.org/10.1111/cgf.70592}{doi:10.1111/cgf.70592}.
+
+\bibitem[Zhou et~al.(2023)]{zhou2023domaingeneralization}
+Kaiyang Zhou, Ziwei Liu, Yu Qiao, Tao Xiang, and Chen Change Loy.
+Domain generalization: A survey.
+\emph{IEEE Transactions on Pattern Analysis and Machine Intelligence}, 45(4):4396--4415, 2023.
+\href{https://doi.org/10.1109/TPAMI.2022.3195549}{doi:10.1109/TPAMI.2022.3195549}.
+
+
+\bibitem[Einabadi et~al.(2021)]{einabadi2021illumination}
+Farshad Einabadi, Jean-Yves Guillemaut, and Adrian Hilton.
+Deep neural models for illumination estimation and relighting: A survey.
+\emph{Computer Graphics Forum}, 40(6):315--331, 2021.
+\href{https://doi.org/10.1111/cgf.14283}{doi:10.1111/cgf.14283}.
+
+\end{thebibliography}
+\end{document}
