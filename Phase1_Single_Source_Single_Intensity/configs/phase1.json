@@ -39,12 +39,11 @@
     "candidate_domain": "world_outside_observation_and_obstacles",
     "window_parent_restriction": false,
     "adaptive_budget": null,
-    "spatial_prior": "uniform",
-    "candidate_weighting": "nonoverlapping_cell_area",
+    "candidate_weighting": "equal_per_retained_candidate",
     "adaptive_comparison_required": true,
-    "target_semantics": "fixed_window_response_compatibility",
-    "area_estimation": null,
-    "candidate_spacing": null
+    "target_semantics": "fixed_window_discrete_candidate_compatibility",
+    "candidate_spacing": null,
+    "final_candidate_spacing": null
   },
   "training": {
     "device": null,

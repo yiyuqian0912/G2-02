@@ -36,14 +36,12 @@ Reject invalid candidates before rendering. Their costs do not enter probability
 | Field | Shape | Meaning |
 |---|---|---|
 | `candidate_xy` | `[N,2]` | Candidate world coordinates |
-| `cell_bounds` | `[N,4]` | World-coordinate `[x_min,y_min,x_max,y_max]` for each represented cell |
 | `valid` | `[N]` boolean | Validity under the recorded support policy |
-| `area_weight` | `[N]` | Area represented by each candidate cell |
 | `physical_cost` | `[N]` | Final costs, available after physical evaluation |
 | `search_level` | `[N]` | Refinement depth or level |
 | `num_physics_evaluations` | Scalar | Actual physical evaluation count |
 
-Final cell areas must not double-count parent/child coverage. `area_weight` represents valid-domain area or a documented approximation; handle cells crossing window/obstacle boundaries rather than assuming center validity implies full-cell validity. Store the area estimation convention in configuration metadata. Valid candidates have positive areas. All fields share candidate order. Partial search results must be marked incomplete and cannot be passed to target construction as final costs. Retain the configured domain, coverage, and cost definition with search metadata.
+All fields share candidate order. Deduplicate positions and refine retained regions toward a common final spacing. Partial search results must be marked incomplete and cannot be passed to target construction as final costs. Retain domain, coverage, spacing, and cost settings as metadata. Search region bounds may be stored internally; they are not required teacher inputs. No area weighting is used.
 
 ## 4. Teacher record — `teacher.py`
 
@@ -52,24 +50,22 @@ Required fields (`temperature` is a scalar; `config_id` is a record identifier, 
 ```text
 scene_id, view_id
 candidate_xy       [N,2]
-cell_bounds        [N,4]
 valid              [N]
-area_weight        [N]
 physical_cost      [N]
 teacher_prob       [N]
 temperature        scalar > 0
 config_id          reference to saved experiment settings
 ```
 
-Save records under `outputs/teachers/`. Retain renderer/generation version and support policy in the referenced settings. Targets sum to one over valid candidates; invalid probabilities are zero. No valid candidates means explicit failure. Uniform candidate cells may use equal positive weights consistently.
+Save records under `outputs/teachers/`. Retain renderer/generation version and support policy in the referenced settings. Targets sum to one over valid candidates; invalid probabilities are zero. No valid candidates means explicit failure. Targets use softmax of negative costs divided by temperature over retained valid candidates.
 
-The same coordinates, ordering, validity, and weights must be used for student normalization. Stored physical costs remain available for absolute compatibility diagnostics.
+The same coordinates, ordering, and validity must be used for student normalization. Stored physical costs remain available for absolute compatibility diagnostics.
 
 ## 5. Student — `model.py`
 
 Energy inputs: `response`, `window`, and `candidate_xy`.
 
-Probability-normalization inputs: `energy`, `valid`, and `area_weight`. The last two are not energy-encoder features.
+Probability-normalization inputs: `energy` and `valid`. Validity is not an energy-encoder feature. Use softmax of negative energy over the same valid candidates as the teacher.
 
 ```text
 candidate_xy       [N,2]
@@ -96,17 +92,19 @@ The Chinese README includes a field-by-field input guide for all eight modules. 
 | `data.py` | RIND location supplies the generator/reader; scene count controls dataset size; fixed intensity defines the shared response scale; seed controls reproducibility; quadtree settings define observations; split settings assign whole scenes to partitions. |
 | `physics.py` | Geometry determines occlusion; observed response supplies the comparison target and observed-boundary weights; window fixes the render region; candidate coordinates reposition the source; fixed intensity must match data generation; cost settings define response/edge evaluation. |
 | `search.py` | World bounds and the window define public spatial restrictions; `candidate_spacing` is the initial grid step in world units; `adaptive_budget` limits physical candidate evaluations; the evaluator is bound to the current scene, response, intensity, and cost settings; geometry may be passed directly or encapsulated in that teacher-only evaluator. |
-| `teacher.py` | Coordinates and cell bounds identify hypotheses and coverage; final costs establish compatibility; validity excludes candidates; area weights convert density-like scores to cell masses; positive temperature controls sharpness; sample IDs match targets to observations; `config_id` resolves to the settings and provenance used to generate targets. |
-| `model.py` | Response conveys local structure; window supplies world location and scale; candidate coordinates specify queries. Normalize window and candidate coordinates using the same `coordinate_scale` before Fourier encoding. `valid` and `area_weight` are used only after energy scoring to normalize probabilities. Initialization reads Fourier frequencies and recorded architecture settings. |
-| `train.py` | Observations supply model conditioning and record IDs; teacher candidates determine queries; `teacher_prob` supplies the soft target; shared validity and area ensure consistent normalization; the model supplies trainable parameters; training settings govern resources, updates, and validation-based checkpoint selection. |
+| `teacher.py` | Coordinates identify hypotheses; final costs establish compatibility; validity excludes candidates; positive temperature controls sharpness; sample IDs match targets to observations; `config_id` resolves to the settings and provenance used to generate targets. |
+| `model.py` | Response conveys local structure; window supplies world location and scale; candidate coordinates specify queries. Normalize window and candidate coordinates using the same `coordinate_scale` before Fourier encoding. `valid` is used only after energy scoring to normalize probabilities. Initialization reads Fourier frequencies and recorded architecture settings. |
+| `train.py` | Observations supply model conditioning and record IDs; teacher candidates determine queries; `teacher_prob` supplies the soft target; shared candidate ordering and validity ensure consistent normalization; the model supplies trainable parameters; training settings govern resources, updates, and validation-based checkpoint selection. |
 | `evaluate.py` | Test observations supply held-out inputs; teacher records supply reference costs and distributions on matching candidates; a fixed trained checkpoint supplies predictions; evaluation configuration defines support, metrics, comparisons, and provenance. |
 | `checks.py` | A few real scenes provide verifiable physical examples; the actual Phase I configuration keeps all module settings consistent and identifies incomplete required settings. |
 
 Configuration notes:
 
+- `final_candidate_spacing` is the target spacing for retained regions after refinement. If the budget prevents reaching it everywhere, record the achieved levels and do not claim uniform final sampling.
+
 - `candidate_spacing` replaces the ambiguous former name `candidate_resolution`; it is an initial step in world-coordinate units, not an image resolution or candidate count.
 - `adaptive_budget` counts physical candidate evaluations, not batch API calls. Report reevaluations and optional edge-computation cost separately; record actual elapsed time as well.
 - `learning_rate` and `checkpoint_selection_metric` remain unresolved until training is configured. Save the optimizer and architecture settings actually used along with each checkpoint.
-- `teacher_prob` already includes area weighting. Do not multiply it by `area_weight` again in the cross-entropy target.
+- `teacher_prob` is a normalized soft target over retained valid candidates. Do not add area factors to either teacher or student normalization.
 - If teacher records use different adaptive candidates, obtain reference teacher evaluations on the common evaluation grid before comparing distributions. Do not directly compare vectors with different coordinate meanings.
 - Zero padding is not an observed zero response. If batching uses padding, carry a pixel-valid mask and exclude padding from response feature aggregation and any pixel-domain loss.

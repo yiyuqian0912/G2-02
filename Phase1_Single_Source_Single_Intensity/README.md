@@ -112,26 +112,26 @@ Adaptive search remains part of the full proposal: establish the uniform baselin
 1. Provide uniform candidates for the baseline and a small reference evaluation.
 2. Implement coarse-to-fine search: cover the domain, screen with response consistency, and refine low-cost regions or regions identified by an explicit uncertainty rule.
 3. When using edge enhancement, complete the required evaluation of final candidates so the teacher receives comparable costs.
-4. Record candidate counts, physical evaluation counts, and necessary spatial weights; inspect missed disconnected feasible regions.
+4. Record candidate counts, physical evaluation counts, and final sampling spacing; inspect missed disconnected feasible regions.
 
-**Deliverables:** candidate coordinates, validity information, available physical costs, and search records. Candidates lie inside the world and outside the observation window; the physical teacher also excludes obstacle interiors.
+**Deliverables:** candidate coordinates, validity information, available physical costs, and search records. Refine retained regions toward a common final spacing and deduplicate coordinates to limit density-induced mass differences. Region bounds may remain internal search metadata but are not required teacher inputs. Candidates lie inside the world and outside the observation window; the physical teacher also excludes obstacle interiors.
 
 **Completion goal:** adaptive search reduces computation relative to uniform reference evaluation and provides evidence that plausible regions are retained. It changes teacher cost, not student inputs or architecture. A design note alone is not final completion.
 
 ### 3.4 `teacher.py` — Convert costs into supervision
 
-**Inputs:** observation identifiers, candidate coordinates, final physical costs, temperature, and necessary spatial weights.
+**Inputs:** observation identifiers, candidate coordinates, final physical costs, temperature, and final sampling spacing.
 
 **Responsibilities:**
 
 1. Coordinate `search.py` and `physics.py` to obtain candidate evaluations, reusing computed results.
-2. Construct the proposal's soft distribution: for equal-weight candidates, `qᵢ ∝ exp(−Cᵢ/τ)`.
+2. Construct the proposal's soft distribution: on retained valid candidates, `qᵢ ∝ exp(−Cᵢ/τ)`.
 3. Retain probability on compatible alternatives instead of saving only one minimum-cost coordinate.
 4. Save complete supervision records so every target probability is associated with the correct candidate.
 
 **Deliverables:** records in `outputs/teachers/` containing sample identifiers, candidates, physical costs, teacher probabilities, and relevant settings.
 
-**Completion goal:** targets normalize correctly and remain traceable to physical evaluations; coordinates, ordering, and weights survive handoff. Use a uniform spatial prior and cell-area weights: teacher mass is proportional to `area_weight × exp(−physical_cost / temperature)`. Save `cell_bounds [N,4]` with coordinates. Refined parent cells must not overlap their children in the final area accounting. For cells crossing window or obstacle boundaries, clip, subdivide, or document valid-area approximations; a valid center does not imply a fully valid cell. Normalize only valid candidates; invalid candidates have zero probability. Valid areas and temperature must be positive. An empty valid set is an explicit failure. If another sampling scheme is introduced, define its weights accordingly. Retain raw costs because normalization alone does not establish a good explanation.
+**Completion goal:** targets normalize correctly and remain traceable to physical evaluations; coordinates, ordering, and validity survive handoff. Apply softmax over retained valid candidates without area factors. Temperature must be positive; invalid candidates receive zero mass; an empty valid set is a failure. Retain raw costs because normalization alone does not establish a good explanation. The target describes relative candidate compatibility, not a calibrated continuous spatial posterior.
 
 ### 3.5 `model.py` — Score candidates from the observation
 
@@ -142,7 +142,7 @@ Adaptive search remains part of the full proposal: establish the uniform baselin
 1. Support different observation sizes while retaining world location and extent.
 2. Provide Fourier features for candidate coordinates.
 3. Output conditional energy `Eθ(O,v,s)`, with lower energy indicating greater compatibility.
-4. Produce a student distribution on the same valid candidates using `pᵢ ∝ area_weightᵢ × exp(−Eᵢ)`. Equal areas reduce this to the original softmax. `valid` and `area_weight` control normalization only; they are not energy-encoder features.
+4. Produce a student distribution on the same valid candidates using `pᵢ ∝ exp(−Eᵢ)`. `valid` controls normalization only; it is not an energy-encoder feature.
 
 **Deliverables:** a callable student and example scores/distributions for different window sizes.
 
@@ -177,7 +177,7 @@ Adaptive search remains part of the full proposal: establish the uniform baselin
 
 **Deliverables:** observation–teacher–student figures in `outputs/figures/`, metrics and findings in `outputs/reports/`.
 
-**Completion goal:** answer whether source-space constraints and uncertainty are recovered, whether edge cost adds independent value, and whether adaptive search saves computation. For variable-area heatmaps, display probability divided by represented area as density; region probability is the sum of cell masses. Coordinate error cannot replace this evidence; a second boundary is not guaranteed to concentrate every scene's posterior.
+**Completion goal:** answer whether source-space constraints and uncertainty are recovered, whether edge cost adds independent value, and whether adaptive search saves computation. Use a common uniform evaluation grid and label spacing. Adaptive candidate probabilities are discrete masses, not continuous densities. Count pruned reference locations as uncovered when measuring search recall. Coordinate error cannot replace this evidence; a second boundary is not guaranteed to concentrate every scene's posterior.
 
 ### 3.8 `checks.py` — Verify the handoffs
 
@@ -214,7 +214,7 @@ There is no separate scripts hierarchy or detailed test-directory plan. Put a st
 | Record | Required content |
 |---|---|
 | Observation | `scene_id`, `view_id`, `response`, `window=(x,y,size)` |
-| Teacher supervision | Sample identifiers, `candidate_xy [N,2]`, `cell_bounds [N,4]`, `valid [N]`, `area_weight [N]`, `physical_cost [N]`, `teacher_prob [N]`, `temperature`, and `config_id` |
+| Teacher supervision | Sample identifiers, `candidate_xy [N,2]`, `valid [N]`, `physical_cost [N]`, `teacher_prob [N]`, `temperature`, and `config_id` |
 | Student result | `candidate_xy`, candidate-aligned `energy` and `probability`, with model/configuration identifiers retained in run records |
 
 World coordinates span `[0,1024]`, with x rightward and y downward; arrays use `[row,column]`. Scene IDs, true sources, and geometry may be retained in records but are not student features.
