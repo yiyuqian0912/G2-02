@@ -1,0 +1,61 @@
+{
+  "status": "planning_only_not_a_runnable_experiment",
+  "seed": 20260923,
+  "data": {
+    "rind_project_root": null,
+    "output_dir": "data/raw/phase1-single-source",
+    "world_size": 1024,
+    "num_scenes": null,
+    "num_sources": 1,
+    "fixed_intensity": null,
+    "window_policy": "source_driven_quadtree",
+    "exclude_occupied_leaves": true,
+    "split_by": "scene_id",
+    "split_ratios": null,
+    "min_window_size": 16
+  },
+  "student": {
+    "inputs": [
+      "response",
+      "window_x",
+      "window_y",
+      "window_size"
+    ],
+    "candidate_frame": "world",
+    "coordinate_scale": 1024,
+    "full_scene_geometry_input": false,
+    "full_quadtree_input": false,
+    "batching": "size_buckets_or_padding_with_mask",
+    "fourier_frequencies": null
+  },
+  "teacher": {
+    "baseline": "uniform_candidates_response_only",
+    "alpha": 1.0,
+    "beta": 0.0,
+    "boundary_lambda": null,
+    "boundary_sigma": null,
+    "temperature": null,
+    "adaptive_search": false,
+    "candidate_domain": "world_outside_observation_and_obstacles",
+    "window_parent_restriction": false,
+    "adaptive_budget": null,
+    "spatial_prior": "uniform",
+    "candidate_weighting": "nonoverlapping_cell_area",
+    "adaptive_comparison_required": true,
+    "target_semantics": "fixed_window_response_compatibility",
+    "area_estimation": null,
+    "candidate_spacing": null
+  },
+  "training": {
+    "device": null,
+    "batch_size": null,
+    "epochs": null,
+    "learning_rate": null,
+    "checkpoint_selection_metric": null
+  },
+  "coordination": {
+    "ownership": "self_selected",
+    "first_review": "2026-10-01",
+    "compute": "pending"
+  }
+}
