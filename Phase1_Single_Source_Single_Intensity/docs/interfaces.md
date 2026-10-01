@@ -89,7 +89,7 @@ The Chinese README includes a field-by-field input guide for all eight modules. 
 
 | Module | Inputs and their use |
 |---|---|
-| `data.py` | RIND location supplies the generator/reader; scene count controls dataset size; fixed intensity defines the shared response scale; seed controls reproducibility; quadtree settings define observations; split settings assign whole scenes to partitions. |
+| `data.py` | The installed data root supplies observations; `Phase1Dataset` returns response/window and IDs; scene lists select partitions, and size buckets make batches stackable. Geometry, references, and rerendering are separate teacher interfaces. The release fixes intensity at 1 and contains 10,000 scenes. |
 | `physics.py` | Geometry determines occlusion; observed response supplies the comparison target and observed-boundary weights; window fixes the render region; candidate coordinates reposition the source; fixed intensity must match data generation; cost settings define response/edge evaluation. |
 | `search.py` | World bounds and the window define public spatial restrictions; `candidate_spacing` is the initial grid step in world units; `adaptive_budget` limits physical candidate evaluations; the evaluator is bound to the current scene, response, intensity, and cost settings; geometry may be passed directly or encapsulated in that teacher-only evaluator. |
 | `teacher.py` | Coordinates identify hypotheses; final costs establish compatibility; validity excludes candidates; positive temperature controls sharpness; sample IDs match targets to observations; `config_id` resolves to the settings and provenance used to generate targets. |

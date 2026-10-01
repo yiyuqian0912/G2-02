@@ -1,0 +1,13 @@
+{
+  "upstream_package_version": "2.0.0",
+  "schema_version": 3,
+  "upstream_files_sha256": {
+    "__init__.py": "5db147aaa43beffd683f3b56cda1ddaef8612b52bd21d34cd6f3ed0adf2d0dc1",
+    "constants.py": "e1bce72c3c0a31a3357bfc54fe0ab5275047d0771f6adb44928c72216acc3385",
+    "geometry.py": "f1ffc7d205e4bc8440fa93c50d01970af570c554685f2f7b002baeae7fb0d230",
+    "render.py": "690aad4961553e04ca1ecacef0ae18c1a613a44edea905be389e410893f3fb8b",
+    "dataset.py": "20bcffa2b88faf1b559372d8314e44564833b069890ffcfd4d8d963eaa7ddb73",
+    "adaptive.py": "d8fefcf3d4519912c196c0230838d9d6d5a563b2df0c1548ae3a05300868ecf9",
+    "browser.py": "115886f6c954904f01de43f491d6c2caffdc498a77360f57a73b83b20d978e4e"
+  }
+}

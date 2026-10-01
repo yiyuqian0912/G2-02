@@ -6,7 +6,7 @@ This document defines the current method, not completed software or experimental
 
 ## 1. Observation and inverse problem
 
-Generate new single-source scenes with a shared fixed intensity in a continuous 1024 × 1024 occlusion environment. Phase I excludes distance decay, reflections, noise, and material differences. Split data by scene ID before training or target selection.
+Use the supplied single-source release (10,000 scenes, intensity 1) in a continuous 1024 × 1024 occlusion environment. Generate additional scenes separately when an evaluation protocol requires them. Phase I excludes distance decay, reflections, noise, and material differences. Split data by scene ID before training or target selection.
 
 Let R be the local response, v = (x, y, size) the window metadata, and O = (R, v). The student predicts a distribution of candidate source locations s = (s_x, s_y), rather than one uniquely labeled coordinate.
 
