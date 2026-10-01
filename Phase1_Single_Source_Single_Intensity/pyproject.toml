@@ -7,7 +7,18 @@ name = "rind-phase1"
 version = "0.1.0"
 description = "Physics-supervised conditional energy modeling for RIND source localization"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["rind-dataset==2.0.0"]
+
+[project.optional-dependencies]
+train = ["torch>=2.0"]
+browser = ["flask>=3.0", "pillow>=10.0"]
+
+[project.scripts]
+rind-install-data = "rind_phase1.install_data:main"
+rind-browser = "rind_phase1.browser:main"
+
+[tool.uv.sources]
+rind-dataset = { path = "vendor/rind-dataset", editable = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]

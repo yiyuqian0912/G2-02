@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-**当前状态：**项目结构与职责占位文件已建立，以下内容定义待完成的研究任务，并不表示功能已实现。原始 RIND 生成器与数据仍需接入。
+**当前状态：**ZIP 安装、数据读取、本地可视化、场景子集、按尺寸组批和参考解重渲染已实现。物理代价、搜索、教师、学生、训练和评价仍是待实现的研究任务。数据检查通过不表示研究链路已完成。
 
 补充文档：[数学定义与方法细节](docs/method.md) · [模块数据接口](docs/interfaces.md)。两份文档目前为英文，已与当前八个核心文件的职责和字段对齐。
 
@@ -49,6 +49,139 @@ Phase I 只考虑：**单源、固定强度、二维连续空间、遮挡，无�
 
 ---
 
+## 数据集：下载、安装与使用
+
+已生成的**单源、强度固定为 1 的 RIND 数据集**含 10,000 个场景、180,000 个局部观测，每场景 18 个。每个场景是 1024 × 1024 的连续二维世界，包含障碍物和一个源。源到像素中心的线段未受遮挡时响应为 1，否则为 0；障碍物内部也为 0，并另有障碍物掩码。栅格只规定采样精度，源坐标和障碍物边界始终保持连续。
+
+### 首次安装
+
+1. 从 [Google Drive](https://drive.google.com/file/d/1_zerwmggBskUtPtkhWTb6Xqs4kIU5L5I/view?usp=sharing) 下载 ZIP，直接放到**本 README 与 `pyproject.toml` 所在的项目根目录**，不用手动解压。
+2. 若尚未安装 uv，按 [uv 官方安装说明](https://docs.astral.sh/uv/getting-started/installation/)安装。
+3. 在项目根目录运行：
+
+```bash
+./scripts/install_data.sh
+```
+
+项目声明 **Python >=3.10**，不固定小版本。uv 会选择符合要求的解释器及锁文件中对应的依赖版本；NumPy、Numba 和可选的 PyTorch 仍须支持该解释器和平台。基础读取和重渲染已在 Python 3.12、3.13 实测。已有 `.venv` 会继续使用原来的解释器；需要明确选择其他版本时，例如运行 `UV_PYTHON=3.11 ./scripts/install_data.sh`，uv 可能据此重建环境。
+
+脚本根据 `uv.lock` 在本项目的 `.venv` 中安装模型项目和数据读取器，校验 ZIP 内部的 SHA256 校验和，仅解压数据到 `data/raw/phase1-single-source/`，检查数组形状与源强度，成功后删除 ZIP。校验失败时保留 ZIP 并清理临时解压目录。下载包中的 Python 代码和环境不会被安装。重复运行会检查已有数据，不会重复解压。当前数据及安装过程请预留约 3 GB 空间，基础读取环境还需额外空间；大数组使用内存映射，只在读取时解码需要的窗口。
+
+成功解压后也会删除旁边对应的 `.zip.sha256` 文件（若存在）。已安装数据、`.venv` 和 uv 的共享依赖缓存会保留。若数据已经安装，脚本会跳过解压，不删除后来放入的 ZIP；首次安装时加 `--keep-archive` 也可保留 ZIP。
+
+根目录有多个 ZIP 时，可指定文件；希望保留 ZIP 时加 `--keep-archive`：
+
+```bash
+./scripts/install_data.sh ./RIND-adaptive-v3-10000scenes-single.zip --keep-archive
+```
+
+数据需要放到另一块硬盘时，安装和运行模型均使用同一设置：
+
+```bash
+export RIND_DATA_ROOT=/mnt/data/rind-phase1-single
+./scripts/install_data.sh
+```
+
+也可在安装时使用 `--data-root /path/to/data`，在代码中使用 `Phase1Dataset(root="/path/to/data")`。脚本接受带参考位置的单源发布包，会拒绝多源包。bash 入口适用于 Linux/macOS；等价的 Python 入口是先运行 `uv sync --locked`，再运行 `uv run --no-sync rind-install-data`。
+
+### 浏览已安装的数据
+
+```bash
+./scripts/browser.sh
+```
+
+脚本自动安装可选的 Flask/Pillow 依赖，并在 `http://127.0.0.1:8766` 打开原来的 RIND 可视化页面。它与 `Phase1Dataset` 共用 `data/raw/phase1-single-source/` 或 `RIND_DATA_ROOT` 指定的数据，不需要另一份数据或独立的数据集环境。
+
+页面保留场景缩略图、连续障碍物和源位置叠加、不同尺寸的局部窗口、响应通道选择、诊断筛选和像素响应数值检查。当前为单源、强度固定为 1 的版本，因此总响应与唯一源的贡献相同。
+
+```bash
+./scripts/browser.sh --no-open --port 8770
+./scripts/browser.sh --data-root /path/to/data
+# 安装 browser 可选依赖后的等价 Python 入口：
+uv run --extra browser rind-browser
+```
+
+### 在代码里读取观测
+
+用 `uv run python` 启动 Python，或在 IDE 中选择本项目的 `.venv`：
+
+```python
+from rind_phase1.data import Phase1Dataset
+
+ds = Phase1Dataset()  # 默认安装位置，或 RIND_DATA_ROOT
+print(ds.num_scenes, len(ds))  # 10000 个场景、180000 个观测
+sample = ds[0]
+R = sample["response"]
+window = sample["window"]
+s, v = sample["scene_id"], sample["view_id"]
+print(R.shape, R.dtype)       # (L, L)，float32
+print(window)                # 世界坐标 [x, y, L]
+```
+
+| 观测字段 | 含义 |
+|---|---|
+| `scene_id`、`view_id` | 整数标识，用于匹配教师记录，不作为模型特征 |
+| `response` | NumPy `float32 [L,L]`，原始采样精度下的 0/1 响应 |
+| `window` | NumPy `int64 [3]`，左上角世界坐标 `(x,y)` 和边长 `L` |
+
+`ds[i]` 仅返回这四个字段。学生使用响应和窗口；真实源、参考解与几何通过独立方法取得。数组索引为 `[row,column]`，x 向右、y 向下；像素 `(row,column)` 的采样中心为 `(x+column+0.5,y+row+0.5)`。窗口尺寸有 16、32、64、128、256、512 六种。即使编码器内部缩放图像，也必须保留窗口的原始位置和尺度。
+
+### 按场景划分与 PyTorch DataLoader
+
+训练前确定并保存场景划分。下面的比例只是使用示例，不是已决定的实验协议：
+
+```python
+import json
+from pathlib import Path
+from rind_phase1.data import Phase1Dataset, split_scene_ids, make_dataloader
+
+all_data = Phase1Dataset()
+splits = split_scene_ids(all_data.num_scenes, ratios=(0.8, 0.1, 0.1), seed=20260923)
+Path("data/splits").mkdir(parents=True, exist_ok=True)
+for name, ids in splits.items():
+    Path(f"data/splits/{name}.json").write_text(json.dumps(ids))
+train_data = Phase1Dataset(scene_ids=splits["train"])
+loader = make_dataloader(train_data, batch_size=8, num_workers=0)
+for batch in loader:
+    R = batch["response"]      # torch.float32 [B,L,L]
+    window = batch["window"]   # torch.int64 [B,3]
+    break
+```
+
+PyTorch 为可选依赖，用 `uv sync --locked --extra train` 安装，并用 `uv run --extra train python` 运行上述例子。默认安装仅包含读取器和 CPU 渲染器。`make_dataloader` 按窗口尺寸组批，同一批次可直接堆叠，不需要填充或改变采样精度。每个尺寸组的最后一批可能不足 `batch_size`；每轮调用 `loader.batch_sampler.set_epoch(epoch)` 可得到可复现的新顺序。在使用 spawn 的平台上增大 `num_workers` 时，将 DataLoader 的创建放在 `if __name__ == "__main__":` 内。同一场景的所有窗口必须在同一集合；后续实验读取保存的场景名单，避免每次重新改变划分。
+
+### 参考解、重新渲染与树状读取
+
+```python
+import numpy as np
+
+references = ds.get_candidates(s, v)  # 10 组，每组 float64 [1,3]
+source_xy = references[1][0, :2]      # (x,y)，第 3 列为强度 1
+fresh = ds.rerender(s, sample["window"], source_xy)
+assert np.array_equal(fresh, sample["response"])
+scene = ds.get_scene(s)              # 真实源和连续障碍物几何
+region = ds.get_region(s, 0, 0, 32)  # 独立通道、总响应、障碍物掩码
+root = ds.get_view_tree(s)           # 仅恢复树的元数据，不解码图像
+for leaf in ds.iter_view_leaves(s):
+    observation = ds.get_observation(s, leaf["view_id"])
+```
+
+第 0 组参考解是真实源，其余 9 组位置不同，均位于原含源的 16 × 16 格子内，已逐组验证与当前窗口的采样响应完全一致。它们是兼容位置示例，不是全部逆解，也不是教师概率分布；部分位置差异很小。它们不保证在窗口外或采样中心之间的所有连续位置都产生相同响应。教师搜索仍需覆盖实验规定的候选范围。
+
+`rerender` 在原场景中放置一个强度为 1 的假设源，返回 NumPy `float32 [L,L]`，拒绝世界范围外及障碍物内部的源。搜索模块还需按协议排除观察窗口内部位置。该 CPU NumPy/Numba 渲染器用于教师代价与评价，不能通过它对源坐标反向传播。首次调用可能因 Numba 编译而较慢。几何和参考坐标保留 `float64`，观测响应由适配层转换为 `float32`。
+
+树节点的 `kind` 为 `split`、`view` 或 `occupied`。`view` 叶节点带 `view_id`；`occupied` 是含源的最小格子，不对应观测。四个子节点依次为左上、右上、左下、右下。`iter_view_leaves` 默认仅遍历观测叶节点；使用 `include_occupied=True` 可同时取得含源叶节点。
+
+### 检查安装及以后更新
+
+```bash
+uv run python -m rind_phase1.checks --data-only
+# 可选：检查真正的张量批次和多进程读取
+uv run --extra train python -m rind_phase1.checks --data-only --torch --workers 2
+```
+
+这些命令检查数据读取、场景子集、按尺寸组批、树状恢复和样本参考解重渲染，并不代表教师生成或模型训练已实现。`installation.json` 保存压缩包哈希和环境锁文件哈希。读取器版本保存在 `vendor/rind-dataset/`，运行代码在本仓库更新，并由 uv 锁定依赖。以后的数据版本应安装到新的数据目录并显式选择，以便追溯实验。需要更完整的生成与几何介绍时，可单独阅读下载包中的 Word 指南。
+
 ## 数据与观察窗口
 
 完整场景范围为：
@@ -80,7 +213,7 @@ window = (x, y, size)
 
 真实源坐标和完整场景几何只用于教师监督和评价，不作为学生输入。窗口大小可以不同，必须保留原始空间尺度。单源场景按上述规则从 1024 分割到 16，应产生 18 个无源窗口，可作为检查依据。
 
-本阶段使用**新生成的单源、固定强度数据**，后续运行可读取这份已生成数据。训练、验证、测试始终按 `scene_id` 划分，同一场景的窗口不得跨集合。
+本阶段可直接使用上述**已生成的单源、强度固定为 1 的数据**。实验需要新场景或新协议时再单独生成，并记录来源。训练、验证、测试始终按 `scene_id` 划分，同一场景的窗口不得跨集合。
 
 ---
 
@@ -99,6 +232,8 @@ window = (x, y, size)
 │   └── phase1.json
 ├── src/rind_phase1/
 │   ├── __init__.py
+│   ├── install_data.py
+│   ├── browser.py
 │   ├── data.py
 │   ├── physics.py
 │   ├── search.py
@@ -107,6 +242,10 @@ window = (x, y, size)
 │   ├── train.py
 │   ├── evaluate.py
 │   └── checks.py
+├── scripts/install_data.sh
+├── scripts/browser.sh
+├── vendor/rind-dataset/
+├── uv.lock
 ├── data/
 │   ├── raw/
 │   └── splits/
@@ -126,71 +265,19 @@ window = (x, y, size)
 
 **输入**
 
-```text
-RIND 数据或生成器
-scene 数量
-固定 source intensity
-random seed
-quadtree 设置
-split 设置
-```
+已安装的数据目录、场景名单或划分比例、随机种子和加载参数。当前发布数据为 10,000 个场景，每场景一个强度为 1 的源和 18 个无源窗口。
 
-**这些输入分别做什么、怎么用**
+**已实现**
 
-- **RIND 数据或生成器**：原始 RIND 项目路径、生成接口或已生成实例路径。 提供场景几何和真实响应的来源。
-  **怎么用：**首次调用生成器创建新单源数据；之后读取同一实例。不能用读取已有响应的接口代替改变源后的重渲染。
+`Phase1Dataset`、`split_scene_ids`、`SizeBucketBatchSampler`、`make_dataloader`，以及参考解、场景几何、四分树和重渲染接口。`install_data.py` 负责校验、解压和压缩包清理；读取代码使用本仓库的版本快照。具体调用见前面的使用说明。
 
-- **scene 数量**：需要新生成的独立场景数量，正整数。 确定数据规模和生成成本。
-  **怎么用：**例如设置为 100，就生成 100 个独立场景；每个场景再产生多个观察窗口。这里的 100 是示例，不是已确定的实验规模。生成后核对场景数量。
+**仍需完成的研究接入**
 
-- **固定 source intensity**：所有场景共用的源强度，取 RIND 接受的正值。 隔离强度变化，只研究位置和遮挡。
-  **怎么用：**生成真实响应和候选重渲染时使用完全相同的值；不逐场景随机取值。
+确定并保存实验场景划分，向教师和学生模块提供观测，并记录额外生成的评价场景。先用现有数据接通链路；需要新场景或不同协议时再调用生成器。固定强度和窗口规则以数据清单为准，不能在读取时改成另一套物理假设。
 
-- **random seed**：生成器的随机数种子。 让相同设置的数据生成可复现。
-  **怎么用：**初始化场景生成及相关随机步骤，并随数据保存；种子本身不保证跨划分无重复场景，仍需检查场景身份。
+**输出与目的**
 
-- **quadtree 设置**：世界大小、`min_window_size`、含源分割规则及边界归属规则。 定义哪些区域可以成为观测。
-  **怎么用：**当前从 1024 × 1024 全场开始，含源区域继续四等分，无源区域保存为观察窗口；到 16 × 16 仍含源的区域不保存为观测。
-
-- **split 设置**：训练、验证、测试的比例或显式场景名单。 避免同场景几何泄漏。
-  **怎么用：**按场景分配后保存名单，再让窗口继承所属集合；比例总和应为 1，小规模试验应确认各必要集合非空。
-
-**处理**
-
-- 接入 RIND 生成新的单源、固定强度场景，之后支持读取，不覆盖旧实例；
-- 构造动态四分树 observation；
-- 按 `scene_id` 划分 train / validation / test；
-- 保留窗口的世界坐标和尺度。
-
-**输出**
-
-```python
-{
-    "scene_id": ...,
-    "view_id": ...,
-    "response": ...,
-    "window": [x, y, size]
-}
-```
-
-数据写入：
-
-```text
-data/raw/
-data/splits/
-```
-
-**目的**
-
-建立统一的：
-
-$$
-\text{scene}
-\rightarrow
-\text{local observation}
-$$
-
-数据接口。
+`data/raw/phase1-single-source/` 保存已安装的原生数组，`data/splits/` 保存约定的场景名单。每条观测为 `scene_id`、`view_id`、`response [L,L]` 和 `window [x,y,L]`。建立统一的场景到局部观测接口，并保持世界尺度与场景划分。
 
 ---
 
@@ -713,6 +800,8 @@ Observation
 
 ### `checks.py`
 
+当前已实现 `--data-only` 数据检查；以下研究链路检查仍需各模块负责人继续接入。
+
 **输入**
 
 ```text
@@ -776,11 +865,11 @@ model settings
 training settings
 ```
 
-`null` 表示尚未确定，不是可运行默认值。至少在运行前确定 RIND 路径、固定强度、场景数量及必要的搜索和训练参数。
+`null` 表示尚未确定，不是可运行默认值。数据路径、固定强度 1 和场景数量 10,000 已按当前发布数据填写；研究运行前仍须确定划分、搜索及训练参数。数据类读取数据清单，研究模块需显式读取配置。
 
 ### `data/raw/`
 
-保存本阶段新生成的 RIND 场景，沿用原生数据格式；响应可能以压缩可见性保存并在读取时恢复：
+默认在 `data/raw/phase1-single-source/` 保存安装后的 RIND 原生数组；响应按位压缩保存，并在读取窗口时恢复：
 
 ```text
 scene geometry
@@ -823,7 +912,7 @@ test.json
 
 保存旧版设计、旧模块和不再参与当前 Phase I 的内容。旧文档中的路径和职责不再作为当前任务要求。
 
-`pyproject.toml` 保存项目定义和依赖；`.gitignore` 排除大型产物与缓存；`__init__.py` 标记 Python 包；空目录中的 `.gitkeep` 仅保留目录。
+`pyproject.toml` 与 `uv.lock` 管理模型及读取器环境；`scripts/install_data.sh` 负责安装，`scripts/browser.sh` 负责安装可视化依赖并打开数据，`vendor/rind-dataset/` 保存读取器和可视化页面的版本；`.gitignore` 排除大型产物与缓存；`__init__.py` 标记 Python 包；空目录中的 `.gitkeep` 仅保留目录。
 
 ---
 
@@ -881,7 +970,7 @@ test.json
 
 | 工作 | 文件 | 负责人 | 最小交付 |
 |---|---|---|---|
-| 数据 | `data.py` | 待认领 | 小份新数据、窗口示例及场景划分 |
+| 数据 | `data.py` | Yushu He | 安装已有数据、窗口示例及约定的场景划分 |
 | 物理监督 | `physics.py`、`teacher.py` | 待认领 | 真实源重渲染验证、一个观测的代价与教师分布 |
 | 候选搜索 | `search.py` | 待认领 | 均匀候选基线及自适应搜索的后续交付计划 |
 | 模型与训练 | `model.py`、`train.py` | 待认领 | 不同窗口大小的评分，监督就绪时完成小规模学习 |

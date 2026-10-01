@@ -1,5 +1,198 @@
-"""Prepare new single-source RIND scenes, validate quadtree windows, split by scene, and expose observation records.
+"""Phase I observations, scene subsets, reference sources, and size-aware loading."""
 
-Status: responsibility placeholder, not an implementation.
-See README.md or README.zh-CN.md for inputs, outputs, and completion goals.
-"""
+import math
+import os
+from pathlib import Path
+
+import numpy as np
+from rind_dataset import RINDDataset
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def default_data_root():
+    configured = os.environ.get("RIND_DATA_ROOT")
+    return Path(configured).expanduser().resolve() if configured else (
+        PROJECT_ROOT / "data/raw/phase1-single-source")
+
+
+class Phase1Dataset:
+    """Lazy unit-strength observations; truth is available through separate methods.
+
+    dataset[i] returns scene_id, view_id, response [L,L] float32, and window
+    [3] int64. scene_ids selects whole scenes. Disk arrays stay memory mapped.
+    """
+
+    def __init__(self, root=None, *, scene_ids=None):
+        self.root = Path(root).expanduser().resolve() if root is not None else default_data_root()
+        if not (self.root / "manifest.json").is_file():
+            raise FileNotFoundError(
+                f"RIND data not installed at {self.root}. Place the single-source ZIP "
+                "in the project root and run ./scripts/install_data.sh, or pass root=...")
+        self._base = RINDDataset(self.root)
+        m = self._base.manifest
+        if (m.get("max_drivers") != 1 or m.get("driver_strength_mode") != "fixed-one" or
+                m.get("candidate_layout") != "single-position-list"):
+            raise ValueError("Phase I requires schema-v3 unit-strength single-source data with references")
+        if scene_ids is None:
+            self.scene_ids = np.arange(self.num_scenes, dtype=np.int64)
+        else:
+            ids = np.asarray(scene_ids)
+            if ids.ndim != 1 or (ids.size and ids.dtype.kind not in "iu"):
+                raise ValueError("scene_ids must be a one-dimensional integer sequence")
+            self.scene_ids = ids.astype(np.int64)
+            if (np.any(self.scene_ids < 0) or np.any(self.scene_ids >= self.num_scenes) or
+                    len(np.unique(self.scene_ids)) != len(self.scene_ids)):
+                raise ValueError("scene_ids must be unique and within the dataset")
+        self._selected_scenes = set(self.scene_ids.tolist())
+        self._offsets = np.concatenate(([0], np.cumsum(
+            self._base.view_counts[self.scene_ids], dtype=np.int64)))
+
+    @property
+    def num_scenes(self):
+        """Total release scenes; len(scene_ids) is the selected scene count."""
+        return self._base.num_scenes
+
+    @property
+    def manifest(self):
+        return dict(self._base.manifest)
+
+    def __len__(self):
+        return int(self._offsets[-1])
+
+    def _identity(self, index):
+        if not isinstance(index, (int, np.integer)):
+            raise TypeError("Observation index must be an integer")
+        if index < 0:
+            index += len(self)
+        if index < 0 or index >= len(self):
+            raise IndexError("Observation index out of range")
+        selected = int(np.searchsorted(self._offsets, index, side="right") - 1)
+        return int(self.scene_ids[selected]), int(index - self._offsets[selected])
+
+    def __getitem__(self, index):
+        return self.get_observation(*self._identity(index))
+
+    def _check_selected(self, scene_id):
+        if scene_id not in self._selected_scenes:
+            raise IndexError(f"Scene {scene_id} is outside this dataset subset")
+
+    def get_observation(self, scene_id, view_id):
+        self._check_selected(scene_id)
+        item = self._base.get_view(scene_id, view_id)
+        return {"scene_id": int(scene_id), "view_id": int(view_id),
+                "response": item["response"].astype(np.float32),
+                "window": item["view"].astype(np.int64)}
+
+    def get_candidates(self, scene_id, view_id):
+        """Reference sets [1,3] float64: (world_x, world_y, strength=1)."""
+        self._check_selected(scene_id)
+        return self._base.get_candidates(scene_id, view_id)
+
+    def get_scene(self, scene_id):
+        """Continuous truth for teacher/evaluation use."""
+        self._check_selected(scene_id)
+        return self._base.get_scene(scene_id)
+
+    def get_region(self, scene_id, x, y, width, height=None):
+        """Teacher/diagnostic response channels and obstacle mask for any rectangle."""
+        self._check_selected(scene_id)
+        return self._base.get_region(scene_id, x, y, width, height)
+
+    def get_view_tree(self, scene_id):
+        self._check_selected(scene_id)
+        return self._base.get_view_tree(scene_id)
+
+    def iter_view_leaves(self, scene_id, *, include_occupied=False):
+        self._check_selected(scene_id)
+        return self._base.iter_view_leaves(scene_id, include_occupied=include_occupied)
+
+    def rerender(self, scene_id, window, source_xy, *, backend="auto"):
+        """Render one unit-strength source; return float32 [L,L].
+
+        The CPU geometry renderer is not differentiable. Invalid source
+        positions (inside obstacles or outside the world) are rejected.
+        """
+        self._check_selected(scene_id)
+        window = np.asarray(window)
+        if window.shape != (3,) or window.dtype.kind not in "iu":
+            raise ValueError("window must contain three integers (x,y,L)")
+        source_xy = np.asarray(source_xy, dtype=np.float64)
+        if source_xy.shape == (2,):
+            source_xy = source_xy[None, :]
+        if source_xy.shape != (1, 2):
+            raise ValueError("Phase I rerender expects exactly one source_xy [2] or [1,2]")
+        x, y, side = map(int, window)
+        result = self._base.rerender_region(scene_id, x, y, side,
+                                           drivers=source_xy, strengths=np.ones(1),
+                                           backend=backend)
+        return result["response"].astype(np.float32)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop("_base")
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._base = RINDDataset(self.root)
+
+
+def split_scene_ids(num_scenes, *, ratios, seed=20260923):
+    """Deterministically split whole scenes; ratios are an explicit experiment choice."""
+    weights = np.asarray(ratios, dtype=np.float64)
+    if (num_scenes <= 0 or weights.shape != (3,) or not np.isfinite(weights).all() or
+            np.any(weights < 0) or not np.isclose(weights.sum(), 1, rtol=0, atol=1e-10)):
+        raise ValueError("Provide positive num_scenes and three nonnegative ratios summing to 1")
+    ids = np.random.default_rng(seed).permutation(num_scenes)
+    a = int(num_scenes * weights[0])
+    b = a + int(num_scenes * weights[1])
+    return {"train": ids[:a].tolist(), "validation": ids[a:b].tolist(),
+            "test": ids[b:].tolist()}
+
+
+class SizeBucketBatchSampler:
+    """Batch equal-size views without decoding response images."""
+
+    def __init__(self, dataset, batch_size, *, shuffle=True, seed=20260923, drop_last=False):
+        if not isinstance(batch_size, int) or batch_size <= 0:
+            raise ValueError("batch_size must be a positive integer")
+        self.batch_size, self.shuffle, self.seed = batch_size, shuffle, seed
+        self.drop_last, self.epoch = drop_last, 0
+        sizes = np.concatenate([
+            dataset._base.local_views[s, :int(dataset._base.view_counts[s]), 2]
+            for s in dataset.scene_ids]) if len(dataset.scene_ids) else np.empty(0)
+        self.buckets = [np.flatnonzero(sizes == size) for size in np.unique(sizes)]
+
+    def set_epoch(self, epoch):
+        self.epoch = epoch
+
+    def __len__(self):
+        return sum(len(b) // self.batch_size if self.drop_last else
+                   math.ceil(len(b) / self.batch_size) for b in self.buckets)
+
+    def __iter__(self):
+        rng = np.random.default_rng(self.seed + self.epoch)
+        batches = []
+        for bucket in self.buckets:
+            indices = rng.permutation(bucket) if self.shuffle else bucket
+            for start in range(0, len(indices), self.batch_size):
+                batch = indices[start:start + self.batch_size].tolist()
+                if not self.drop_last or len(batch) == self.batch_size:
+                    batches.append(batch)
+        if self.shuffle:
+            rng.shuffle(batches)
+        yield from batches
+
+
+def make_dataloader(dataset, *, batch_size=8, shuffle=True, seed=20260923,
+                    num_workers=0, drop_last=False, pin_memory=False):
+    """Return torch batches: response [B,L,L], window [B,3], IDs [B]."""
+    try:
+        from torch.utils.data import DataLoader
+    except ImportError as exc:
+        raise ImportError("PyTorch is optional. Run uv sync --locked --extra train") from exc
+    sampler = SizeBucketBatchSampler(dataset, batch_size, shuffle=shuffle,
+                                     seed=seed, drop_last=drop_last)
+    return DataLoader(dataset, batch_sampler=sampler, num_workers=num_workers,
+                      pin_memory=pin_memory)

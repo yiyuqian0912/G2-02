@@ -1,1 +1,1 @@
-"""RIND Phase I research package scaffold; implementations are pending."""
+"""RIND Phase I: data access is implemented; research stages remain pending."""
