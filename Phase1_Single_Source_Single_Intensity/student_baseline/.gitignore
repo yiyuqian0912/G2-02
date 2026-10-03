@@ -1,0 +1,35 @@
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.uv-cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Local datasets and experiment artifacts
+/data/
+/datasets/
+/outputs/
+*.pt
+*.pth
+*.ckpt
+*.log
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.zip
+*.zip.sha256
+
+# macOS metadata
+.DS_Store
+._*

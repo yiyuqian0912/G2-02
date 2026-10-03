@@ -1,0 +1,15 @@
+{
+  "base_config": {
+    "epochs": 120,
+    "batch_size": 4,
+    "candidate_count": 64,
+    "teacher_temperature": 0.1,
+    "validation_interval": 40,
+    "checkpoint_interval": 40,
+    "random_seed": 0
+  },
+  "trials": [
+    {"name": "mock-hidden64", "mock": true, "config": {"hidden_dim": 64}},
+    {"name": "mock-hidden128", "mock": true, "config": {"hidden_dim": 128}}
+  ]
+}
