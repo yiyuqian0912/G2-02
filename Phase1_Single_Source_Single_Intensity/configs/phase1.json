@@ -1,5 +1,5 @@
 {
-  "status": "planning_only_not_a_runnable_experiment",
+  "status": "uniform_teacher_ready_student_pending",
   "seed": 20260923,
   "data": {
     "dataset_root": "data/raw/phase1-single-source",
@@ -16,6 +16,7 @@
   "student": {
     "inputs": [
       "response",
+      "obstacle",
       "window_x",
       "window_y",
       "window_size"
@@ -31,18 +32,17 @@
     "baseline": "uniform_candidates_response_only",
     "alpha": 1.0,
     "beta": 0.0,
-    "boundary_lambda": null,
+    "boundary_lambda": 0.0,
     "boundary_sigma": null,
     "temperature": null,
     "adaptive_search": false,
-    "candidate_domain": "world_outside_observation_and_obstacles",
-    "window_parent_restriction": false,
     "adaptive_budget": null,
-    "candidate_weighting": "equal_per_retained_candidate",
+    "candidate_weighting": "equal_per_valid_uniform_grid_point",
     "adaptive_comparison_required": true,
-    "target_semantics": "fixed_window_discrete_candidate_compatibility",
+    "target_semantics": "fixed_window_world_discrete_compatibility",
     "candidate_spacing": null,
-    "final_candidate_spacing": null
+    "final_candidate_spacing": null,
+    "quadtree_prior": false
   },
   "training": {
     "device": null,

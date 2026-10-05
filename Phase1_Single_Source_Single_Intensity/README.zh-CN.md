@@ -2,25 +2,26 @@
 
 [English](README.md) | 中文
 
-**当前状态：**ZIP 安装、数据读取、本地可视化、场景子集、按尺寸组批和参考解重渲染已实现。物理代价、搜索、教师、学生、训练和评价仍是待实现的研究任务。数据检查通过不表示研究链路已完成。
+**当前状态：**ZIP 安装、数据读取、本地可视化、场景子集、按尺寸组批和参考解重渲染已实现。均匀源空间搜索、响应物理代价、稳定的软教师分布、记录存取和逆空间诊断也已实现。自适应剪枝、边界损失、学生模型、训练与学生评价仍待完成。
 
-补充文档：[数学定义与方法细节](docs/method.md) · [模块数据接口](docs/interfaces.md)。两份文档目前为英文，已与当前八个核心文件的职责和字段对齐。
+补充文档：[数学定义与方法细节](docs/method.md) · [模块数据接口](docs/interfaces.md)。另有 [教师基线使用与解释](docs/teacher-baseline.md)，包含可运行命令、Python 调用、记录读取和诊断解释。
 
 ## 项目目标
 
 RIND Phase I 研究二维遮挡环境中的逆问题：
 
-> 给定局部响应和观察窗口的位置，预测能够解释当前观测的源位置分布。
+> 给定局部响应、局部障碍物掩码和观察窗口的位置，预测能够解释当前观测的源位置分布。
 
 我们不直接回归唯一源坐标，而是学习连续二维源空间中的兼容性：
 
 $$
-O=(R,v), \qquad v=(x,y,\text{size})
+O=(R,M,v), \qquad v=(x,y,\text{size})
 $$
 
 其中：
 
 - $R$：局部响应；
+- $M$：仅当前窗口内的障碍物掩码；
 - $v$：窗口位置和大小；
 - $s=(s_x,s_y)$：候选源位置。
 
@@ -43,7 +44,7 @@ $$
 - $E_\theta(O,s)$：学生条件能量；
 - $p_\theta(s\mid O)$：学生预测分布。
 
-物理教师可以访问完整场景和障碍物，并通过 RIND 重渲染候选位置；学生只使用局部响应、窗口信息和候选坐标。训练完成后，学生不再需要逐候选调用物理渲染。
+物理教师可以访问完整场景和障碍物，并通过 RIND 重渲染候选位置；学生只使用局部响应、局部障碍物掩码、窗口信息和候选坐标，不接收窗外障碍物或完整场景几何。训练完成后，学生不再需要逐候选调用物理渲染。
 
 Phase I 只考虑：**单源、固定强度、二维连续空间、遮挡，无距离衰减、反射、噪声和材料差异。**
 
@@ -112,6 +113,7 @@ ds = Phase1Dataset()  # 默认安装位置，或 RIND_DATA_ROOT
 print(ds.num_scenes, len(ds))  # 10000 个场景、180000 个观测
 sample = ds[0]
 R = sample["response"]
+M = sample["obstacle"]        # bool [L,L]，仅局部窗口
 window = sample["window"]
 s, v = sample["scene_id"], sample["view_id"]
 print(R.shape, R.dtype)       # (L, L)，float32
@@ -122,9 +124,10 @@ print(window)                # 世界坐标 [x, y, L]
 |---|---|
 | `scene_id`、`view_id` | 整数标识，用于匹配教师记录，不作为模型特征 |
 | `response` | NumPy `float32 [L,L]`，原始采样精度下的 0/1 响应 |
+| `obstacle` | NumPy `bool [L,L]`，true 表示窗口内障碍物 |
 | `window` | NumPy `int64 [3]`，左上角世界坐标 `(x,y)` 和边长 `L` |
 
-`ds[i]` 仅返回这四个字段。学生使用响应和窗口；真实源、参考解与几何通过独立方法取得。数组索引为 `[row,column]`，x 向右、y 向下；像素 `(row,column)` 的采样中心为 `(x+column+0.5,y+row+0.5)`。窗口尺寸有 16、32、64、128、256、512 六种。即使编码器内部缩放图像，也必须保留窗口的原始位置和尺度。
+`ds[i]` 返回这五个字段。学生使用响应、局部掩码和窗口；真实源、参考解、完整几何与窗外障碍物仅供教师/评价，通过独立方法取得。数组索引为 `[row,column]`，x 向右、y 向下；像素 `(row,column)` 的采样中心为 `(x+column+0.5,y+row+0.5)`。窗口尺寸有 16、32、64、128、256、512 六种。即使编码器内部缩放图像，也必须保留窗口的原始位置和尺度。
 
 ### 按场景划分与 PyTorch DataLoader
 
@@ -144,6 +147,7 @@ train_data = Phase1Dataset(scene_ids=splits["train"])
 loader = make_dataloader(train_data, batch_size=8, num_workers=0)
 for batch in loader:
     R = batch["response"]      # torch.float32 [B,L,L]
+    M = batch["obstacle"]      # torch.bool [B,L,L]，仅局部
     window = batch["window"]   # torch.int64 [B,3]
     break
 ```
@@ -166,7 +170,7 @@ for leaf in ds.iter_view_leaves(s):
     observation = ds.get_observation(s, leaf["view_id"])
 ```
 
-第 0 组参考解是真实源，其余 9 组位置不同，均位于原含源的 16 × 16 格子内，已逐组验证与当前窗口的采样响应完全一致。它们是兼容位置示例，不是全部逆解，也不是教师概率分布；部分位置差异很小。它们不保证在窗口外或采样中心之间的所有连续位置都产生相同响应。教师搜索仍需覆盖实验规定的候选范围。
+第 0 组参考解是真实源，其余 9 组位置不同，均位于原含源的 16 × 16 格子内，已逐组验证与当前窗口的采样响应完全一致。它们是兼容位置示例，不是全部逆解，也不是教师概率分布；部分位置差异很小。它们不保证在窗口外或采样中心之间的所有连续位置都产生相同响应。教师搜索仍需覆盖实验规定的候选范围。不能把这十个位置追加到均匀网格后归一化，也不能把它们直接当作概率目标。
 
 `rerender` 在原场景中放置一个强度为 1 的假设源，返回 NumPy `float32 [L,L]`，拒绝世界范围外及障碍物内部的源。搜索模块还需按协议排除观察窗口内部位置。该 CPU NumPy/Numba 渲染器用于教师代价与评价，不能通过它对源坐标反向传播。首次调用可能因 Numba 编译而较慢。几何和参考坐标保留 `float64`，观测响应由适配层转换为 `float32`。
 
@@ -180,7 +184,35 @@ uv run python -m rind_phase1.checks --data-only
 uv run --extra train python -m rind_phase1.checks --data-only --torch --workers 2
 ```
 
-这些命令检查数据读取、场景子集、按尺寸组批、树状恢复和样本参考解重渲染，并不代表教师生成或模型训练已实现。`installation.json` 保存压缩包哈希和环境锁文件哈希。读取器版本保存在 `vendor/rind-dataset/`，运行代码在本仓库更新，并由 uv 锁定依赖。以后的数据版本应安装到新的数据目录并显式选择，以便追溯实验。需要更完整的生成与几何介绍时，可单独阅读下载包中的 Word 指南。
+这些命令检查全部窗口的父格含源/观测窗无源规则、局部掩码、场景子集、组批、树状恢复和样本参考解。教师链路使用下面独立的 `--teacher` 检查；模型训练仍待实现。`installation.json` 保存压缩包哈希和环境锁文件哈希。读取器版本保存在 `vendor/rind-dataset/`，运行代码在本仓库更新，并由 uv 锁定依赖。以后的数据版本应安装到新的数据目录并显式选择，以便追溯实验。需要更完整的生成与几何介绍时，可单独阅读下载包中的 Word 指南。
+
+## 均匀物理教师：生成与读取
+
+本任务明确研究**窗口外的源**。默认候选范围为 `world \ W`，即整个世界减去观测窗。quadtree 用于提供数据窗口，主教师不要求候选源能够重新生成相同的叶节点。完整几何由教师用于排除非法源；`--prior parent` 仅用于显式开启父格减观测窗的可选消融。十个参考解只用于独立检查和叠加显示。
+
+```bash
+uv sync --locked --inexact --extra diagnostics
+# 间距和温度只是运行示例，不是已确定的实验默认值：
+NUMBA_NUM_THREADS=2 uv run --no-sync rind-teacher \
+  --scene-id 0 --view-id 4 --spacing 64 --temperature 0.05 --plot \
+  --output outputs/teachers/example-world.npz
+NUMBA_NUM_THREADS=2 uv run --no-sync python -m rind_phase1.checks --teacher
+```
+
+输出包括压缩 NPZ 教师记录、JSON 诊断报告和六面板 PNG。物理代价为响应不一致的采样像素比例；完成全部候选评价后，在有效候选上稳定归一化 `exp(-cost/tau)`。不加面积权重，也不使用真实源标签。预算不足导致未完成、或没有有效候选时明确失败。配置中的间距和温度仍为 `null`，必须显式选择。
+
+```python
+from rind_phase1.teacher import load_teacher_record
+from rind_phase1.diagnostics import grid_from_record
+record = load_teacher_record("outputs/teachers/example-world.npz")
+xy = record["candidate_xy"]     # [N,2] 世界坐标，固定顺序
+cost = record["physical_cost"]  # [N] 原始物理代价
+q = record["teacher_prob"]      # [N] 软教师目标，无效候选为 0
+valid = record["valid"]
+cost_map = grid_from_record(record).as_map(cost)
+```
+
+同一教师支持 16、32、64、128、256、512 六种窗口：按原始尺寸重渲染，以 `L²` 归一化不一致像素数，不需要为不同大小另建教师。大窗口的计算量更高。[详细使用说明](docs/teacher-baseline.md) 包含 Python 直接生成、网格恢复、元数据、参考解检查、零代价连通区域、熵和不同窗口大小的比较。粗网格没有零代价点时，不能据此认为连续逆解为空，也不能通过追加参考解修补教师分布。
 
 ## 数据与观察窗口
 
@@ -208,6 +240,7 @@ $$
 scene_id
 view_id
 response
+obstacle = local obstacle mask
 window = (x, y, size)
 ```
 
@@ -227,7 +260,8 @@ window = (x, y, size)
 ├── .gitignore
 ├── docs/
 │   ├── method.md
-│   └── interfaces.md
+│   ├── interfaces.md
+│   └── teacher-baseline.md
 ├── configs/
 │   └── phase1.json
 ├── src/rind_phase1/
@@ -241,6 +275,7 @@ window = (x, y, size)
 │   ├── model.py
 │   ├── train.py
 │   ├── evaluate.py
+│   ├── diagnostics.py
 │   └── checks.py
 ├── scripts/install_data.sh
 ├── scripts/browser.sh
@@ -277,178 +312,61 @@ window = (x, y, size)
 
 **输出与目的**
 
-`data/raw/phase1-single-source/` 保存已安装的原生数组，`data/splits/` 保存约定的场景名单。每条观测为 `scene_id`、`view_id`、`response [L,L]` 和 `window [x,y,L]`。建立统一的场景到局部观测接口，并保持世界尺度与场景划分。
+`data/raw/phase1-single-source/` 保存已安装的原生数组，`data/splits/` 保存约定的场景名单。每条观测为 `scene_id`、`view_id`、`response [L,L]`、局部 `obstacle [L,L]` 和 `window [x,y,L]`。建立统一的场景到局部观测接口，并保持世界尺度与场景划分。
 
 ---
 
 ### `physics.py`
 
-**输入**
+**输入与用途**
+
+- 当前场景的连续障碍物几何：教师用它判断源是否合法和射线遮挡，不交给学生。
+- 观测响应与 `[x,y,L]`：确定重渲染区域、像素中心及比较目标。
+- 一个候选 `[sx,sy]`：在原场景放置唯一强度为 1 的源。
+
+**当前实现**
+
+`PhysicalEvaluator(ds,scene_id,view_id).evaluate(xy)` 返回几何有效性、物理代价、是否缓存命中和本次新增渲染次数。候选范围/观测窗排除由搜索模块负责；非法几何位置不渲染。完全相同坐标复用缓存，渲染计数只包含真正的新评价。
 
 ```text
-scene geometry
-observed response
-window
-candidate source coordinate
-fixed source intensity
-physics loss settings
+C(s) = mean(abs(rerendered_response(s) - observed_response))
+     = 不一致的采样像素数量 / L²
 ```
 
-**这些输入分别做什么、怎么用**
+所有像素等权，包含双方响应都为零的障碍物像素。二值数据的代价在 `[0,1]`，零表示当前采样观测完全相等。`check_reference_solutions` 单独验证十个参考解全部为零代价；这些位置不进入教师候选构造。
 
-- **scene geometry**：通过 `scene_id` 取得的连续障碍物类型、位置及形状参数。 决定候选源到窗口各位置的遮挡关系。
-  **怎么用：**传给 RIND 重渲染并检查候选位置是否合法；仅教师和离线评价使用，不送入学生编码器。
+`CandidateEvaluator.evaluate(xy) -> CandidateEvaluation` 是小型显式接口，可用合成评价器独立测试搜索和教师。
 
-- **observed response**：观测数组 `response[size,size]`。 作为候选解释要匹配的目标。
-  **怎么用：**与候选响应逐位置比较，并从它提取边界权重；权重不能由候选响应决定。
+**后续研究**
 
-- **window**：`[x,y,size]`，世界坐标中的左上角与边长。 指定要重渲染哪一块区域。
-  **怎么用：**所有候选都渲染同一窗口并保持像素中心约定，使候选和真实响应逐像素对齐。
-
-- **candidate source coordinate**：一个世界坐标 `[sx,sy]`，批量时为 `[N,2]`。 代表待验证的源位置假设。
-  **怎么用：**先检查在世界内、窗口外及障碍物外，再将唯一源放到该位置渲染；不移动窗口或障碍物。
-
-- **fixed source intensity**：与生成真实响应完全一致的强度。 保证代价反映位置差异，而非强度不一致。
-  **怎么用：**将它与候选坐标组合为 RIND 所需的源参数，每个候选保持不变。
-
-- **physics loss settings**：`alpha`、`beta`、`boundary_lambda`、`boundary_sigma`，以及边界提取、距离单位和空边界约定。 决定像素差异与边界几何差异如何评价。
-  **怎么用：**`lambda` 控制边界附近加权幅度，`sigma` 控制范围，`alpha/beta` 汇总两项代价；`beta=0` 时跳过边界项。所有候选使用同一设置。
-
-**处理**
-
-将候选源 $s$ 放入原场景重新渲染：
-
-$$
-s \rightarrow \hat R(s)
-$$
-
-再比较真实响应 $R$ 与候选响应 $\hat R(s)$。
-
-基础代价是边界加权的响应误差：
-
-$$
-L_{\text{resp}}(s)
-=\frac{\sum_u w(u)|\hat R(s)(u)-R(u)|}{\sum_u w(u)}
-$$
-
-其中权重仅由真实响应的边界确定：
-
-$$
-w(u)=1+\lambda\exp\left(-\frac{d(u)^2}{2\sigma^2}\right)
-$$
-
-$d(u)$ 是像素到最近真实响应边界的距离。没有有效边界时使用均匀权重。固定强度应满足 `0 < intensity ≤ 1` 且为 RIND 接口接受的值；`α>0`、`β≥0`、`λ≥0`、`σ>0`。强度为零会使所有候选响应退化为零，不用于本阶段。
-
-可选边界项直接比较两组边界的空间位置：
-
-$$
-L_{\text{edge}}(s)=D(E_R,E_s)+D(E_s,E_R)
-$$
-
-$E_R$ 与 $E_s$ 分别为真实响应和候选响应的边界；$D$ 表示单向边界距离。需统一距离单位，并明确边界为空、缺失或额外出现时的结果。
-
-最终：
-
-$$
-C(s;O)
-=
-\alpha L_{\text{resp}}(s)
-+
-\beta L_{\text{edge}}(s)
-$$
-
-其中 `β=0` 对应 response-only baseline。先验证真实源能够重现观测；无效源不参与重渲染，`valid=False`，其代价不进入分布归一化。边界项关闭时 `L_edge` 可为空，并记录是否计算。
-
-**输出**
-
-```text
-candidate_xy
-candidate_response
-L_resp
-L_edge
-physical_cost
-valid
-```
-
-**目的**
-
-建立：
-
-$$
-s \rightarrow C(s;O)
-$$
-
-即用物理模型评价某个候选源能否解释当前观测。
+提案的边界加权响应与边界距离尚未实现。本基线为 `alpha=1,lambda=0,beta=0`。启用更复杂代价之前，需约定边界提取、距离单位、裁剪边缘与空/缺失/额外边界处理；一条教师记录中的所有候选必须使用相同代价定义。
 
 ---
 
 ### `search.py`
 
-**输入**
+**输入与用途**
 
-```text
-world bounds
-observation window
-candidate spacing
-search budget
-physics evaluator
-optional scene geometry
-```
+- `CandidateDomain(window,world_size,quadtree_prior=False)`：默认采用世界减观测窗。显式设为 true 时启用父格减观测窗的可选消融。
+- `spacing`：世界坐标中的候选间距，独立于响应采样精度。
+- 物理评价器：提供每个坐标的有效性和响应代价。
+- 可选 `max_evaluations`：实际新增物理渲染预算；未完成结果不能生成最终教师目标。
 
-**这些输入分别做什么、怎么用**
+**当前实现**
 
-- **world bounds**：允许搜索的全场边界，当前为 `[0,1024]²`。 限定候选位置的外部范围。
-  **怎么用：**建立初始网格与空间单元；所有细分单元都不得越界。
+构造全局锚定的 `((kx+0.5)*spacing,(ky+0.5)*spacing)` 网格，按 y 后 x 升序排列。先排除空间范围之外的候选，再评价几何与响应。返回坐标、有效性、已评价标记、原始代价、完成状态、新渲染/缓存次数与时间。`grid.as_map(values)` 恢复源空间图，观测窗位置为空值。
 
-- **observation window**：当前观测的 `[x,y,size]`。 排除已知不含源的观察区域。
-  **怎么用：**从搜索范围中排除窗口内部并处理跨边界单元；默认不追加父节点范围限制。
+同一间距下父格候选是世界候选的子集。分割线归右/下，世界最外边界归末端格。`deduplicate_candidates` 对完全相同坐标按首次出现去重。
 
-- **candidate spacing**：世界坐标单位下的初始网格步长，对应配置 `candidate_spacing`。 控制初始覆盖精度和候选数量。
-  **怎么用：**按此步长构造粗网格及单元边界；步长越小通常候选越多。它不是响应图的像素分辨率。
+**后续研究**
 
-- **search budget**：自适应模式下允许的物理候选评价次数上限，对应 `adaptive_budget`。 控制教师构造成本。
-  **怎么用：**在选择继续细分的区域时检查剩余预算；按评价过的候选计数，批量调用不算作一次候选评价。重算和边界项成本另行记录。
-
-- **physics evaluator**：由 `physics.py` 提供、绑定了当前场景、观测和强度的评价能力。 告诉搜索过程哪些区域更能解释观测。
-  **怎么用：**给它候选坐标，取得有效性与代价，用于筛选和细化；缓存结果供教师复用。
-
-- **optional scene geometry**：当前场景的障碍物信息；也可封装在物理评价器内部。 提前排除非法候选。
-  **怎么用：**只在教师搜索中使用；若不直接传入，应由评价器完成几何检查。无几何部署不能复用这条教师搜索路径。
-
-**处理**
-
-先提供均匀网格候选，再扩展到 coarse-to-fine 自适应搜索：
-
-```text
-coarse sampling
-→ physics evaluation
-→ select promising regions
-→ refine
-```
-
-当前不乘候选面积权重。Coarse-to-fine 先排除明显不匹配区域，再细化保留区域；最终分布只在保留的有效候选之间比较兼容性。通过 `final_candidate_spacing` 约定最终细化目标，尽量让保留区域达到相同的最终采样间距，并去除重复坐标，避免某个区域仅因采样更密或重复出现而获得更多概率。
-
-该分布是候选集合上的相对分布，不是全场连续概率密度。被错误排除的合理区域无法由后续 softmax 恢复，因此需要用共同的均匀参考网格检查搜索遗漏。搜索内部可以保留区域边界和细分层级，但它们不是教师或学生概率归一化的必需输入。
-
-候选应在世界范围内、观察窗口外；教师使用场景几何排除障碍物内部位置。保持必要的粗覆盖并检查遗漏的可行区域；仅对保留区域归一化时，应明确结果针对的是该候选覆盖范围。最终候选使用一致的物理代价，不能直接混合仅响应项与已加入边界项的评分。
-
-**输出**
-
-```text
-candidate_xy
-valid
-physical_cost
-search_level
-num_physics_evaluations
-```
-
-**目的**
-
-把连续源空间转换为有限候选集合，同时降低物理评价成本。
+先通过均匀代价图了解多解形状，再决定 coarse-to-fine 策略。不能假设单峰、只细化最好区域，或把粗细过程点直接混合进教师 softmax。搜索轨迹与最终支持集需要分开；声明完成时最终间距应一致，缓存/去重并按真实渲染计数。质量必须与共同均匀参考支持比较。当前没有自适应剪枝算法。
 
 ---
 
 ### `teacher.py`
+
+**已实现：**完成的均匀代价转稳定的有效候选软分布、NPZ 存取、实际配置和数据/代码版本追溯，以及 `rind-teacher` 命令。`diagnostics.py` 提供局部响应/掩码、代价/零代价/概率图、参考解叠加、采样连通区域与熵。
 
 **输入**
 
@@ -467,7 +385,7 @@ config_id
   **怎么用：**按原顺序保存；与所有候选数组一一对应，不单独重排。
 
 - **physical_cost**：`[N]` 最终物理代价。 确定候选对观测的解释程度。
-  **怎么用：**在有效候选上计算 `exp(-cost/temperature)`；保留原代价用于绝对一致性评价。
+  **怎么用：**在有效候选上先减去最小代价，再计算 `exp(-(cost-min_cost)/temperature)`，避免小温度下溢；保留原代价用于绝对一致性评价。
 
 - **valid**：`[N]` 布尔值，标记该候选是否属于所声明的有效范围。 排除不能作为源假设的位置。
   **怎么用：**只对有效项归一化，无效项概率为零；全无效时报告失败。
@@ -540,6 +458,7 @@ $$
 ```text
 model config（初始化时使用）
 local response
+local obstacle mask
 window = (x, y, size)
 candidate_xy
 valid
@@ -553,6 +472,9 @@ valid
 - **local response**：`[size,size]` 的观测数组。 提供遮挡形状与有效边界等局部信息。
   **怎么用：**输入观测编码器；不同大小样本可按大小分组，或填充并屏蔽填充值。不能让填充区域被当作零响应证据。
 
+- **local obstacle mask**：`obstacle[size,size]` 布尔数组，仅包含当前窗口。
+  **怎么用：**与局部响应共同作为观测条件；禁止读取窗外掩码或完整几何作为学生特征。
+
 - **window = (x, y, size)**：`[x,y,size]`。 告诉模型局部响应在世界中的位置和实际范围。
   **怎么用：**将位置及大小交给窗口编码部分，与响应表示组合；内部坐标按统一 `coordinate_scale=1024` 归一化，保存记录仍用世界坐标。
 
@@ -562,14 +484,14 @@ valid
 - **valid**：当前预测候选集合的有效性标记。 规定分布归一化范围。
   **怎么用：**仅用于将能量转为概率，不送入编码器。教师辅助评价可用教师掩码；无几何预测只能使用公开可知的范围约束。
 
-**不作为学生特征：**真实源、场景 ID、完整场景几何、障碍物掩码、教师物理代价和完整四分树。`valid` 是归一化元数据，不能作为额外的几何编码输入。
+**不作为学生特征：**真实源、场景 ID、完整场景几何、窗外障碍物掩码、教师物理代价和完整四分树。`valid` 是归一化元数据，不能作为额外的几何编码输入。
 
 **处理**
 
 首先编码 observation：
 
 $$
-R \rightarrow h_R
+(R,M) \rightarrow h_{RM}
 $$
 
 同时编码窗口位置和大小：
@@ -581,7 +503,7 @@ $$
 得到：
 
 $$
-h_O=f(h_R,h_v)
+h_O=f(h_{RM},h_v)
 $$
 
 候选坐标使用 Fourier features：
@@ -596,7 +518,7 @@ $$
 E_\theta(O,s)
 $$
 
-能量越低表示候选越合理。能量函数本身只接收响应、窗口信息和候选坐标；`valid` 用于随后将评分转成分布，不作为编码特征。模型应支持不同窗口大小，并能查询新的连续坐标。
+能量越低表示候选越合理。能量函数本身只接收响应、局部掩码、窗口信息和候选坐标；`valid` 用于随后将评分转成分布，不作为编码特征。模型应支持不同窗口大小，并能查询新的连续坐标。
 
 在有效候选集合上归一化，无效候选概率为 0：
 
@@ -645,7 +567,7 @@ training config
 
 **这些输入分别做什么、怎么用**
 
-- **observation**：训练或验证集合中的响应、窗口及样本标识。 提供学生条件输入，并确定监督记录。
+- **observation**：训练或验证集合中的响应、局部掩码、窗口及样本标识。 提供学生条件输入，并确定监督记录。
   **怎么用：**用标识匹配教师记录，只将响应和窗口送入模型；训练集用于更新，验证集用于选择模型。
 
 - **teacher candidate set**：教师记录中的 `candidate_xy`，附带对应空间单元信息。 确定这一训练样本需要比较的位置。
@@ -800,7 +722,7 @@ Observation
 
 ### `checks.py`
 
-当前已实现 `--data-only` 数据检查；以下研究链路检查仍需各模块负责人继续接入。
+已实现 `--data-only` 数据检查和 `--teacher` 均匀教师联调检查；后者覆盖六种窗口、六十个精确参考解、坐标/代价对应、归一化、几何排除、缓存计数与记录存取。学生链路检查仍待接入。
 
 **输入**
 
@@ -865,7 +787,7 @@ model settings
 training settings
 ```
 
-`null` 表示尚未确定，不是可运行默认值。数据路径、固定强度 1 和场景数量 10,000 已按当前发布数据填写；研究运行前仍须确定划分、搜索及训练参数。数据类读取数据清单，研究模块需显式读取配置。
+`null` 表示尚未确定，不是可运行默认值。数据路径、固定强度 1 和场景数量 10,000 已按当前发布数据填写；主实验关闭 `quadtree_prior`，研究窗口外源的全世界兼容性；基线使用均匀响应代价。候选间距、温度、正式场景划分与训练参数仍待确定。数据类读取数据清单，研究模块需显式读取配置。
 
 ### `data/raw/`
 
@@ -925,6 +847,7 @@ test.json
     "scene_id": ...,
     "view_id": ...,
     "response": ...,
+    "obstacle": ...,  # 仅局部，bool [L,L]
     "window": [x, y, size]
 }
 ```
@@ -944,7 +867,7 @@ test.json
 }
 ```
 
-候选相关数组按同一顺序排列：`candidate_xy` 为 `[N, 2]`，`valid`、`physical_cost` 和 `teacher_prob` 为 `[N]`。`temperature` 是标量，`config_id` 是配置记录标识。`response` 为 `[size, size]`，`window` 为 `[3]`。
+候选相关数组按同一顺序排列：`candidate_xy` 为 `[N, 2]`，`valid`、`physical_cost` 和 `teacher_prob` 为 `[N]`。`temperature` 是标量，`config_id` 是配置记录标识。`response` 和局部 `obstacle` 为 `[size,size]`，`window` 为 `[3]`。实际教师记录另有 `evaluated`、`metadata`、`run_id`、网格轴与索引，见接口文档。
 
 ### Student output
 
@@ -960,7 +883,7 @@ test.json
 
 ## 研究解释与边界
 
-- **教师目标的含义：**当前目标是固定窗口下、给定场景的响应兼容性 Gibbs 分布，而非已校准的真实源后验。候选不必重新生成相同的四分树叶节点。单源规则下，相同叶节点的生成确实要求源位于其父节点内且在该窗口外；当前关闭父节点限制，是明确选择只评价响应兼容性。如果以后要研究包含窗口选择机制的完整条件后验，需要加入该规则，并重新生成教师目标。
+- **教师目标的含义：**研究窗口外的源。默认 `quadtree_prior=false`，主教师在整个世界减观测窗内评价响应兼容性，不要求候选源重新生成相同 quadtree 叶节点。父格限制仅是显式开启的可选消融。教师目标是给定场景、声明均匀支持上的离散兼容性分布，尚不是已校准的完整生成后验。
 - 教师依赖隐藏场景几何，严格来说其目标为 $q^*(s\mid O,S)$。学生只看到 $O$；相同观测可能对应不同场景的兼容性分布，因此不能保证逐场景精确恢复教师结果。
 - **评价与部署分开：**教师有效范围上的一致性用于判断蒸馏是否成功。无几何预测必须在预先声明的完整公开候选范围上独立运行，不能复用依赖场景几何或物理代价的有效掩码/自适应候选集。仅在教师保留范围内训练，不会自动约束被排除位置的能量；无几何结果需单独报告，不能由教师有效范围上的表现推断。
 
