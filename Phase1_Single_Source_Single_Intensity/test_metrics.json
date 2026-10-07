@@ -1,0 +1,705 @@
+{
+  "data_kind": "real_rind_32_scene_pilot",
+  "observations": [
+    {
+      "scene_id": 28,
+      "view_id": 7,
+      "window_size": 16,
+      "config_id": "0c3b97879d4f9c4d78d9ee2c363ea43f7546ed37357c029f0243a43c985fe625",
+      "support_policy": {
+        "candidate_domain": "world_minus_window",
+        "quadtree_prior": false,
+        "source_location_scope": "outside_observation_window",
+        "world_size": 1024,
+        "window": [
+          224,
+          96,
+          16
+        ],
+        "bounds": [
+          0,
+          0,
+          1024,
+          1024
+        ],
+        "boundary_rule": "half-open; terminal world edges included",
+        "candidate_spacing": 128.0,
+        "grid_origin": [
+          0.0,
+          0.0
+        ],
+        "grid_phase": "half_spacing_cell_centers",
+        "ordering": "row-major: y ascending, then x ascending",
+        "sampling_measure": "equal_mass_per_valid_uniform_grid_point",
+        "target_semantics": "fixed_window_world_discrete_compatibility",
+        "reference_positions_in_support": false
+      },
+      "threshold": 0.01,
+      "valid_candidates": 60,
+      "compatible_candidates": 20,
+      "exact_candidates": 20,
+      "teacher_entropy": 3.0276541161580974,
+      "effective_candidates": 20.648736191584284,
+      "teacher_expected_physical_cost": 0.0008846985319884969,
+      "teacher_compatible_mass": 0.9858728658783473,
+      "teacher_only": false,
+      "physical_evaluations": 60,
+      "search_seconds": 0.023194100009277463,
+      "sampled_compatible_components": 2,
+      "component_teacher_mass": [
+        0.7394046494087606,
+        0.2464682164695868
+      ],
+      "component_cell_counts": [
+        15,
+        5
+      ],
+      "candidate_spacing": 128.0,
+      "forward_kl": 0.884355209732912,
+      "forward_kl_infinite": false,
+      "jensen_shannon": 0.2465266340489386,
+      "l1_distance": 1.0616296370607303,
+      "total_variation": 0.5308148185303652,
+      "student_entropy": 3.938072306199782,
+      "entropy_mismatch": 0.9104181900416846,
+      "student_expected_physical_cost": 0.5095706241342337,
+      "student_compatible_mass": 0.45505804734798233,
+      "student_top1_physical_cost": 0.0,
+      "student_top1_compatible": true,
+      "component_student_mass": [
+        0.4142993004012684,
+        0.04075874694671392
+      ]
+    },
+    {
+      "scene_id": 29,
+      "view_id": 7,
+      "window_size": 16,
+      "config_id": "4e6b43e8b22b7ada2b57515845ead16cb8254a0f4d518ede1bf56151a7557071",
+      "support_policy": {
+        "candidate_domain": "world_minus_window",
+        "quadtree_prior": false,
+        "source_location_scope": "outside_observation_window",
+        "world_size": 1024,
+        "window": [
+          896,
+          320,
+          16
+        ],
+        "bounds": [
+          0,
+          0,
+          1024,
+          1024
+        ],
+        "boundary_rule": "half-open; terminal world edges included",
+        "candidate_spacing": 128.0,
+        "grid_origin": [
+          0.0,
+          0.0
+        ],
+        "grid_phase": "half_spacing_cell_centers",
+        "ordering": "row-major: y ascending, then x ascending",
+        "sampling_measure": "equal_mass_per_valid_uniform_grid_point",
+        "target_semantics": "fixed_window_world_discrete_compatibility",
+        "reference_positions_in_support": false
+      },
+      "threshold": 0.01,
+      "valid_candidates": 62,
+      "compatible_candidates": 38,
+      "exact_candidates": 38,
+      "teacher_entropy": 3.637586187704314,
+      "effective_candidates": 38.00000106316129,
+      "teacher_expected_physical_cost": 1.3321855509050123e-09,
+      "teacher_compatible_mass": 0.9999999986657829,
+      "teacher_only": false,
+      "physical_evaluations": 62,
+      "search_seconds": 0.03337730001658201,
+      "sampled_compatible_components": 1,
+      "component_teacher_mass": [
+        0.9999999986657829
+      ],
+      "component_cell_counts": [
+        38
+      ],
+      "candidate_spacing": 128.0,
+      "forward_kl": 0.38688766790055945,
+      "forward_kl_infinite": false,
+      "jensen_shannon": 0.11192528378472612,
+      "l1_distance": 0.5488053163400817,
+      "total_variation": 0.27440265817004084,
+      "student_entropy": 3.9416944002740566,
+      "entropy_mismatch": 0.3041082125697425,
+      "student_expected_physical_cost": 0.23609046287679272,
+      "student_compatible_mass": 0.7638439328067248,
+      "student_top1_physical_cost": 0.0,
+      "student_top1_compatible": true,
+      "component_student_mass": [
+        0.763843932806725
+      ]
+    },
+    {
+      "scene_id": 30,
+      "view_id": 9,
+      "window_size": 16,
+      "config_id": "b773e068dc3747f84f13a9240b7f764edf11af1eeecf3c65275188df3e75e248",
+      "support_policy": {
+        "candidate_domain": "world_minus_window",
+        "quadtree_prior": false,
+        "source_location_scope": "outside_observation_window",
+        "world_size": 1024,
+        "window": [
+          224,
+          416,
+          16
+        ],
+        "bounds": [
+          0,
+          0,
+          1024,
+          1024
+        ],
+        "boundary_rule": "half-open; terminal world edges included",
+        "candidate_spacing": 128.0,
+        "grid_origin": [
+          0.0,
+          0.0
+        ],
+        "grid_phase": "half_spacing_cell_centers",
+        "ordering": "row-major: y ascending, then x ascending",
+        "sampling_measure": "equal_mass_per_valid_uniform_grid_point",
+        "target_semantics": "fixed_window_world_discrete_compatibility",
+        "reference_positions_in_support": false
+      },
+      "threshold": 0.01,
+      "valid_candidates": 56,
+      "compatible_candidates": 17,
+      "exact_candidates": 17,
+      "teacher_entropy": 2.833289662320221,
+      "effective_candidates": 17.001297459997403,
+      "teacher_expected_physical_cost": 3.4525620945406913e-06,
+      "teacher_compatible_mass": 0.9999927330042904,
+      "teacher_only": false,
+      "physical_evaluations": 56,
+      "search_seconds": 0.027505500009283423,
+      "sampled_compatible_components": 3,
+      "component_teacher_mass": [
+        0.8823465291214325,
+        0.05882310194142885,
+        0.05882310194142885
+      ],
+      "component_cell_counts": [
+        15,
+        1,
+        1
+      ],
+      "candidate_spacing": 128.0,
+      "forward_kl": 1.0719268633075236,
+      "forward_kl_infinite": false,
+      "jensen_shannon": 0.3068692650888127,
+      "l1_distance": 1.284972080170525,
+      "total_variation": 0.6424860400852626,
+      "student_entropy": 3.958649914855561,
+      "entropy_mismatch": 1.1253602525353399,
+      "student_expected_physical_cost": 0.6221487932015957,
+      "student_compatible_mass": 0.35750669291902787,
+      "student_top1_physical_cost": 1.0,
+      "student_top1_compatible": false,
+      "component_student_mass": [
+        0.3371683252303542,
+        0.011978558607266574,
+        0.008359809081407158
+      ]
+    },
+    {
+      "scene_id": 31,
+      "view_id": 7,
+      "window_size": 16,
+      "config_id": "0cb49ce984c7e991fce89b2f9e98182a1b377adeec82a3870dfa66dea2c940e5",
+      "support_policy": {
+        "candidate_domain": "world_minus_window",
+        "quadtree_prior": false,
+        "source_location_scope": "outside_observation_window",
+        "world_size": 1024,
+        "window": [
+          832,
+          576,
+          16
+        ],
+        "bounds": [
+          0,
+          0,
+          1024,
+          1024
+        ],
+        "boundary_rule": "half-open; terminal world edges included",
+        "candidate_spacing": 128.0,
+        "grid_origin": [
+          0.0,
+          0.0
+        ],
+        "grid_phase": "half_spacing_cell_centers",
+        "ordering": "row-major: y ascending, then x ascending",
+        "sampling_measure": "equal_mass_per_valid_uniform_grid_point",
+        "target_semantics": "fixed_window_world_discrete_compatibility",
+        "reference_positions_in_support": false
+      },
+      "threshold": 0.01,
+      "valid_candidates": 60,
+      "compatible_candidates": 15,
+      "exact_candidates": 15,
+      "teacher_entropy": 2.7588259124142134,
+      "effective_candidates": 15.78130343443368,
+      "teacher_expected_physical_cost": 0.00151993589224286,
+      "teacher_compatible_mass": 0.979829214456575,
+      "teacher_only": false,
+      "physical_evaluations": 60,
+      "search_seconds": 0.023100599995814264,
+      "sampled_compatible_components": 2,
+      "component_teacher_mass": [
+        0.06532194763043836,
+        0.9145072668261367
+      ],
+      "component_cell_counts": [
+        1,
+        14
+      ],
+      "candidate_spacing": 128.0,
+      "forward_kl": 1.06895762573961,
+      "forward_kl_infinite": false,
+      "jensen_shannon": 0.30718382449975157,
+      "l1_distance": 1.2934331409929445,
+      "total_variation": 0.6467165704964722,
+      "student_entropy": 3.9795410965082874,
+      "entropy_mismatch": 1.220715184094074,
+      "student_expected_physical_cost": 0.579569588256848,
+      "student_compatible_mass": 0.3331984088341712,
+      "student_top1_physical_cost": 0.0,
+      "student_top1_compatible": true,
+      "component_student_mass": [
+        0.014439942220340129,
+        0.31875846661383106
+      ]
+    }
+  ],
+  "aggregate": {
+    "observations": 4,
+    "scenes": 4,
+    "infinite_kl_observations": 0,
+    "metrics": {
+      "candidate_spacing": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 128.0,
+        "scene_mean": 128.0
+      },
+      "compatible_candidates": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 22.5,
+        "scene_mean": 22.5
+      },
+      "effective_candidates": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 22.857834537294167,
+        "scene_mean": 22.857834537294167
+      },
+      "entropy_mismatch": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.8901504598102102,
+        "scene_mean": 0.8901504598102102
+      },
+      "exact_candidates": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 22.5,
+        "scene_mean": 22.5
+      },
+      "forward_kl": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.8530318416701513,
+        "scene_mean": 0.8530318416701513
+      },
+      "jensen_shannon": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.24312625185555725,
+        "scene_mean": 0.24312625185555725
+      },
+      "l1_distance": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 1.0472100436410705,
+        "scene_mean": 1.0472100436410705
+      },
+      "physical_evaluations": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 59.5,
+        "scene_mean": 59.5
+      },
+      "sampled_compatible_components": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 2.0,
+        "scene_mean": 2.0
+      },
+      "search_seconds": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.02679437500773929,
+        "scene_mean": 0.02679437500773929
+      },
+      "student_compatible_mass": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.4774017704769765,
+        "scene_mean": 0.4774017704769765
+      },
+      "student_entropy": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 3.9544894294594215,
+        "scene_mean": 3.9544894294594215
+      },
+      "student_expected_physical_cost": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.4868448671173675,
+        "scene_mean": 0.4868448671173675
+      },
+      "student_top1_physical_cost": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.25,
+        "scene_mean": 0.25
+      },
+      "teacher_compatible_mass": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.9914237030012489,
+        "scene_mean": 0.9914237030012489
+      },
+      "teacher_entropy": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 3.0643389696492114,
+        "scene_mean": 3.0643389696492114
+      },
+      "teacher_expected_physical_cost": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.000602022079627862,
+        "scene_mean": 0.000602022079627862
+      },
+      "threshold": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.01,
+        "scene_mean": 0.01
+      },
+      "total_variation": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 0.5236050218205353,
+        "scene_mean": 0.5236050218205353
+      },
+      "valid_candidates": {
+        "observations": 4,
+        "scenes": 4,
+        "observation_mean": 59.5,
+        "scene_mean": 59.5
+      }
+    }
+  },
+  "by_window_size": {
+    "16": {
+      "observations": 4,
+      "scenes": 4,
+      "infinite_kl_observations": 0,
+      "metrics": {
+        "candidate_spacing": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 128.0,
+          "scene_mean": 128.0
+        },
+        "compatible_candidates": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 22.5,
+          "scene_mean": 22.5
+        },
+        "effective_candidates": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 22.857834537294167,
+          "scene_mean": 22.857834537294167
+        },
+        "entropy_mismatch": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.8901504598102102,
+          "scene_mean": 0.8901504598102102
+        },
+        "exact_candidates": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 22.5,
+          "scene_mean": 22.5
+        },
+        "forward_kl": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.8530318416701513,
+          "scene_mean": 0.8530318416701513
+        },
+        "jensen_shannon": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.24312625185555725,
+          "scene_mean": 0.24312625185555725
+        },
+        "l1_distance": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 1.0472100436410705,
+          "scene_mean": 1.0472100436410705
+        },
+        "physical_evaluations": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 59.5,
+          "scene_mean": 59.5
+        },
+        "sampled_compatible_components": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 2.0,
+          "scene_mean": 2.0
+        },
+        "search_seconds": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.02679437500773929,
+          "scene_mean": 0.02679437500773929
+        },
+        "student_compatible_mass": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.4774017704769765,
+          "scene_mean": 0.4774017704769765
+        },
+        "student_entropy": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 3.9544894294594215,
+          "scene_mean": 3.9544894294594215
+        },
+        "student_expected_physical_cost": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.4868448671173675,
+          "scene_mean": 0.4868448671173675
+        },
+        "student_top1_physical_cost": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.25,
+          "scene_mean": 0.25
+        },
+        "teacher_compatible_mass": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.9914237030012489,
+          "scene_mean": 0.9914237030012489
+        },
+        "teacher_entropy": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 3.0643389696492114,
+          "scene_mean": 3.0643389696492114
+        },
+        "teacher_expected_physical_cost": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.000602022079627862,
+          "scene_mean": 0.000602022079627862
+        },
+        "threshold": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.01,
+          "scene_mean": 0.01
+        },
+        "total_variation": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.5236050218205353,
+          "scene_mean": 0.5236050218205353
+        },
+        "valid_candidates": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 59.5,
+          "scene_mean": 59.5
+        }
+      }
+    }
+  },
+  "unseen_scene": {
+    "protocol": "held_out_scene_ids",
+    "verified": true,
+    "evaluated_scenes": 4,
+    "trained_scenes": 24,
+    "unseen_obstacle_combinations_verified": false
+  },
+  "edge_ablation": [],
+  "search_comparison": [],
+  "obstacle_combinations": {
+    "definition": "sorted multiset of obstacle type labels",
+    "novel_combination_results": {
+      "observations": 4,
+      "scenes": 4,
+      "infinite_kl_observations": 0,
+      "metrics": {
+        "candidate_spacing": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 128.0,
+          "scene_mean": 128.0
+        },
+        "compatible_candidates": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 22.5,
+          "scene_mean": 22.5
+        },
+        "effective_candidates": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 22.857834537294167,
+          "scene_mean": 22.857834537294167
+        },
+        "entropy_mismatch": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.8901504598102102,
+          "scene_mean": 0.8901504598102102
+        },
+        "exact_candidates": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 22.5,
+          "scene_mean": 22.5
+        },
+        "forward_kl": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.8530318416701513,
+          "scene_mean": 0.8530318416701513
+        },
+        "jensen_shannon": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.24312625185555725,
+          "scene_mean": 0.24312625185555725
+        },
+        "l1_distance": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 1.0472100436410705,
+          "scene_mean": 1.0472100436410705
+        },
+        "physical_evaluations": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 59.5,
+          "scene_mean": 59.5
+        },
+        "sampled_compatible_components": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 2.0,
+          "scene_mean": 2.0
+        },
+        "search_seconds": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.02679437500773929,
+          "scene_mean": 0.02679437500773929
+        },
+        "student_compatible_mass": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.4774017704769765,
+          "scene_mean": 0.4774017704769765
+        },
+        "student_entropy": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 3.9544894294594215,
+          "scene_mean": 3.9544894294594215
+        },
+        "student_expected_physical_cost": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.4868448671173675,
+          "scene_mean": 0.4868448671173675
+        },
+        "student_top1_physical_cost": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.25,
+          "scene_mean": 0.25
+        },
+        "teacher_compatible_mass": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.9914237030012489,
+          "scene_mean": 0.9914237030012489
+        },
+        "teacher_entropy": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 3.0643389696492114,
+          "scene_mean": 3.0643389696492114
+        },
+        "teacher_expected_physical_cost": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.000602022079627862,
+          "scene_mean": 0.000602022079627862
+        },
+        "threshold": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.01,
+          "scene_mean": 0.01
+        },
+        "total_variation": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 0.5236050218205353,
+          "scene_mean": 0.5236050218205353
+        },
+        "valid_candidates": {
+          "observations": 4,
+          "scenes": 4,
+          "observation_mean": 59.5,
+          "scene_mean": 59.5
+        }
+      }
+    },
+    "seen_combination_results": {
+      "observations": 0,
+      "scenes": 0,
+      "infinite_kl_observations": 0,
+      "metrics": {}
+    }
+  },
+  "research_result": "requires independent provenance/physical checks; record metrics only"
+}

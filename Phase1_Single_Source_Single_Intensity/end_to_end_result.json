@@ -1,0 +1,126 @@
+{
+  "full_pipeline_complete": true,
+  "teacher_side_complete": true,
+  "evaluation_support": "teacher_supported_hidden_geometry_mask",
+  "config": {
+    "teacher_source": "C:\\Users\\\u534e\u4e3a\\.codex\\.chatgpt-projects\\g-p-6ac5ad90e0d48191847974534e3dbebf\\upstream_snapshots\\teacher",
+    "student_source": "C:\\Users\\\u534e\u4e3a\\.codex\\.chatgpt-projects\\g-p-6ac5ad90e0d48191847974534e3dbebf\\upstream_snapshots\\student\\student_baseline",
+    "data_root": "C:\\Users\\\u534e\u4e3a\\.codex\\.chatgpt-projects\\g-p-6ac5ad90e0d48191847974534e3dbebf\\data\\pilot-single-source",
+    "scene_id": 28,
+    "view_id": 7,
+    "candidate_spacing": 128,
+    "temperature": 0.05,
+    "compatibility_threshold": 0.01,
+    "checkpoint": "C:\\Users\\\u534e\u4e3a\\.codex\\.chatgpt-projects\\g-p-6ac5ad90e0d48191847974534e3dbebf\\part_e_outputs\\real_pilot\\checkpoints\\best.pt",
+    "trusted_checkpoint": true
+  },
+  "stages": [
+    {
+      "name": "A_dataset",
+      "status": "passed"
+    },
+    {
+      "name": "A_observation",
+      "status": "passed"
+    },
+    {
+      "name": "B_physical_reconstruction",
+      "status": "passed"
+    },
+    {
+      "name": "C_teacher_generation",
+      "status": "passed"
+    },
+    {
+      "name": "C_teacher_handoff",
+      "status": "passed"
+    },
+    {
+      "name": "D_student_prediction",
+      "status": "passed"
+    },
+    {
+      "name": "D_student_handoff",
+      "status": "passed"
+    },
+    {
+      "name": "E_evaluation_visualization",
+      "status": "passed"
+    }
+  ],
+  "physical_checks": {
+    "max_absolute_error": 0.0,
+    "source_free_window": true,
+    "reference_witnesses_checked": 10
+  },
+  "metrics": {
+    "scene_id": 28,
+    "view_id": 7,
+    "window_size": 16,
+    "config_id": "0c3b97879d4f9c4d78d9ee2c363ea43f7546ed37357c029f0243a43c985fe625",
+    "support_policy": {
+      "candidate_domain": "world_minus_window",
+      "quadtree_prior": false,
+      "source_location_scope": "outside_observation_window",
+      "world_size": 1024,
+      "window": [
+        224,
+        96,
+        16
+      ],
+      "bounds": [
+        0,
+        0,
+        1024,
+        1024
+      ],
+      "boundary_rule": "half-open; terminal world edges included",
+      "candidate_spacing": 128.0,
+      "grid_origin": [
+        0.0,
+        0.0
+      ],
+      "grid_phase": "half_spacing_cell_centers",
+      "ordering": "row-major: y ascending, then x ascending",
+      "sampling_measure": "equal_mass_per_valid_uniform_grid_point",
+      "target_semantics": "fixed_window_world_discrete_compatibility",
+      "reference_positions_in_support": false
+    },
+    "threshold": 0.01,
+    "valid_candidates": 60,
+    "compatible_candidates": 20,
+    "exact_candidates": 20,
+    "teacher_entropy": 3.0276541161580974,
+    "effective_candidates": 20.648736191584284,
+    "teacher_expected_physical_cost": 0.0008846985319884969,
+    "teacher_compatible_mass": 0.9858728658783473,
+    "teacher_only": false,
+    "physical_evaluations": 60,
+    "search_seconds": 0.02212889993097633,
+    "sampled_compatible_components": 2,
+    "component_teacher_mass": [
+      0.7394046494087606,
+      0.2464682164695868
+    ],
+    "component_cell_counts": [
+      15,
+      5
+    ],
+    "candidate_spacing": 128,
+    "forward_kl": 0.884355209732912,
+    "forward_kl_infinite": false,
+    "jensen_shannon": 0.2465266340489386,
+    "l1_distance": 1.0616296370607303,
+    "total_variation": 0.5308148185303652,
+    "student_entropy": 3.938072306199782,
+    "entropy_mismatch": 0.9104181900416846,
+    "student_expected_physical_cost": 0.5095706241342337,
+    "student_compatible_mass": 0.45505804734798233,
+    "student_top1_physical_cost": 0.0,
+    "student_top1_compatible": true,
+    "component_student_mass": [
+      0.4142993004012684,
+      0.04075874694671392
+    ]
+  }
+}
