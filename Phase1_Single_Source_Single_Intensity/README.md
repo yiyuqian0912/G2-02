@@ -10,6 +10,8 @@ The physical teacher rerenders candidates to judge whether they explain the obse
 
 **Status:** ZIP installation, data reading, the local browser, scene subsets, size-aware batching, and reference rerendering are implemented. The physical costs, search, teacher, student, training, and evaluation remain research placeholders. Data verification does not establish completion of the research pipeline.
 
+**Thomas’s student baseline:** [Standalone implementation and verification](student_baseline/README.md) are available separately. It follows the supplied fixed-size, window-relative student specification and does not implement the newer shared interface described below.
+
 Supplementary references: [method and mathematical definitions](docs/method.md) · [module data contracts](docs/interfaces.md). Both follow the current flat module layout.
 
 ## Dataset: download, install, and use
