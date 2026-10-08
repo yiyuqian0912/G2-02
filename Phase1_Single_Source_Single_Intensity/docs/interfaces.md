@@ -1,110 +1,104 @@
 # Phase I Data and Module Contracts
 
-[Project responsibilities](../README.md) · [中文 README](../README.zh-CN.md) · [Method](method.md)
+[English README](../README.md) · [中文 README](../README.zh-CN.md) · [Method](method.md) · [Teacher usage](teacher-baseline.md)
 
-These are proposed handoff contracts for the current flat module layout. Implementations are pending; field names match the current README.
+Data access, physical response costs, uniform search, teacher records, and teacher diagnostics are implemented. Student/training/evaluation contracts below describe the intended handoff to later modules.
 
 ## 1. Observation — `data.py`
 
+`Phase1Dataset.get_observation(scene_id,view_id)` and `ds[i]` return:
+
 | Field | Shape / type | Meaning |
 |---|---|---|
-| `scene_id`, `view_id` | Stable identifiers | Trace the sample; never student features |
-| `response` | `[size, size]` float | Single-source local response |
-| `window` | `[3]` | World-coordinate `(x, y, size)` |
+| `scene_id`, `view_id` | Python integers | Stable record IDs; not student features |
+| `response` | `float32 [L,L]` | Binary local response |
+| `obstacle` | `bool [L,L]` | Local mask; true means obstacle |
+| `window` | `int64 [3]` | World-coordinate `(x,y,L)` |
 
-Source coordinates, intensity, and scene geometry may be retrieved separately for teacher supervision and evaluation. They are not student features. World coordinates span [0,1024]; arrays use [row,col]. Preserve original window extent when batching different sizes. If padding is used, distinguish valid image pixels from padded entries.
+`make_dataloader` groups equal-size windows; PyTorch batches include response `[B,L,L]`, boolean obstacle `[B,L,L]`, window `[B,3]`, and IDs. No resizing/padding is required. Source truth, references, region rendering, and continuous geometry are separate methods, teacher/evaluation-only. A scene's observations and targets inherit its partition; formal scene splits remain unresolved.
 
-Split manifests in `data/splits/` contain disjoint scene-ID lists. Every derived sample and target inherits its scene's partition.
+Array indexing is `[row,col]`; coordinates point right/down and pixels sample world centers. The local mask is an allowed student feature; masks outside that window and full geometry are not.
 
 ## 2. Physical evaluation — `physics.py`
 
-Input: scene geometry, observed response, window, candidate coordinates, fixed intensity, and cost settings.
+Bind `PhysicalEvaluator(dataset,scene_id,view_id,backend="auto")`, then call `.evaluate(xy)` for one finite world-coordinate `[2]` candidate. It returns a `CandidateEvaluation`:
 
-| Output | Shape / type | Meaning |
+| Field | Type | Meaning |
 |---|---|---|
-| `candidate_xy` | `[2]` per query | World-coordinate source candidate |
-| `candidate_response` | `[size,size]`, or absent for invalid candidates | Rerendered response |
-| `L_resp` | Scalar | Boundary-weighted response disagreement |
-| `L_edge` | Scalar or absent when disabled | Symmetric boundary disagreement |
-| `physical_cost` | Scalar | Consistently combined candidate cost |
-| `valid` | Boolean | Candidate satisfies the declared domain restrictions |
+| `valid` | Boolean | Inside world and accepted by continuous scene geometry |
+| `physical_cost` | Float | Mean absolute response disagreement; infinity if invalid |
+| `num_physics_evaluations` | 0 or 1 | New physical renders for this query |
+| `cache_hit` | Boolean | Exact coordinate previously evaluated in this scene/window |
 
-Reject invalid candidates before rendering. Their costs do not enter probability normalization. Record whether edge costs were computed; disabled and measured-zero edge costs are different cases. Geometry access is confined to the teacher/evaluation pathway.
+Physics does not decide parent/window exclusions. The search domain owns those restrictions. The physical cost is `mismatched_pixels/L²` for the binary unit-intensity release. One evaluator supports all six stored sizes at original resolution; no fixed response width or height is assumed. It uses all sampled pixels equally, without boundary weighting or an edge term.
 
-## 3. Candidate set — `search.py`
+`CandidateEvaluator` is a small protocol: `.evaluate(xy) -> CandidateEvaluation`. Synthetic evaluators can test search/teacher without a renderer. `response_disagreement(rendered,observed)` exposes the same scalar cost. `check_reference_solutions` independently checks all ten references and returns their coordinates/costs and the separate diagnostic render count.
 
-| Field | Shape | Meaning |
+## 3. Domain and search — `search.py`
+
+`CandidateDomain(window,world_size,quadtree_prior=False)` defaults to world-minus-window: the task studies sources outside the observation window. Set the prior to true only for the optional parent-minus-window ablation. It validates alignment and exposes bounds, membership, and metadata. Split-line ownership is right/down; terminal world edges are included.
+
+`uniform_grid(domain,spacing)` returns `UniformGrid`: candidate coordinates, ascending x/y axes, flattened raster `grid_index`, spacing, and domain. The global half-spacing lattice is deterministic; order is ascending y then x. `grid.as_map(values)` restores a source-space raster with excluded-window entries as NaN. `deduplicate_candidates` removes exact duplicates in first-occurrence order.
+
+`uniform_search(domain,evaluator,spacing=...,max_evaluations=None)` returns:
+
+| Field | Shape / type | Meaning |
 |---|---|---|
-| `candidate_xy` | `[N,2]` | Candidate world coordinates |
-| `valid` | `[N]` boolean | Validity under the recorded support policy |
-| `physical_cost` | `[N]` | Final costs, available after physical evaluation |
-| `search_level` | `[N]` | Refinement depth or level |
-| `num_physics_evaluations` | Scalar | Actual physical evaluation count |
+| `grid` | `UniformGrid` | Declared support and ordering |
+| `valid` | `bool [N]` | Physical geometric validity for evaluated candidates |
+| `evaluated` | `bool [N]` | Candidate visited; false for budget-unfinished entries |
+| `physical_cost` | `float64 [N]` | Finite valid cost; infinity if invalid; NaN if unfinished |
+| `complete` | Boolean | Every domain candidate evaluated |
+| `num_physics_evaluations` | Integer | Actual new renders; cache hits and invalid queries count zero |
+| `num_cache_hits` | Integer | Reused evaluations |
+| `elapsed_seconds` | Float | Search/evaluation elapsed time |
 
-All fields share candidate order. Deduplicate positions and refine retained regions toward a common final spacing. Partial search results must be marked incomplete and cannot be passed to target construction as final costs. Retain domain, coverage, spacing, and cost settings as metadata. Search region bounds may be stored internally; they are not required teacher inputs. No area weighting is used.
+The optional budget stops visits conservatively once the new-render limit is reached. Incomplete results cannot become teacher targets. This guard and cache prepare later adaptive work; no adaptive pruning is implemented.
 
-## 4. Teacher record — `teacher.py`
+## 4. Teacher records — `teacher.py`
 
-Required fields (`temperature` is a scalar; `config_id` is a record identifier, not a candidate array):
+`generate_uniform_teacher(ds,scene_id,view_id,spacing=...,temperature=...,quadtree_prior=False)` requires explicit spacing and temperature. It never reads reference positions or uses true-source labels to construct support or probabilities.
+
+Core candidate-aligned fields are:
 
 ```text
-scene_id, view_id
-candidate_xy       [N,2]
-valid              [N]
-physical_cost      [N]
-teacher_prob       [N]
-temperature        scalar > 0
-config_id          reference to saved experiment settings
+candidate_xy       float64 [N,2]
+valid, evaluated   bool [N]
+physical_cost      float64 [N]
+teacher_prob       float64 [N]
+search_level       uint8 [N] (zero for this uniform baseline)
 ```
 
-Save records under `outputs/teachers/`. Retain renderer/generation version and support policy in the referenced settings. Targets sum to one over valid candidates; invalid probabilities are zero. No valid candidates means explicit failure. Targets use softmax of negative costs divided by temperature over retained valid candidates.
+The record also holds `scene_id`, `view_id`, `window`, `temperature`, `run_id`, `config_id`, `grid_index`, x/y axes, and `metadata`. Metadata preserves dataset manifest/archive identity, code/reader hashes, actual domain and prior, spacing/anchor/order, cost settings, tau, search mode, completeness, rendering count, cache hits, and timing.
 
-The same coordinates, ordering, and validity must be used for student normalization. Stored physical costs remain available for absolute compatibility diagnostics.
+`target_from_search(result,temperature=...)` rejects incomplete/nonuniform support. `teacher_probabilities(cost,valid,temperature=...)` normalizes stably over valid entries in the original order. Invalid probabilities are zero; no valid candidate is an explicit failure. No area weighting, reference augmentation, or true-source one-hot target is used.
 
-## 5. Student — `model.py`
+`save_teacher_record(record,path)` writes compressed NPZ with numeric/string arrays and `metadata_json`. `load_teacher_record(path)` uses `allow_pickle=False`, restores JSON metadata, and converts scalar arrays to Python values. Training can reload these records without rerendering. Keep raw costs available for absolute compatibility diagnostics.
 
-Energy inputs: `response`, `window`, and `candidate_xy`.
+## 5. Diagnostic reports — `diagnostics.py`
 
-Probability-normalization inputs: `energy` and `valid`. Validity is not an energy-encoder feature. Use softmax of negative energy over the same valid candidates as the teacher.
+`inspect_teacher(ds,record,low_cost_threshold=None)` independently rerenders all ten references and requires exactly zero costs. It reports sampled zero/low-cost fractions, four-neighbor components and approximate areas, entropy/effective candidate count, witness/domain coverage, and nearest-grid witness costs. Witnesses remain outside teacher normalization.
 
-```text
-candidate_xy       [N,2]
-energy             [N]
-probability        [N]
+`grid_from_record(record)` restores map indexing. `plot_teacher(ds,record,report,path)` writes a static six-panel PNG; install the optional `diagnostics` extra. `representative_view_ids(ds,scene_id)` selects the first stored observation of each size, small to large.
+
+Components and area estimates describe the sampled lattice, not continuous topology. Report spacing with every ambiguity comparison and use common spacing for quantitative comparisons. Grid and diagnostic witness renders have separate counts.
+
+## 6. Student / training / evaluation handoff (not implemented)
+
+The intended energy inputs are `response`, local `obstacle`, `window`, and queried `candidate_xy`. `valid` is used after scoring for probability normalization and is not an encoder feature. IDs, truth, reference positions, full geometry, outside-window masks, physical costs, and the complete quadtree are excluded from student features.
+
+`train.py` should match observations and teacher records by IDs, preserve candidate ordering, and compare distributions on the same valid support. Save actual architecture/optimizer settings and checkpoints; choose models using validation scenes. Padding, if introduced later, needs a separate valid-pixel mask.
+
+`evaluate.py` should use matching candidate support, record window size/spacing/domain, and compare adaptive results against a common uniform reference grid. Teacher-supported geometric validity uses hidden scene information and must be distinguished from geometry-free deployment on a declared public candidate set.
+
+## 7. Configuration and runnable checks
+
+`configs/phase1.json` explicitly disables the parent prior and selects the world-minus-window response-only uniform baseline (`alpha=1,beta=0,boundary_lambda=0`). Spacing, temperature, scene split, adaptive settings, and training hyperparameters remain unresolved `null` fields. CLI spacing/tau/prior overrides are reflected in saved target settings. A richer physical-cost/adaptive configuration is rejected by the current CLI.
+
+```bash
+uv run --no-sync python -m unittest discover -s tests -v
+NUMBA_NUM_THREADS=2 uv run --no-sync python -m rind_phase1.checks --data-only
+NUMBA_NUM_THREADS=2 uv run --no-sync python -m rind_phase1.checks --teacher
 ```
 
-Candidate permutation must only reorder the associated scores. Different window sizes must be supported. Keep model/configuration identifiers in run records. A hidden-geometry-derived validity mask is used during teacher-supported training and explicitly labeled teacher-supported evaluation; it is not available automatically at deployment. Geometry-free prediction must use a predeclared public candidate set, not a set selected through teacher geometry or physical costs. Scores outside training support are not guaranteed to be suppressed.
-
-## 6. Training, evaluation, and checks
-
-`train.py` matches observations to teacher records by identifiers and candidate ordering. Save model weights, optimizer state, histories, and configuration in `outputs/checkpoints/`. Use validation scenes for model selection.
-
-`evaluate.py` records per-observation and aggregate metrics, window size, support policy, and timing. Produce observation / physical-cost / teacher / student figures in `outputs/figures/` and metrics and summaries in `outputs/reports/`. Compare search strategies on common evaluation support rather than comparing unequal probability vectors directly.
-
-`checks.py` verifies scene separation, source-free windows, generating-source reconstruction, consistent candidate arrays, probability normalization, variable-size model inputs, and the small end-to-end handoff. Report pass/fail and identify the failing stage. Clearly label untrained outputs and incomplete stages.
-
-## 7. Input routing and use
-
-The Chinese README includes a field-by-field input guide for all eight modules. The following rules specify how those inputs are used together.
-
-| Module | Inputs and their use |
-|---|---|
-| `data.py` | The installed data root supplies observations; `Phase1Dataset` returns response/window and IDs; scene lists select partitions, and size buckets make batches stackable. Geometry, references, and rerendering are separate teacher interfaces. The release fixes intensity at 1 and contains 10,000 scenes. |
-| `physics.py` | Geometry determines occlusion; observed response supplies the comparison target and observed-boundary weights; window fixes the render region; candidate coordinates reposition the source; fixed intensity must match data generation; cost settings define response/edge evaluation. |
-| `search.py` | World bounds and the window define public spatial restrictions; `candidate_spacing` is the initial grid step in world units; `adaptive_budget` limits physical candidate evaluations; the evaluator is bound to the current scene, response, intensity, and cost settings; geometry may be passed directly or encapsulated in that teacher-only evaluator. |
-| `teacher.py` | Coordinates identify hypotheses; final costs establish compatibility; validity excludes candidates; positive temperature controls sharpness; sample IDs match targets to observations; `config_id` resolves to the settings and provenance used to generate targets. |
-| `model.py` | Response conveys local structure; window supplies world location and scale; candidate coordinates specify queries. Normalize window and candidate coordinates using the same `coordinate_scale` before Fourier encoding. `valid` is used only after energy scoring to normalize probabilities. Initialization reads Fourier frequencies and recorded architecture settings. |
-| `train.py` | Observations supply model conditioning and record IDs; teacher candidates determine queries; `teacher_prob` supplies the soft target; shared candidate ordering and validity ensure consistent normalization; the model supplies trainable parameters; training settings govern resources, updates, and validation-based checkpoint selection. |
-| `evaluate.py` | Test observations supply held-out inputs; teacher records supply reference costs and distributions on matching candidates; a fixed trained checkpoint supplies predictions; evaluation configuration defines support, metrics, comparisons, and provenance. |
-| `checks.py` | A few real scenes provide verifiable physical examples; the actual Phase I configuration keeps all module settings consistent and identifies incomplete required settings. |
-
-Configuration notes:
-
-- `final_candidate_spacing` is the target spacing for retained regions after refinement. If the budget prevents reaching it everywhere, record the achieved levels and do not claim uniform final sampling.
-
-- `candidate_spacing` replaces the ambiguous former name `candidate_resolution`; it is an initial step in world-coordinate units, not an image resolution or candidate count.
-- `adaptive_budget` counts physical candidate evaluations, not batch API calls. Report reevaluations and optional edge-computation cost separately; record actual elapsed time as well.
-- `learning_rate` and `checkpoint_selection_metric` remain unresolved until training is configured. Save the optimizer and architecture settings actually used along with each checkpoint.
-- `teacher_prob` is a normalized soft target over retained valid candidates. Do not add area factors to either teacher or student normalization.
-- If teacher records use different adaptive candidates, obtain reference teacher evaluations on the common evaluation grid before comparing distributions. Do not directly compare vectors with different coordinate meanings.
-- Zero padding is not an observed zero response. If batching uses padding, carry a pixel-valid mask and exclude padding from response feature aggregation and any pixel-domain loss.
+Data checks include the generation prior for every installed view, local masks, subsets/batching/tree, reference rerendering, and serialization. Teacher checks cover six window sizes, sixty exact witnesses, coordinate/cost alignment, prior/world domains, geometric rejection, physical caching/counts, normalization, and NPZ round trips. They do not claim student training or adaptive-search completion.

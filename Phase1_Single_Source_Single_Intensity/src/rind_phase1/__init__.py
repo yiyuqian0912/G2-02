@@ -1,1 +1,1 @@
-"""RIND Phase I: data access is implemented; research stages remain pending."""
+"""RIND Phase I data and uniform physical teachers; student stages remain pending."""

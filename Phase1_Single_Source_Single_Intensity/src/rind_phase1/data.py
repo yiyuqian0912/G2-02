@@ -19,8 +19,9 @@ def default_data_root():
 class Phase1Dataset:
     """Lazy unit-strength observations; truth is available through separate methods.
 
-    dataset[i] returns scene_id, view_id, response [L,L] float32, and window
-    [3] int64. scene_ids selects whole scenes. Disk arrays stay memory mapped.
+    dataset[i] returns IDs, response [L,L] float32, obstacle [L,L] bool,
+    and window [3] int64. The obstacle mask covers only this local window.
+    scene_ids selects whole scenes. Disk arrays stay memory mapped.
     """
 
     def __init__(self, root=None, *, scene_ids=None):
@@ -82,6 +83,7 @@ class Phase1Dataset:
         item = self._base.get_view(scene_id, view_id)
         return {"scene_id": int(scene_id), "view_id": int(view_id),
                 "response": item["response"].astype(np.float32),
+                "obstacle": item["obstacle"].astype(bool),
                 "window": item["view"].astype(np.int64)}
 
     def get_candidates(self, scene_id, view_id):
@@ -187,7 +189,7 @@ class SizeBucketBatchSampler:
 
 def make_dataloader(dataset, *, batch_size=8, shuffle=True, seed=20260923,
                     num_workers=0, drop_last=False, pin_memory=False):
-    """Return torch batches: response [B,L,L], window [B,3], IDs [B]."""
+    """Return response/obstacle [B,L,L], window [B,3], and IDs [B]."""
     try:
         from torch.utils.data import DataLoader
     except ImportError as exc:

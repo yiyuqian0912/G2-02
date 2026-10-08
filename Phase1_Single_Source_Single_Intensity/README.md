@@ -4,15 +4,13 @@ English | [简体中文](README.zh-CN.md)
 
 The Chinese README adopts the latest supplied revision, organized as inputs, processing, outputs, and purpose. This English guide summarizes the same responsibilities and interface conventions. The [Chinese module guide](README.zh-CN.md) now explains every input by meaning, purpose, and use; the [interface reference](docs/interfaces.md) also records input routing and configuration ownership.
 
-**Goal: predict a distribution of possible 2D source locations from a local response and its window metadata, preserving ambiguity and multiple solutions.**
+**Goal: predict a distribution of possible 2D source locations from a local response, local obstacle mask, and window metadata, preserving ambiguity and multiple solutions.**
 
 The physical teacher rerenders candidates to judge whether they explain the observation. The student learns those judgments and predicts without candidate-by-candidate rerendering. The project contains **seven research files and one shared verification file**.
 
-**Status:** ZIP installation, data reading, the local browser, scene subsets, size-aware batching, and reference rerendering are implemented. The physical costs, search, teacher, student, training, and evaluation remain research placeholders. Data verification does not establish completion of the research pipeline.
+**Status:** ZIP installation, data reading, the local browser, scene subsets, size-aware batching, and reference rerendering are implemented. Uniform source-space search, response-only physical costs, stable soft teacher targets, portable records, and inverse-space diagnostics are now implemented. Adaptive pruning, boundary/edge losses, student modeling, training, and student evaluation remain future work.
 
-**Thomas’s student baseline:** [Standalone implementation and verification](student_baseline/README.md) are available separately. It follows the supplied fixed-size, window-relative student specification and does not implement the newer shared interface described below.
-
-Supplementary references: [method and mathematical definitions](docs/method.md) · [module data contracts](docs/interfaces.md). Both follow the current flat module layout.
+Supplementary references: [method and mathematical definitions](docs/method.md) · [module data contracts](docs/interfaces.md). Both follow the current flat module layout. [Uniform teacher usage and interpretation](docs/teacher-baseline.md) describes the runnable teacher baseline.
 
 ## Dataset: download, install, and use
 
@@ -77,6 +75,7 @@ ds = Phase1Dataset()  # default installed path, or RIND_DATA_ROOT
 print(ds.num_scenes, len(ds))  # 10000 scenes, 180000 observations
 sample = ds[0]
 R = sample["response"]
+M = sample["obstacle"]        # bool [L,L], local mask only
 window = sample["window"]
 s, v = sample["scene_id"], sample["view_id"]
 print(R.shape, R.dtype)       # (L, L), float32
@@ -87,9 +86,10 @@ print(window)                # [x, y, L] in world coordinates
 |---|---|
 | `scene_id`, `view_id` | Integer identifiers for matching observations to teacher records; not model features |
 | `response` | NumPy `float32 [L,L]`; values 0/1 at the original sampling resolution |
+| `obstacle` | NumPy `bool [L,L]`; true means obstacle inside this window |
 | `window` | NumPy `int64 [3]`: top-left world position `(x,y)` and side length `L` |
 
-Only these four fields are returned by `ds[i]`. The student receives response and window; source truth, reference solutions, and geometry are accessed separately. Array indexing is `[row,column]`; x points right and y points down. Pixel `(row,column)` samples `(x+column+0.5, y+row+0.5)`. The six view sizes are 16, 32, 64, 128, 256, and 512. Keep this scale and position even if an encoder resizes images internally.
+These five fields are returned by `ds[i]`. The intended student observation is response, local obstacle mask, and window. Source truth, reference solutions, full geometry, and outside-window obstacle information are teacher/evaluation-only and accessed separately. Array indexing is `[row,column]`; x points right and y points down. Pixel `(row,column)` samples `(x+column+0.5, y+row+0.5)`. The six view sizes are 16, 32, 64, 128, 256, and 512. Keep this scale and position even if an encoder resizes images internally.
 
 ### Scene splits and PyTorch DataLoader
 
@@ -109,6 +109,7 @@ train_data = Phase1Dataset(scene_ids=splits["train"])
 loader = make_dataloader(train_data, batch_size=8, num_workers=0)
 for batch in loader:
     R = batch["response"]      # torch.float32 [B,L,L]
+    M = batch["obstacle"]      # torch.bool [B,L,L], local only
     window = batch["window"]   # torch.int64 [B,3]
     break
 ```
@@ -131,7 +132,7 @@ for leaf in ds.iter_view_leaves(s):
     observation = ds.get_observation(s, leaf["view_id"])
 ```
 
-Reference 0 is the generating source. The other nine distinct positions stay in its occupied 16 × 16 tile and were verified to reproduce this window's sampled response exactly. They are examples of compatible sources, not exhaustive coverage or a teacher probability distribution; some differences are very small. They need not match responses elsewhere or at every point between sampled pixel centers. Teacher search must still explore the declared candidate domain.
+Reference 0 is the generating source. The other nine distinct positions stay in its occupied 16 × 16 tile and were verified to reproduce this window's sampled response exactly. They are examples of compatible sources, not exhaustive coverage or a teacher probability distribution; some differences are very small. They need not match responses elsewhere or at every point between sampled pixel centers. Teacher search must still explore the declared candidate domain. Never append these witnesses to the uniform grid before normalization or use them as the probability target.
 
 `rerender` evaluates one hypothetical source at strength 1 in the original scene. It returns NumPy `float32 [L,L]` and rejects sources outside the world or inside obstacles. The caller's search code must also exclude the observation window according to the protocol. This CPU NumPy/Numba renderer is for teacher costs and evaluation; it does not backpropagate gradients to source coordinates. The first call may take longer while Numba compiles. Scene geometry and reference coordinates retain `float64`; the adapter converts observation responses to `float32`.
 
@@ -145,7 +146,33 @@ uv run python -m rind_phase1.checks --data-only
 uv run --extra train python -m rind_phase1.checks --data-only --torch --workers 2
 ```
 
-These commands check data access, scene subsets, size grouping, tree recovery, and sample reference rerendering. They do not claim that teacher generation or training is implemented. `installation.json` records the archive hash and environment lock hash. The reader snapshot lives in `vendor/rind-dataset/`; runtime updates are made in this repository and locked with uv. A future data version should be installed into a new data root and selected explicitly, preserving experiment traceability. The supplied ZIP's Word guide can be read separately if a fuller description of generation and geometry is needed.
+These commands check data access, the parent-minus-window generation rule for every installed view, local masks, scene subsets, size grouping, tree recovery, and sample reference rerendering. Teacher verification uses the separate `--teacher` command below; model training remains unimplemented. `installation.json` records the archive hash and environment lock hash. The reader snapshot lives in `vendor/rind-dataset/`; runtime updates are made in this repository and locked with uv. A future data version should be installed into a new data root and selected explicitly, preserving experiment traceability. The supplied ZIP's Word guide can be read separately if a fuller description of generation and geometry is needed.
+
+## Uniform physical teacher: run and read
+
+The task studies **sources outside the observation window**. The default candidate domain is `world \ W`; quadtree determines dataset windows and does not restrict main-experiment source locations. `--prior parent` explicitly enables the optional parent-minus-window ablation. Continuous teacher geometry rejects invalid sources. The ten dataset references remain independent diagnostic witnesses.
+
+```bash
+uv sync --locked --inexact --extra diagnostics
+# Illustrative spacing/tau, not agreed research defaults:
+NUMBA_NUM_THREADS=2 uv run --no-sync rind-teacher \
+  --scene-id 0 --view-id 4 --spacing 64 --temperature 0.05 --plot \
+  --output outputs/teachers/example-world.npz
+NUMBA_NUM_THREADS=2 uv run --no-sync python -m rind_phase1.checks --teacher
+```
+
+This writes a compressed teacher NPZ, a diagnostic JSON report, and a six-panel PNG. Cost is the fraction of sampled response pixels that disagree. Teacher probabilities preserve all completed valid grid candidates using stable `exp(-cost/tau)` normalization, without area weights or source labels. Incomplete searches and empty valid support fail explicitly. Spacing and temperature remain `null` in the shared config until explicitly chosen.
+
+```python
+from rind_phase1.teacher import load_teacher_record
+from rind_phase1.diagnostics import grid_from_record
+record = load_teacher_record("outputs/teachers/example-world.npz")
+xy, cost, q = (record[k] for k in ("candidate_xy", "physical_cost", "teacher_prob"))
+valid = record["valid"]
+cost_map = grid_from_record(record).as_map(cost)
+```
+
+The same teacher supports all six stored sizes (16–512), rerenders at the original resolution, and normalizes pixel disagreement by `L²`. Larger windows cost more to render; they do not require a separate teacher. See [teacher usage](docs/teacher-baseline.md) for Python generation, support semantics, masks, provenance, witness checks, ambiguity diagnostics, and window-size comparisons.
 
 ## 1. Alignment with the proposal
 
@@ -154,7 +181,7 @@ Retain one source, fixed intensity, continuous 2D occlusion, and scene-disjoint 
 Two later decisions update the original proposal:
 
 - **Adaptive quadtree windows:** subdivide source-containing regions into four; retain source-free regions immediately. The minimum size is 16; occupied minimum-size leaves are excluded.
-- **Student conditioning:** response plus window position and size `(x, y, size)`. Candidate source coordinates are the locations being queried.
+- **Student conditioning:** response, local obstacle mask, and window position and size `(x, y, size)`. Candidate source coordinates are the locations being queried.
 
 | Proposal section | File | Required outcome |
 |---|---|---|
@@ -178,7 +205,8 @@ Adaptive search remains part of the full proposal: establish the uniform baselin
 ├── README.zh-CN.md
 ├── docs/
 │   ├── method.md
-│   └── interfaces.md
+│   ├── interfaces.md
+│   └── teacher-baseline.md
 ├── configs/
 │   └── phase1.json
 ├── src/rind_phase1/
@@ -192,6 +220,7 @@ Adaptive search remains part of the full proposal: establish the uniform baselin
 │   ├── model.py                # Conditional energy model and prediction
 │   ├── train.py                # Training and validation
 │   ├── evaluate.py             # Metrics, figures, ablations, and report
+│   ├── diagnostics.py           # Cost/zero maps, witnesses, components, entropy
 │   └── checks.py               # Small end-to-end verification
 ├── scripts/install_data.sh     # Environment setup and verified ZIP installation
 ├── scripts/browser.sh          # Optional dependencies and local browser startup
@@ -210,7 +239,7 @@ Adaptive search remains part of the full proposal: establish the uniform baselin
 └── archive/                    # Previous planning and web prototype; inactive
 ```
 
-`src/rind_phase1/` contains code. Root `data/` and `outputs/` hold datasets and experiment artifacts. Data installation, loading, and data-only checks are implemented. The research files remain responsibility descriptions.
+`src/rind_phase1/` contains code. Root `data/` and `outputs/` hold datasets and experiment artifacts. Data access and the uniform physical-cost → teacher-target baseline are implemented. The student files remain responsibility descriptions; adaptive search and richer physical losses are future work.
 
 ## 3. What each file must accomplish
 
@@ -226,35 +255,21 @@ Adaptive search remains part of the full proposal: establish the uniform baselin
 
 ### 3.2 `physics.py` — Judge whether a candidate explains the observation
 
-**Inputs:** original scene, observation, window metadata, candidate coordinates, and fixed intensity.
+**Implemented:** `PhysicalEvaluator` binds a scene/window, validates continuous geometry, rerenders a unit-intensity source, and returns `C(s)=mean(abs(R_hat-R))`. For the binary release this is disagreement count divided by `L²`. Invalid coordinates are not rendered. Exact-coordinate caching counts actual new renders. The small `CandidateEvaluator` protocol supports synthetic tests independently of the final renderer.
 
-**Responsibilities:**
+**Sanity check:** all ten dataset witnesses must independently reproduce the sampled response exactly and have zero cost. Witness checks never construct the teacher support.
 
-1. Place a candidate source in the original scene and rerender the same window.
-2. Compute boundary-weighted response disagreement `Lresp`. Weights depend only on the observed boundary; use uniform weights when it is absent.
-3. Provide optional symmetric boundary distance `Ledge`, covering displacement, missing boundaries, and extra boundaries.
-4. Return `C = αLresp + βLedge`, including the response-only baseline with `β=0`.
+**Later responsibilities:** the proposal's boundary-weighted response and optional edge costs need explicit boundary and empty-set conventions before implementation. The current baseline is `alpha=1,lambda=0,beta=0`.
 
-**Deliverables:** candidate responses, component costs, and final physical costs for `search.py` and `teacher.py`.
+### 3.3 `search.py` — Declare and evaluate source-space support
 
-**Completion goal:** the generating source reproduces its observation; all candidates use consistent cost definitions; empty/missing boundaries have defined outcomes. This file produces costs, not probability targets or trained models.
+**Implemented:** default world-minus-window support and an optional parent-minus-window prior, deterministic global half-spacing lattice, row-major ordering, map indexing, exact deduplication, and uniform evaluation. Preserve coordinates, geometric validity, evaluated flags, raw costs, completeness, render/cache counts, and timing. A budget-unfinished result cannot become a final teacher target.
 
-### 3.3 `search.py` — Find candidates worth evaluating
-
-**Inputs:** allowed source domain, window metadata, physical evaluation capability, and candidate budget.
-
-**Responsibilities:**
-
-1. Provide uniform candidates for the baseline and a small reference evaluation.
-2. Implement coarse-to-fine search: cover the domain, screen with response consistency, and refine low-cost regions or regions identified by an explicit uncertainty rule.
-3. When using edge enhancement, complete the required evaluation of final candidates so the teacher receives comparable costs.
-4. Record candidate counts, physical evaluation counts, and final sampling spacing; inspect missed disconnected feasible regions.
-
-**Deliverables:** candidate coordinates, validity information, available physical costs, and search records. Refine retained regions toward a common final spacing and deduplicate coordinates to limit density-induced mass differences. Region bounds may remain internal search metadata but are not required teacher inputs. Candidates lie inside the world and outside the observation window; the physical teacher also excludes obstacle interiors.
-
-**Completion goal:** adaptive search reduces computation relative to uniform reference evaluation and provides evidence that plausible regions are retained. It changes teacher cost, not student inputs or architecture. A design note alone is not final completion.
+**Later responsibilities:** investigate multiple compatible regions using the uniform diagnostics, then design coarse-to-fine search. Trace points and final target support must remain distinct; retain multiple regions, reach a consistent final spacing, cache/deduplicate, and compare quality/cost against common uniform support. No adaptive pruning is implemented yet.
 
 ### 3.4 `teacher.py` — Convert costs into supervision
+
+**Implemented:** completed uniform costs → stable valid-only Gibbs probabilities, compressed NPZ save/load, actual support/cost/dataset/code provenance, and `rind-teacher` CLI. `diagnostics.py` supplies source-space figures, zero components/fractions, entropy, and independent witness checks. No source-label or reference augmentation is used.
 
 **Inputs:** observation identifiers, candidate coordinates, final physical costs, temperature, and final sampling spacing.
 
@@ -271,7 +286,7 @@ Adaptive search remains part of the full proposal: establish the uniform baselin
 
 ### 3.5 `model.py` — Score candidates from the observation
 
-**Inputs:** local response, window `(x,y,size)`, and queried candidate coordinates.
+**Inputs:** local response, local obstacle mask, window metadata, and candidate world coordinates.
 
 **Responsibilities:**
 
@@ -282,7 +297,7 @@ Adaptive search remains part of the full proposal: establish the uniform baselin
 
 **Deliverables:** a callable student and example scores/distributions for different window sizes.
 
-**Completion goal:** new continuous coordinates can be queried without physical rerendering. Ground-truth sources, full geometry, obstacle masks, and the complete quadtree are not student inputs. A raw-coordinate comparison may be added within this file without creating another module.
+**Completion goal:** new continuous coordinates can be queried without physical rerendering. Ground-truth sources, full geometry, outside-window obstacle masks, and the complete quadtree are not student inputs; the local mask is allowed. A raw-coordinate comparison may be added within this file without creating another module.
 
 ### 3.6 `train.py` — Fit the student to the teacher
 
@@ -317,7 +332,7 @@ Adaptive search remains part of the full proposal: establish the uniform baselin
 
 ### 3.8 `checks.py` — Verify the handoffs
 
-Data-only checks are implemented via `--data-only`; research handoff checks below remain to be added by their owners.
+Data checks run via `--data-only`; implemented uniform teacher checks run via `--teacher`, across six sizes and sixty reference witnesses. Focused domain/ordering/normalization/completion tests run with `python -m unittest discover -s tests -v`. Student handoff checks remain future work.
 
 **Inputs:** a few real RIND samples and the modules above.
 
@@ -334,7 +349,7 @@ Data-only checks are implemented via `--data-only`; research handoff checks belo
 | `configs/phase1.json` | Shared data, observation, cost, search, model, and training settings; `null` means unresolved, not a runnable default |
 | `README.md`, `README.zh-CN.md` | Goals, file responsibilities, and ownership; synchronize assignment changes between versions |
 | `src/rind_phase1/__init__.py` | Package marker; no separate research task |
-| `pyproject.toml`, `uv.lock` | Project dependencies and locked reader environment; optional `train` extra adds PyTorch |
+| `pyproject.toml`, `uv.lock` | Project dependencies and locked reader environment; optional `train` adds PyTorch; `diagnostics` adds Matplotlib |
 | `scripts/install_data.sh`, `install_data.py` | Install the environment, verify and extract a local ZIP, and clean the archive |
 | `scripts/browser.sh`, `browser.py` | Install optional browser dependencies and visualize the same installed dataset |
 | `vendor/rind-dataset/` | Versioned reader and CPU renderer, independent of the downloaded code |
@@ -348,22 +363,22 @@ Data-only checks are implemented via `--data-only`; research handoff checks belo
 | `.gitkeep` | Preserve empty data/output directories; not an experimental result |
 | `archive/` | Previous README versions, notes, empty scaffolds, and web prototype; old paths/tasks are inactive and require no further work |
 
-The installation script and data-only verification commands above are runnable. Put future research run entry points in their corresponding core files; teacher generation and training commands are not implemented yet.
+Installation, browsing, data checks, and uniform teacher generation/checks are runnable. Student training and adaptive search remain unimplemented.
 
 ## 5. Minimum handoff agreement
 
 | Record | Required content |
 |---|---|
-| Observation | `scene_id`, `view_id`, `response`, `window=(x,y,size)` |
+| Observation | `scene_id`, `view_id`, `response`, local `obstacle`, `window=(x,y,size)` |
 | Teacher supervision | Sample identifiers, `candidate_xy [N,2]`, `valid [N]`, `physical_cost [N]`, `teacher_prob [N]`, `temperature`, and `config_id` |
 | Student result | `candidate_xy`, candidate-aligned `energy` and `probability`, with model/configuration identifiers retained in run records |
 
-World coordinates span `[0,1024]`, with x rightward and y downward; arrays use `[row,column]`. Scene IDs, true sources, and geometry may be retained in records but are not student features.
+World coordinates span `[0,1024]`, with x rightward and y downward; arrays use `[row,column]`. Scene IDs, true sources, and full scene geometry may be retained in teacher/evaluation records but are not student features. The local obstacle mask is an intended student feature.
 
 **Three necessary interpretation notes:**
 
-- Source-driven window selection makes window location and size informative. Declare this observation process. Reproducing the same single-source quadtree leaf requires a source inside its parent and outside the leaf. That restriction is disabled by default: the current teacher is a fixed-window response-compatibility Gibbs target, not the full generative posterior conditioned on window selection.
-- The teacher knows hidden scene geometry; the student does not. Identical observable inputs may correspond to different teacher maps, so exact recovery of every scene-specific target is not guaranteed.
+- The dataset uses source-driven quadtree windows, but the main teacher evaluates physical compatibility for a fixed observation and **sources outside that window**. `quadtree_prior=false` searches world-minus-window. Candidates need not regenerate the same quadtree leaf. The parent prior is an explicit optional ablation; neither target is a calibrated generative posterior.
+- The teacher knows full scene geometry; the student sees only the local obstacle mask. Identical observable inputs may correspond to different teacher maps, so exact recovery of every scene-specific target is not guaranteed.
 - The teacher excludes obstacle-interior candidates using geometry. If student evaluation uses this teacher-provided support, label it explicitly rather than presenting it as geometry-free deployment. Deployment also needs a predeclared public candidate set: teacher-selected adaptive support leaks information even without passing a mask. Training on retained valid candidates does not automatically suppress energies outside that support.
 
 ## 6. Self-selected ownership and Thursday milestone
