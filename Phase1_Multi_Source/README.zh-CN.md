@@ -28,7 +28,7 @@
 
 ## 2. 安装与浏览
 
-向数据维护者获取多源包 **`RIND-adaptive-v3-10000scenes.zip`**。这里尚未登记多源下载链接；单源版的 Drive 链接对应另一份数据。把 ZIP 放到本 README 所在目录，保持压缩状态：
+从 [Google Drive 下载多光源发布包 RIND-adaptive-v3-10000scenes.zip](https://drive.google.com/file/d/1A7cX78-yzfRt6rBdIP7a5nA6BF0HqICs/view?usp=sharing)（约 153 MiB）。把 ZIP 放到本 README 所在目录，保持压缩状态：
 
 ```bash
 ./scripts/install_data.sh

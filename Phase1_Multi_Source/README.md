@@ -27,7 +27,7 @@ Quadtree generation splits a source-containing cell into four, records source-fr
 
 ## 2. Install and browse
 
-Obtain the **multi-source** `RIND-adaptive-v3-10000scenes.zip` from the dataset maintainer. Its download link is not yet listed here; the single-source Drive link is a different release. Put the ZIP beside this README and keep it compressed:
+Download the **multi-source** release [RIND-adaptive-v3-10000scenes.zip from Google Drive](https://drive.google.com/file/d/1A7cX78-yzfRt6rBdIP7a5nA6BF0HqICs/view?usp=sharing) (about 153 MiB). Put the ZIP beside this README and keep it compressed:
 
 ```bash
 ./scripts/install_data.sh
