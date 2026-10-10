@@ -354,11 +354,14 @@ def inspect_observation(
         "window",
     }
 
-    if set(sample.keys()) != required:
+    if not required.issubset(sample):
         raise ValueError(
             "Unexpected observation fields: "
             f"{sorted(sample.keys())}"
         )
+
+    from .interfaces import validate_observation
+    validate_observation(sample)
 
     response = np.asarray(
         sample["response"]
@@ -878,7 +881,7 @@ def validate_student_result(
     Required:
         candidate_xy
         energy
-        probability
+        student_prob
 
     Model/config identifiers are expected in experiment records
     but their naming is not yet fixed, so this function does not
@@ -888,7 +891,7 @@ def validate_student_result(
     required = {
         "candidate_xy",
         "energy",
-        "probability",
+        "student_prob",
     }
 
     missing = (
@@ -914,7 +917,7 @@ def validate_student_result(
     )
 
     prob = validate_probability(
-        result["probability"],
+        result["student_prob"],
         "student probability",
     )
 
@@ -931,7 +934,7 @@ def validate_student_result(
     return {
         "candidate_xy": xy,
         "energy": energy,
-        "probability": prob,
+        "student_prob": prob,
     }
 
 
@@ -946,6 +949,14 @@ def validate_common_support(
 
     Candidate ordering is part of the handoff contract.
     """
+
+    for key in ("scene_id", "view_id", "window", "valid", "config_id"):
+        if key not in student_result or not np.array_equal(teacher_record[key], student_result[key]):
+            raise ValueError(f"Teacher/student mismatch: {key}")
+    from part_e.checks import prediction_support
+    mask = prediction_support(student_result, np.asarray(teacher_record["valid"], dtype=bool))
+    if np.any(np.asarray(student_result["student_prob"])[~mask] != 0):
+        raise ValueError("Invalid candidates must have zero student probability")
 
     teacher_xy = np.asarray(
         teacher_record["candidate_xy"],
@@ -1099,7 +1110,7 @@ def physical_compatibility_metrics(
 
     prob = normalize_probability(
         probability,
-        "probability",
+        "student_prob",
     )
 
     cost = np.asarray(
@@ -1143,40 +1154,23 @@ def physical_compatibility_metrics(
         )
     )
 
-    if valid_prob_mass <= 0:
-        raise ValueError(
-            "Distribution places no mass "
-            "on valid candidates."
-        )
-
-    conditional_prob = (
-        prob[mask]
-        / valid_prob_mass
-    )
-
     valid_cost = cost[mask]
-
-    expected_cost = float(
-        np.sum(
-            conditional_prob
-            * valid_cost
-        )
-    )
+    expected_cost = (float(np.sum(prob[mask] * valid_cost) / valid_prob_mass)
+                     if valid_prob_mass > 0 else None)
 
     most_probable_index = int(
         np.argmax(prob)
     )
 
     return {
-        "expected_physical_cost": (
-            expected_cost
-        ),
+        "expected_physical_cost": expected_cost if not np.any(prob[~mask] > 0) else None,
+        "expected_physical_cost_infinite": bool(np.any(prob[~mask] > 0)),
+        "expected_valid_cost": expected_cost,
+        "invalid_probability_mass": float(prob[~mask].sum()),
         "minimum_physical_cost": float(
             np.min(valid_cost)
         ),
-        "most_probable_candidate_cost": float(
-            cost[most_probable_index]
-        ),
+        "most_probable_candidate_cost": float(cost[most_probable_index]) if mask[most_probable_index] else None,
         "valid_probability_mass": (
             valid_prob_mass
         ),
@@ -1398,12 +1392,12 @@ def evaluate_teacher_student_record(
 
     agreement = teacher_student_metrics(
         teacher["teacher_prob"],
-        student["probability"],
+        student["student_prob"],
     )
 
     physical = (
         physical_compatibility_metrics(
-            student["probability"],
+            student["student_prob"],
             teacher["physical_cost"],
             teacher["valid"],
         )
@@ -1417,7 +1411,7 @@ def evaluate_teacher_student_record(
 
     student_ambiguity = (
         ambiguity_metrics(
-            student["probability"]
+            student["student_prob"]
         )
     )
 

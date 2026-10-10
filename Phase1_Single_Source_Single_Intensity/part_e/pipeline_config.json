@@ -1,7 +1,7 @@
 {
-  "teacher_source": "../upstream_snapshots/teacher",
-  "student_source": "../upstream_snapshots/student/student_baseline",
-  "data_root": "../data/pilot-single-source",
+  "teacher_source": "..",
+  "student_source": "../student_baseline",
+  "data_root": "../data/raw/phase1-single-source",
   "scene_id": 0,
   "view_id": 4,
   "candidate_spacing": 128,
@@ -9,5 +9,6 @@
   "compatibility_threshold": 0.01,
   "backend": "auto",
   "checkpoint": null,
-  "protocol_status": "pilot_example_settings_not_final_research_protocol"
+  "protocol_status": "pilot_example_settings_not_final_research_protocol",
+  "student_interface": "phase1-v1"
 }

@@ -1,59 +1,31 @@
 {
-  "status": "uniform_teacher_ready_student_pending",
-  "seed": 20260923,
+  "status": "training_and_results_explorer_ready",
+  "purpose": "Low-level unweighted teacher CLI defaults and project contract index; formal training uses active_experiment",
+  "active_experiment": "configs/experiment_consistent.json",
+  "interface_version": "phase1-v1",
+  "protocol_version": 2,
+  "student_inputs": [
+    "response",
+    "window",
+    "candidate_xy"
+  ],
+  "normalization_support": "world",
+  "fixed_intensity": 1,
+  "minimum_window_size": 16,
+  "candidate_weighting": "equal_per_actual_candidate_no_area",
+  "adaptive_status": "independent_retention_comparison_not_primary_training",
+  "ownership": "self_selected",
   "data": {
-    "dataset_root": "data/raw/phase1-single-source",
-    "world_size": 1024,
-    "num_scenes": 10000,
-    "num_sources": 1,
-    "fixed_intensity": 1.0,
-    "window_policy": "source_driven_quadtree",
-    "exclude_occupied_leaves": true,
-    "split_by": "scene_id",
-    "split_ratios": null,
-    "min_window_size": 16
-  },
-  "student": {
-    "inputs": [
-      "response",
-      "obstacle",
-      "window_x",
-      "window_y",
-      "window_size"
-    ],
-    "candidate_frame": "world",
-    "coordinate_scale": 1024,
-    "full_scene_geometry_input": false,
-    "full_quadtree_input": false,
-    "batching": "size_buckets_or_padding_with_mask",
-    "fourier_frequencies": null
+    "dataset_root": "data/raw/phase1-single-source"
   },
   "teacher": {
-    "baseline": "uniform_candidates_response_only",
     "alpha": 1.0,
     "beta": 0.0,
     "boundary_lambda": 0.0,
-    "boundary_sigma": null,
-    "temperature": null,
-    "adaptive_search": false,
-    "adaptive_budget": null,
-    "candidate_weighting": "equal_per_valid_uniform_grid_point",
-    "adaptive_comparison_required": true,
-    "target_semantics": "fixed_window_world_discrete_compatibility",
+    "boundary_sigma": 1.0,
     "candidate_spacing": null,
-    "final_candidate_spacing": null,
-    "quadtree_prior": false
-  },
-  "training": {
-    "device": null,
-    "batch_size": null,
-    "epochs": null,
-    "learning_rate": null,
-    "checkpoint_selection_metric": null
-  },
-  "coordination": {
-    "ownership": "self_selected",
-    "first_review": "2026-10-01",
-    "compute": "pending"
+    "temperature": null,
+    "quadtree_prior": false,
+    "adaptive_search": false
   }
 }

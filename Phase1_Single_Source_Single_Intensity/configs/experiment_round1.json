@@ -1,0 +1,14 @@
+{
+  "name": "round1_cpu",
+  "data_root": "data/raw/phase1-single-source",
+  "output_root": "outputs/experiments/round1_cpu",
+  "split_seed": 20260923,
+  "scene_counts": {"train": 192, "validation": 32, "test": 32},
+  "window_sizes": [16, 32, 64, 128],
+  "views_per_size": 1,
+  "teacher": {"spacing": 64, "temperature": 0.05, "alpha": 1.0, "boundary_lambda": 2.0, "boundary_sigma": 1.0, "backend": "auto"},
+  "variants": {"response": {"beta": 0.0}, "edge": {"beta": 0.1}},
+  "training": {"seeds": [0, 1, 2], "epochs": 30, "patience": 8, "batch_size": 4, "learning_rate": 0.001, "weight_decay": 0.0001, "grad_clip": 1.0, "hidden": 64, "fourier_frequencies": 6, "device": "cpu", "num_threads": 4},
+  "evaluation": {"compatibility_threshold": 0.01, "prediction_chunk": 128, "plot_count": 4},
+  "search_comparison": {"coarse_stride": 2, "retain_fraction": 0.5, "exploration_fraction": 0.1, "seed": 0, "max_observations": 16}
+}

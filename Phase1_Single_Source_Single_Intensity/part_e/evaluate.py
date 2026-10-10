@@ -79,12 +79,21 @@ def evaluate_record(record, prediction=None, *, threshold, spacing=None):
                       candidate_spacing=spacing)
     if prediction is not None:
         checks.aligned(record, prediction)
-        p = checks.probability(prediction['student_prob'], valid, 'student_prob')
+        p = checks.probability(prediction['student_prob'], checks.prediction_support(prediction,valid), 'student_prob')
         result.update(distributions(q, p))
         best = int(np.argmax(p))
-        result.update(student_expected_physical_cost=float(p[valid] @ cost[valid]),
+        invalid_mass=float(p[~valid].sum())
+        valid_mass=float(p[valid].sum())
+        physics=metadata.get('settings',{}).get('physics',{})
+        invalid_penalty=float(physics.get('alpha',1.0))+2*float(physics.get('beta',0.0))
+        result.update(normalization_support=str(np.asarray(prediction.get('normalization_support','geometry')).item()),
+                      student_invalid_mass=invalid_mass,student_valid_mass=valid_mass,
+                      student_expected_valid_cost=float(p[valid] @ cost[valid])/valid_mass if valid_mass>0 else None,
+                      student_expected_penalized_cost=float(p[valid] @ cost[valid])+invalid_penalty*invalid_mass,
+                      invalid_cost_penalty=invalid_penalty,student_expected_physical_cost_infinite=invalid_mass>0)
+        result.update(student_expected_physical_cost=float(p[valid] @ cost[valid]) if invalid_mass==0 else None,
                       student_compatible_mass=float(p[low].sum()),
-                      student_top1_physical_cost=float(cost[best]),
+                      student_top1_physical_cost=float(cost[best]) if valid[best] else None,
                       student_top1_compatible=bool(low[best]))
         if spacing is not None:
             result['component_student_mass'] = [float(p[g].sum()) for g in groups]
@@ -106,7 +115,11 @@ def aggregate(rows):
             metrics[key] = {'observations': len(values), 'scenes': len(scenes),
                             'observation_mean': float(np.mean(values)),
                             'scene_mean': float(np.mean([np.mean(v) for v in scenes.values()]))}
+    infinite_count = sum(bool(r.get('student_expected_physical_cost_infinite', False)) for r in rows)
+    if infinite_count:
+        metrics.pop('student_expected_physical_cost', None)
     return {'observations': len(rows), 'scenes': len({r['scene_id'] for r in rows}),
+            'infinite_expected_physical_cost_observations': infinite_count,
             'infinite_kl_observations': sum(r.get('forward_kl_infinite', False) for r in rows),
             'metrics': metrics}
 
@@ -202,21 +215,21 @@ def search_comparison(reference, covered, *, threshold, adaptive_evaluations, ad
 
 
 def plot_record(record, prediction, output, response=None):
-    """Dependency-free SVG candidate plots; invalid candidates explicitly omitted."""
+    """Legacy candidate overview; each panel respects its declared support."""
     xy, valid, cost, q = checks.teacher(record)
-    fields = [('Physical cost', cost), ('Teacher mass', q)]
+    fields = [('Physical cost', cost, valid), ('Teacher mass', q, np.ones_like(valid))]
     if prediction is not None:
         checks.aligned(record, prediction)
-        fields.append(('Student mass', checks.probability(prediction['student_prob'], valid, 'student_prob')))
+        fields.append(('Student mass', checks.probability(prediction['student_prob'], checks.prediction_support(prediction,valid), 'student_prob'), checks.prediction_support(prediction,valid)))
     svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{340*len(fields)}" height="380" viewBox="0 0 {340*len(fields)} 380">', '<rect width="100%" height="100%" fill="white"/>']
     support = record.get('metadata', {}).get('settings', {}).get('support', {})
     world = float(support.get('world_size', 1024))
-    for panel, (title, values) in enumerate(fields):
+    for panel, (title, values, panel_support) in enumerate(fields):
         left = panel*340+35
-        maximum, minimum = float(values[valid].max()), float(values[valid].min())
+        maximum, minimum = float(values[panel_support].max()), float(values[panel_support].min())
         svg.append(f'<text x="{left}" y="22" font-size="16">{html.escape(title)}</text>')
         svg.append(f'<rect x="{left}" y="40" width="280" height="280" fill="#eee" stroke="#777"/>')
-        for (x,y), value in zip(xy[valid], values[valid]):
+        for (x,y), value in zip(xy[panel_support], values[panel_support]):
             t = (float(value)-minimum)/(maximum-minimum) if maximum>minimum else .5
             color = f'rgb({int(240*t)},70,{int(240*(1-t))})'
             svg.append(f'<circle cx="{left+280*x/world:.3f}" cy="{40+280*y/world:.3f}" r="2.5" fill="{color}"><title>{x:g},{y:g}: {value:.6g}</title></circle>')

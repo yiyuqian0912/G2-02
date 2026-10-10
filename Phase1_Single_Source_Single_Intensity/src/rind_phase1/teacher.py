@@ -62,10 +62,13 @@ def _digest(value):
 
 def generate_uniform_teacher(dataset, scene_id, view_id, *, spacing, temperature,
                              quadtree_prior=False, backend="auto", max_evaluations=None,
-                             run_id=None):
+                             run_id=None, alpha=1.0, beta=0.0,
+                             boundary_lambda=0.0, boundary_sigma=1.0):
     """Build a target without consulting reference positions or source truth labels."""
     _validate_temperature(temperature)
-    evaluator = PhysicalEvaluator(dataset, scene_id, view_id, backend=backend)
+    evaluator = PhysicalEvaluator(dataset, scene_id, view_id, backend=backend,
+                                  alpha=alpha, beta=beta, boundary_lambda=boundary_lambda,
+                                  boundary_sigma=boundary_sigma)
     domain = CandidateDomain(tuple(evaluator.observation["window"]), evaluator.world_size, quadtree_prior)
     result = uniform_search(domain, evaluator, spacing=spacing, max_evaluations=max_evaluations)
     probabilities = target_from_search(result, temperature=temperature)

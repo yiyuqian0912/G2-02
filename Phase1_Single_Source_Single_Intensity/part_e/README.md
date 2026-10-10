@@ -1,6 +1,8 @@
+> Integration now defaults to `phase1-v1` from `src/rind_phase1/`. Set `student_interface: legacy-relative-v0` explicitly for old pilot checkpoints. The local config points to this repository and installed data. See [current contracts](../docs/interfaces.md); historical pilot commands below describe the legacy experiment.
+
 # Part E：评价与端到端联调
 
-此目录是独立的 E 实现，不覆盖 src/rind_phase1 中已有文件。
+此目录提供正式评价指标和搜索对照，由 `src/rind_phase1/experiments.py` 调用。新默认协议使用公开候选范围，几何辅助另报；下方 pilot 记录仅是历史实验。
 
 ## 查看提交的结果
 
@@ -30,7 +32,7 @@ manifest 的 observations 列表每条含 teacher、student 和可选 observatio
 
 ## 真实联调与对比
 
-主分支的 B/C/D 尚未全部合入。pipeline_config.json 中 teacher_source 指向 C 完整 Phase I 目录，student_source 指向 D 的 student_baseline，data_root 指向已安装数据；使用真实模型时填写 checkpoint。这些产物不在本上传包内，必须先填自己的实际路径。路径相对配置文件。
+当前主线接口已统一；正式实验使用 `src/rind_phase1/`。旧 pilot 的独立路径配置仅供复现。pipeline_config.json 的 data_root 指向已安装数据；使用真实模型时填写 checkpoint。这些产物不在本上传包内，必须先填自己的实际路径。路径相对配置文件。
 
 ```bash
 python -m part_e.checks --pipeline-config part_e/pipeline_config.json --output outputs/reports/end_to_end

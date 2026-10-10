@@ -14,3 +14,17 @@ data/**
 outputs/**
 !outputs/**/
 !outputs/**/.gitkeep
+
+# Local history and generated experiment configurations (keep shared templates).
+/archive/
+/configs/experiment_*.json
+!/configs/experiment_consistent.json
+!/configs/experiment_round1.json
+!/configs/experiment_train5000.json
+/docs/consistency-review.zh-CN.md
+
+# Model weights and numerical artifacts are not source code.
+*.pt
+*.pth
+*.npz
+*.npy

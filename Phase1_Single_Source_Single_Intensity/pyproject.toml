@@ -17,6 +17,7 @@ diagnostics = ["matplotlib>=3.7"]
 [project.scripts]
 rind-install-data = "rind_phase1.install_data:main"
 rind-browser = "rind_phase1.browser:main"
+rind-results = "rind_phase1.results_browser:main"
 rind-teacher = "rind_phase1.teacher:main"
 
 [tool.uv.sources]
@@ -24,3 +25,6 @@ rind-dataset = { path = "vendor/rind-dataset", editable = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+rind_phase1 = ["templates/*.html"]

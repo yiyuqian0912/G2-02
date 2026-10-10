@@ -1,98 +1,77 @@
-# Phase I Method Reference
+# Phase I method reference
 
-[English README](../README.md) · [中文 README](../README.zh-CN.md) · [Contracts](interfaces.md) · [Run the teacher](teacher-baseline.md)
+[README](../README.md) · [Interfaces](interfaces.md) · [Experiment instructions](experiments.zh-CN.md)
 
-The implemented baseline is observation → uniform physical cost map → soft teacher target. Adaptive search, richer boundary losses, and student modeling/training remain future work.
+## Scope and observation
 
-## 1. Observation and inverse problem
+Phase I uses one unit-strength source in a continuous 1024×1024 hard-occlusion world. There is no distance decay, reflection, noise or material variation. The later agreed source-driven quadtree supersedes the proposal's initial fixed-size window: split occupied cells into four, retain source-free cells immediately, stop at size 16, and exclude occupied terminal leaves. Each scene yields 18 observations, three at each size 16–512.
 
-Use the supplied single-source release: 10,000 scenes, 180,000 observations, intensity 1, and a continuous 1024 × 1024 occlusion world. Phase I excludes distance decay, reflections, noise, and material differences. Keep all observations and derived targets of a scene in the same split; the formal split ratios are still unresolved.
+The primary student's information is `O=(R,v)`, where `R` is the native local response and `v=(x,y,size)`. A pixel `[row,col]` samples the world at `(x+col+0.5,y+row+0.5)`. The candidate `s=(sx,sy)` is a world coordinate. IDs, true sources, the full tree and hidden geometry are not model inputs. A local obstacle mask remains in the data contract for checking and an explicit `use_obstacle=true` ablation; it is disabled in the new default configuration.
 
-Let `R` be the sampled local response, `M` the local obstacle mask, `v=(x,y,L)` the window, and `O=(R,M,v)`. The student is intended to predict source-space compatibility for candidate `s=(sx,sy)`. It receives no outside-window obstacle information or full scene geometry. IDs identify records and are not model features.
+## Source domain and the quadtree prior
 
-Windows use the source-driven quadtree. Split source-containing cells into four; immediately retain source-free cells; stop at side length 16 and exclude occupied terminal leaves. A single-source scene has 18 observations. Split-line sources belong to right/lower children; the outer world edge belongs to terminal cells.
+The default domain is the continuous world minus the observed window. The renderer's valid-source test additionally excludes closed obstacle interiors/boundaries. We distinguish this hidden physical validity from the public domain available to the student.
 
-Coordinates point right in x and down in y. Window pixel `[row,col]` samples `(x+col+0.5,y+row+0.5)`. Image resolution describes sampling precision; source and obstacle geometry remain continuous.
+The source-driven selection process also implies a parent-cell constraint for the original generating source. The default experiment deliberately evaluates *fixed-window counterfactual compatibility*, without conditioning on that selection event. It may retain sources outside the parent if they reproduce the fixed local response. `quadtree_prior=true` is a separately labelled parent-minus-window ablation, not the default. Consequently the default target is a compatibility distribution, not a fully generative Bayesian posterior for the entire window-selection process.
 
-## 2. Sources outside the observation window
+## Physical teacher
 
-For a window of side `L`, its parent is the aligned cell of side `2L`:
+For hidden scene `S`, rerender `R(S,s;v)` in the same window. A candidate inside an obstacle is invalid, is not rendered, has infinite physical cost, and receives zero teacher probability.
 
-```text
-parent_origin = (floor(x/(2L))*2L, floor(y/(2L))*2L)
-main domain = world \ W
-optional prior ablation = quadtree_parent(W) \ W
-```
+For valid candidates:
 
-The task explicitly studies sources outside the observation window. The generator supplies quadtree windows, but the main teacher conditions on a fixed window and evaluates response compatibility without requiring candidates to generate the same leaf. The default is `teacher.quadtree_prior=false`, world-minus-window. Although the generating source is inside the parent, that restriction is used only when explicitly enabling the optional parent-prior ablation. Both domains remain subject to world bounds and continuous teacher-side geometric validity. Domain construction belongs to `search.py`; physics owns obstacle/source validity.
+\[
+L_{resp}(s)=\frac{\sum_u w(u)|R(S,s;v)(u)-R(u)|}{\sum_u w(u)},
+\quad w(u)=1+\lambda\exp[-d(u)^2/(2\sigma^2)].
+\]
 
-The main target is physical compatibility for window-external sources on the chosen world support. It is not a calibrated generative posterior: the quadtree window-selection likelihood and a continuous source density are not inferred.
+Weights depend only on the observed response boundary, never the candidate response. The implementation marks both sides of 4-neighbor binary transitions; the image frame is not a response boundary. With no observed boundary, weights are uniform. The formal v2 default uses `lambda=2`, `sigma=1` pixel, `alpha=1`. Direct low-level calls retain their documented unweighted baseline default `lambda=0` unless overridden.
 
-## 3. Response-only physical baseline
+The optional edge term is a symmetric mean nearest-edge distance. Distances are divided by the window diagonal so sizes are comparable. Both empty edge sets have cost zero; exactly one empty set has cost 1 (empty-to-nonempty contributes zero; nonempty-to-empty contributes one). This finite convention makes `0 <= L_edge <= 2`. The exact convention is tested in `physics.py`.
 
-The teacher knows hidden scene geometry `S`. At each valid source position it rerenders the same window at intensity 1 and compares with `R`:
+\[
+C(s;O,S)=\alpha L_{resp}(s)+\beta L_{edge}(s).
+\]
 
-```text
-C(s) = mean(abs(R_hat(s) - R))
-     = disagreeing sampled pixels / L²  (binary data)
-```
+Response-only uses `beta=0`; the default edge ablation uses `beta=0.1`. Boundary weighting and explicit edge distance are distinct but can overlap in information. Their practical value requires a paired experiment, not an assumption of independent gain.
 
-The same evaluator handles all six stored window sizes (16–512) at their original resolution. Dividing by `L²` gives the same disagreement-fraction interpretation across sizes, rather than larger windows automatically receiving larger costs.
+At half-spacing centers of a globally anchored uniform grid, keep candidates outside the observation window in row-major order. Define
 
-Every sampled pixel has equal weight. Obstacle pixels are included and zero in both responses. Thus `C` lies in `[0,1]`; `C=0` means exact equality on this sampled observation. Invalid candidates are not rendered and have infinite cost. This CPU NumPy/Numba evaluator is not differentiable in source coordinates.
+\[
+q_i=\frac{\exp(-C_i/\tau)}{\sum_{j:valid_j}\exp(-C_j/\tau)},\qquad q_i=0\text{ for invalid }i.
+\]
 
-The inverse set is conceptually `{s:C(s)=0}` and can have continuous, disconnected, elongated, or large regions. A finite grid only samples that set. No zero-cost grid point does not imply that the continuous inverse set is empty.
+Each actual candidate has equal base weight. **No cell area, retained block area, source label, or supplied reference witness is multiplied into q.** A valid but uniformly poor candidate set still sums to one; report costs, minimum cost and compatible-grid coverage alongside distributions. Supplied reference solutions are separate renderer checks, not inserted training candidates.
 
-The ten dataset source positions, including truth, are incomplete compatibility witnesses. Each must independently rerender exactly and have zero response cost. They are used for checks, overlays, and limited coverage diagnostics. They never augment the grid or enter teacher normalization as extra samples or labels.
+## Student and optimization
 
-### Later boundary-loss experiments
+The response encoder operates at native size. The window encoder provides position and scale. In the new model, deterministic local x/y channels preserve pixel position within the response features. Candidate Fourier features are computed from world coordinates divided by world size, using `sin(pi*2^k*s/world)` and cosine plus the normalized coordinates. Candidate-conditioned attention combines the observed feature map and candidate query to produce `E_theta(O,s)`.
 
-The proposal's boundary-weighted response cost and optional symmetric edge distance are not implemented in this baseline:
+For the primary protocol, the student softmax includes **all declared world-minus-window candidates**, including physically invalid ones. Physical invalidity is hidden from the student. Teacher q is zero there, but those locations still affect the softmax denominator and therefore receive training gradients. A geometry-assisted ablation masks them out and is labelled separately.
 
-```text
-L_resp = sum_u w(u) abs(R_hat(u)-R(u)) / sum_u w(u)
-w(u) = 1 + lambda exp(-d(u)²/(2 sigma²))
-C = alpha L_resp + beta L_edge
-```
+\[
+p_i=\operatorname{softmax}(-E)_i,\qquad
+\mathcal L=-\sum_i q_i\log p_i.
+\]
 
-Current settings are `alpha=1`, `lambda=0`, `beta=0`; no edge cost is computed. Before enabling richer costs, define boundary extraction, distance units, crop-border behavior, and empty/missing/extra boundary handling. All candidates of a target must use the same physical cost definition.
+This is forward-KL minimization up to teacher entropy; the energy need not equal the physical cost. Teacher temperature is already present in q and is not applied to the student a second time. Candidate scoring can be chunked, but concatenated energies are normalized **once globally**. Size buckets avoid resizing/padding image observations. Training records load lazily; candidate attention uses activation recomputation to reduce peak memory.
 
-## 4. Uniform support and teacher distribution
+The shortest Fourier period is `2*world_size/2^(K-1)` for K frequency bands. New configurations require at least four candidate spacings per shortest period. The default `K=4, spacing=64` satisfies this guard; the legacy `K=6, spacing=64` does not. The guard reduces a specific aliasing risk; it does not prove accurate interpolation or prevent all learned high-frequency structure. A finer validation-grid physics probe measures off-grid agreement without tuning on test observations.
 
-Use globally anchored world-coordinate lattice points `((kx+0.5)*spacing,(ky+0.5)*spacing)`. Filter the declared domain, then evaluate geometric validity and physical cost. Order is ascending y, then ascending x. At equal spacing the prior support is a subset of the world support. Candidate spacing is independent of image sampling resolution.
+## Search and experimental scope
 
-For a completed uniform result and valid candidate set `V`:
+Uniform exhaustive evaluation on a declared grid is the primary training reference. `part_e/adaptive.py` performs broad block scouting followed by complete refinement of promising and randomly explored blocks on the same final grid. Final targets exclude scouting-only and unfinished blocks. Their normalization is conditional on retained support; omitted points are unknown, not known to have zero physical compatibility.
 
-```text
-a_i = exp(-(C_i - min_(j in V) C_j)/tau)
-q_i = a_i / sum_(j in V) a_j
-```
+The comparison records rendering cost and the compatible/teacher mass omitted relative to the uniform reference. It does **not yet implement** the proposal's calibrated uncertainty selection or cheap-response/expensive-edge cascade, and is not silently substituted for primary training. This separation prevents search pruning errors from being presented as exact teacher uncertainty.
 
-Require finite positive `tau`. Invalid probabilities are exactly zero; an empty valid set or incomplete search is an explicit failure. Retain raw costs, positions, validity, ordering, support metadata, and provenance. No one-hot truth label or area weighting is applied. `q` is a discrete approximation of the compatibility landscape on this support, not a continuous density. Compare distributions on the same coordinates.
+## Evaluation and interpretation
 
-Spacing and temperature have no formal defaults in `configs/phase1.json`. CLI overrides are stored with the actual generated target; configuration and source hashes identify the run.
+Freeze data identity, source code, candidate settings, scene split and windows before training. v2 uses fixed disjoint scene pools, with window choices stable under changes to training count. Select best epoch using validation cross-entropy, then evaluate held-out scenes against the same teacher coordinates. Report KL, JS, L1, compatible mass, entropy, invalid mass, size groups, constant/nonconstant responses, and a uniform baseline over the same student support. Edge ablations also compare against the common response teacher.
 
-## 5. Diagnostics before adaptive search
+If student mass on invalid positions is positive, the true expected infinite-cost physical objective is infinite, encoded as `null` plus an explicit flag. Report valid-conditional cost separately. A finite auxiliary cost penalizes invalid mass by `alpha+2*beta`, the upper bound on valid costs for this binary setup; it must not be called the original expected physical cost. Geometry-assisted secondary results normalize the same energies after applying hidden validity.
 
-`diagnostics.py` shows local response/mask, cost map, sampled zero-cost map, teacher mass, truth, all ten witnesses, and a separate witness zoom. It reports zero/low-cost fractions, four-neighbor sampled components, approximate component areas/bounding boxes, entropy, and effective candidate count. Low-cost thresholds are explicit optional analysis settings.
+Dense visualizations directly query every selected grid center and normalize there. The saved teacher remains at its measured resolution; no interpolated physical teacher is invented. Different grid sizes imply different per-point probabilities. Matched-grid displays use identical candidates and shared color scales; dense displays state their independent normalization and scales. Hover and NPZ expose numerical values.
 
-Component connectivity and area describe sampled cells, not proven continuous topology. Witness coverage is only a lower-bound diagnostic; nearest-grid witness matches depend on spacing. Record spacing and use a common world spacing when studying changes with window size.
+The teacher has access to S while the student does not. Identical local observations from different scenes can require different scene-conditioned teacher distributions. The expected cross-entropy optimum averages their teacher targets conditional on the student's information; exact per-scene recovery is not generally identifiable. Preserving uncertainty and generalization are empirical goals, not guaranteed by the energy formulation.
 
-The uniform baseline is the reference for future adaptive search. Later work must preserve multiple regions, separate trace points from final support, deduplicate/cache coordinates, count actual unique renders, reach a consistent declared final spacing, and fail explicitly when the budget prevents completion. Coarse and fine trace points must not be mixed blindly into the teacher softmax. A pruning rule remains undecided.
-
-## 6. Student and evaluation: intended later stages
-
-The intended energy input is `(R,M,v,s)` with local `M` only. Full geometry, outside-window masks, truth, scene IDs, physical costs, and the complete quadtree are excluded. Fourier source features and the model architecture remain student responsibilities; no model/training implementation was changed for this baseline.
-
-On the same valid teacher support:
-
-```text
-p_i = exp(-E_i) / sum_(j in V) exp(-E_j)
-L_CE = -sum_(i in V) q_i log(p_i)
-```
-
-Teacher-to-student KL has the same optimization objective up to a teacher-only constant. Energy need not equal physical cost numerically. Validity is normalization metadata, not an encoder feature.
-
-Evaluate held-out scenes, ambiguity retention, physical compatibility, window-size effects, boundary-loss ablations, and uniform/adaptive quality and rendering cost on shared support. Single-coordinate error alone cannot describe this inverse problem.
-
-The teacher knows `S`, while the student sees only `O`; identical observable inputs can have different scene-specific teacher maps. Agreement on teacher-provided geometric validity must be labeled teacher-supported evaluation. Geometry-free deployment needs a declared public candidate set and cannot reuse support selected by hidden geometry or physical costs. Training on retained candidates does not automatically suppress untrained locations.
+Constant/nonconstant response is not the number of independent boundaries. Obstacle-type multisets are a limited grouping diagnostic, not all geometric combinations. Controlled one-boundary/two-boundary paired tests and broader unseen-combination studies remain necessary before claiming the corresponding proposal outcomes. Existing inspected test scenes are development evidence; reserve a new untouched pool for a final scientific claim.

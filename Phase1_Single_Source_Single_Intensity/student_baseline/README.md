@@ -1,3 +1,5 @@
+> Legacy pilot implementation (`legacy-relative-v0`). New project work uses `src/rind_phase1/{interfaces,model,train,predict}.py` and the [canonical contract](../docs/interfaces.md). Legacy input names and normalization below apply only to old checkpoints.
+
 # G2-02 Phase I student baseline
 
 Independent student-model project implementing Thomas’s confirmed assignment: Section 16.2, “Model and optimization,” of `G2-02_Conditional_Energy_Source_Field_Model.pdf`, with the detailed contract in `CODEX_G2-02_Phase1_Student_Model_Instructions.md`. Dataset construction, teacher physics/search, analytic diagnostic scenes, and profiling belong to other workstreams. Real teacher records are not supplied in this workspace.

@@ -56,7 +56,7 @@ def execute(config, output, dataset_factory, teacher_factory, predictor=None):
             prediction = stage('D_student_prediction',lambda:predictor(record,sample,config))
             def student_handoff():
                 checks.aligned(record,prediction)
-                checks.probability(prediction['student_prob'],record['valid'],'student_prob')
+                checks.probability(prediction['student_prob'],checks.prediction_support(prediction,record['valid']),'student_prob')
                 save(prediction,output/'student.npz')
             stage('D_student_handoff',student_handoff)
         else:
@@ -101,13 +101,23 @@ def run(config, output):
             quadtree_prior=False,backend=cfg.get('backend','auto'),
             max_evaluations=cfg.get('max_evaluations'))
     def predictor(record,sample,cfg):
-        model, checkpoint = load_thomas_model(cfg['student_source'],cfg['checkpoint'],
-                                             trusted_checkpoint=cfg.get('trusted_checkpoint',False))
+        if cfg.get('student_interface', 'phase1-v1') == 'phase1-v1':
+            from rind_phase1.train import load_model
+            model, checkpoint = load_model(cfg['checkpoint'])
+        elif cfg['student_interface'] == 'legacy-relative-v0':
+            model, checkpoint = load_thomas_model(cfg['student_source'], cfg['checkpoint'],
+                trusted_checkpoint=cfg.get('trusted_checkpoint', False))
+        else:
+            raise ValueError('unknown student_interface')
         if checkpoint.get('global_step',0) <= 0:
             raise ValueError('checkpoint has no evidence of training steps')
-        result = predict_thomas(model,record,sample)
+        if getattr(model, 'interface_version', None) == 'phase1-v1':
+            from rind_phase1.predict import predict
+            result = predict(model, record, sample)
+        else:
+            result = predict_thomas(model, record, sample)
         result['metadata'] = {'checkpoint_sha256':hashlib.sha256(Path(cfg['checkpoint']).read_bytes()).hexdigest(),
-                              'checkpoint_config':checkpoint.get('config'),
+                              'checkpoint_config':checkpoint.get('model_config', checkpoint.get('config')),
                               'global_step':checkpoint['global_step'],
                               'data_fingerprints':checkpoint.get('data_fingerprints')}
         return result

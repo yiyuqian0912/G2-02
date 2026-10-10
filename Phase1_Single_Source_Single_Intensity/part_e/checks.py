@@ -137,7 +137,7 @@ def main():
     if args.student:
         prediction = load_record(args.student)
         aligned(record, prediction)
-        probability(prediction['student_prob'], valid, 'student_prob')
+        probability(prediction['student_prob'], prediction_support(prediction,valid), 'student_prob')
     if args.splits:
         scene_splits(json.loads(args.splits.read_text(encoding='utf-8')))
     print('PASS: requested handoff checks (physical reconstruction requires dataset).')
@@ -145,3 +145,12 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def prediction_support(prediction, physical_valid):
+    support=np.asarray(prediction.get('support',physical_valid))
+    mode=str(np.asarray(prediction.get('normalization_support','geometry')).item())
+    expected=np.ones_like(physical_valid) if mode=='world' else physical_valid
+    if mode not in ('world','geometry') or support.dtype != np.dtype(bool) or not np.array_equal(support,expected):
+        raise ValueError('prediction support does not match its declared world/geometry policy')
+    return support

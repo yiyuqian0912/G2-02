@@ -2,7 +2,7 @@
 
 [English README](../README.md) · [中文 README](../README.zh-CN.md) · [Contracts](interfaces.md)
 
-The current runnable chain is **observation → uniform candidate positions → physical costs → teacher probabilities**. It preserves multiple compatible positions. Student modeling/training, boundary weighting, edge costs, and adaptive pruning remain separate future work.
+The current runnable chain is **observation → uniform candidate positions → physical costs → teacher probabilities**. It preserves multiple compatible positions. This document describes the low-level unweighted teacher baseline. Formal experiments now implement student training, boundary weighting and optional edge costs; adaptive retention remains an independent comparison. See [current method](method.md) and [training instructions](experiments.zh-CN.md).
 
 ## What the teacher represents
 
