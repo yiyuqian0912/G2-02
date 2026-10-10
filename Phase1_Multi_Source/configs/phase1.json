@@ -1,21 +1,30 @@
 {
-  "status": "planning_only_not_a_runnable_experiment",
+  "status": "multi_source_joint_sampling_teacher_ready_training_pending",
   "seed": 20260923,
   "data": {
-    "dataset_root": "data/raw/phase1-single-source",
+    "dataset_root": "data/raw/phase1-multi-source",
     "world_size": 1024,
     "num_scenes": 10000,
-    "num_sources": 1,
-    "fixed_intensity": 1.0,
     "window_policy": "source_driven_quadtree",
     "exclude_occupied_leaves": true,
     "split_by": "scene_id",
     "split_ratios": null,
-    "min_window_size": 16
+    "min_window_size": 16,
+    "source_count_range": [
+      1,
+      4
+    ],
+    "source_strength_range": [
+      0.0,
+      1.0
+    ],
+    "source_strength_sampling": "uniform [0,1)",
+    "num_observations": 367109
   },
   "student": {
     "inputs": [
       "response",
+      "obstacle",
       "window_x",
       "window_y",
       "window_size"
@@ -25,25 +34,31 @@
     "full_scene_geometry_input": false,
     "full_quadtree_input": false,
     "batching": "size_buckets_or_padding_with_mask",
-    "fourier_frequencies": null
+    "fourier_frequencies": null,
+    "source_truth_input": false,
+    "source_channels_input": false
   },
   "teacher": {
-    "baseline": "uniform_candidates_response_only",
+    "baseline": "joint_source_sets_response_mae",
     "alpha": 1.0,
     "beta": 0.0,
-    "boundary_lambda": null,
+    "boundary_lambda": 0.0,
     "boundary_sigma": null,
     "temperature": null,
     "adaptive_search": false,
     "candidate_domain": "world_outside_observation_and_obstacles",
-    "source_location_scope": "outside_observation_window",
-    "window_parent_restriction": false,
     "adaptive_budget": null,
-    "candidate_weighting": "equal_per_retained_candidate",
+    "candidate_weighting": "count_prior_over_samples_per_count_with_duplicate_mass_aggregation",
     "adaptive_comparison_required": true,
-    "target_semantics": "fixed_window_discrete_candidate_compatibility",
+    "target_semantics": "fixed_window_joint_source_set_compatibility",
     "candidate_spacing": null,
-    "final_candidate_spacing": null
+    "final_candidate_spacing": null,
+    "source_location_scope": "outside_observation_window",
+    "quadtree_prior": false,
+    "joint_proposal_policy": "stratified_uniform_joint_monte_carlo",
+    "source_counts": null,
+    "samples_per_count": null,
+    "source_count_prior": null
   },
   "training": {
     "device": null,

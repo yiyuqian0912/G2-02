@@ -4,7 +4,9 @@ English | [简体中文](README.zh-CN.md)
 
 The Chinese README adopts the latest supplied revision, organized as inputs, processing, outputs, and purpose. This English guide summarizes the same responsibilities and interface conventions. The [Chinese module guide](README.zh-CN.md) now explains every input by meaning, purpose, and use; the [interface reference](docs/interfaces.md) also records input routing and configuration ownership.
 
-**Goal: predict a distribution of possible 2D source locations from a local response and its window metadata, preserving ambiguity and multiple solutions.**
+**Goal: predict a distribution of possible 2D source locations outside the observation window from its local response and window metadata, preserving ambiguity and multiple solutions.**
+
+The main candidate domain is the world outside the fixed observation window, with obstacle validity checked by the teacher. Quadtree generates the dataset's windows; it does not restrict main-experiment candidates to the window's parent.
 
 The physical teacher rerenders candidates to judge whether they explain the observation. The student learns those judgments and predicts without candidate-by-candidate rerendering. The project contains **seven research files and one shared verification file**.
 
