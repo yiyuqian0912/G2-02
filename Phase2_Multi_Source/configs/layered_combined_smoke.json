@@ -1,0 +1,48 @@
+{
+  "name": "phase2_layered_combined_smoke",
+  "data_root": "data/raw/phase2-multi-source",
+  "output_root": "outputs/experiments/layered_combined_smoke_equal_mixture",
+  "split_seed": 19,
+  "scene_counts": {
+    "train": 200,
+    "validation": 50,
+    "test": 50
+  },
+  "record_counts": {
+    "train": 4,
+    "validation": 2,
+    "test": 2
+  },
+  "window_sizes": [64, 32],
+  "teacher": {
+    "spacing": 16,
+    "temperature": 0.05,
+    "tolerance": 1e-12,
+    "max_layers": 32,
+    "alpha": 1.0,
+    "beta": 0.0,
+    "boundary_lambda": 2.0,
+    "boundary_sigma": 1.0,
+    "backend": "auto",
+    "shadow_screening": true,
+    "combined_rule": "equal_layer_mixture"
+  },
+  "training": {
+    "seeds": [0],
+    "epochs": 30,
+    "patience": 8,
+    "batch_size": 4,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "grad_clip": 1.0,
+    "hidden": 64,
+    "fourier_frequencies": 4,
+    "candidate_chunk": 256,
+    "progress_every_batches": 1,
+    "num_threads": 4,
+    "device": "cpu",
+    "use_obstacle": false,
+    "pixel_coordinates": true,
+    "normalization_support": "world"
+  }
+}

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rind-phase2"
+version = "0.1.0"
+description = "Multi-source additive RIND observations and joint-source physical evaluation"
+requires-python = ">=3.10"
+dependencies = ["rind-dataset==2.0.0"]
+
+[project.optional-dependencies]
+train = ["torch>=2.0"]
+browser = ["flask>=3.0", "pillow>=10.0"]
+diagnostics = ["matplotlib>=3.7"]
+
+[project.scripts]
+rind-multi-install-data = "rind_phase2.install_data:main"
+rind-multi-browser = "rind_phase2.browser:main"
+rind-multi-results = "rind_phase2.results_browser:main"
+rind-multi-teacher = "rind_phase2.teacher:main"
+
+[tool.uv.sources]
+rind-dataset = { path = "vendor/rind-dataset", editable = true }
+
+[tool.setuptools.packages.find]
+where = ["src"]

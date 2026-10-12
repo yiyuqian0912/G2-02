@@ -41,12 +41,13 @@ def batches(records, batch_size, rng=None):
         yield collate_records([records[i] for i in group])
 
 
-def run_epoch(model, records, batch_size=4, optimizer=None, rng=None, grad_clip=None, candidate_chunk=None):
+def run_epoch(model, records, batch_size=4, optimizer=None, rng=None, grad_clip=None,
+              candidate_chunk=None, progress_callback=None):
     model.train(optimizer is not None)
     total, count = 0., 0
     device = next(model.parameters()).device
     with torch.set_grad_enabled(optimizer is not None):
-        for batch in batches(records,batch_size,rng):
+        for batch_index,batch in enumerate(batches(records,batch_size,rng),start=1):
             batch = {k:v.to(device) for k,v in batch.items()}
             if candidate_chunk:
                 from torch.utils.checkpoint import checkpoint
@@ -70,6 +71,8 @@ def run_epoch(model, records, batch_size=4, optimizer=None, rng=None, grad_clip=
                 optimizer.step()
             total += loss.item()*len(energy)
             count += len(energy)
+            if progress_callback is not None:
+                progress_callback(batch_index,len(energy),total/count)
     if not count:
         raise ValueError('empty record split')
     return total/count

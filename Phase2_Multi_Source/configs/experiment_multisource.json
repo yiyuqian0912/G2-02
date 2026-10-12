@@ -1,0 +1,44 @@
+{
+  "name": "phase2_multisource",
+  "status": "data_and_joint_teacher_ready_training_pending",
+  "data_root": "data/raw/phase2-multi-source",
+  "output_root": "outputs/experiments/phase2_multisource",
+  "response_aggregation": "sum_visible_source_intensities",
+  "generation": {
+    "source_counts": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "strength_distribution": "uniform [0,1)"
+  },
+  "student": {
+    "inputs": [
+      "response",
+      "window"
+    ],
+    "use_obstacle": false,
+    "source_count_known": false,
+    "source_truth_input": false
+  },
+  "split_manifest": null,
+  "teacher": {
+    "source_counts": null,
+    "count_prior": null,
+    "spacing": null,
+    "samples_per_count": null,
+    "temperature": null,
+    "seed": 20260923,
+    "base_measure": "explicit_count_prior_and_sampling_mass_no_spatial_area_weight"
+  },
+  "training": {
+    "seeds": [
+      0
+    ],
+    "epochs": null,
+    "batch_size": null,
+    "learning_rate": null,
+    "device": "cpu"
+  }
+}

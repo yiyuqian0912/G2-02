@@ -1,0 +1,13 @@
+{
+  "spacing": 16.0,
+  "temperature": 0.01,
+  "seed": 20261011,
+  "max_sources": 4,
+  "beam_width": 16,
+  "samples_per_pattern": 2,
+  "region_tolerance": 1e-12,
+  "local_mismatch_tolerance": 0.0,
+  "max_final_mae": 0.01,
+  "max_source_renders": null,
+  "max_evaluations": null
+}
