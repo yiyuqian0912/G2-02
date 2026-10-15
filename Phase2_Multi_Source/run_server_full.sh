@@ -20,8 +20,8 @@ if [[ ! -x "$training_python" ]]; then
   exit 1
 fi
 
-if [[ "$command_name" == "train" || "$command_name" == "all" ]]; then
-  "$training_python" -c 'import torch; assert torch.cuda.is_available(), "CUDA is not available in this environment"; print("CUDA:", torch.cuda.get_device_name(0))'
+if [[ "$command_name" == "prepare" || "$command_name" == "train" || "$command_name" == "all" ]]; then
+  "$training_python" -c 'import torch; assert torch.cuda.is_available(), "CUDA is not available in this environment"; print("Visible CUDA devices:", torch.cuda.device_count())'
 fi
 
 export RIND_PYTHON="$training_python"
@@ -29,4 +29,4 @@ export NUMBA_CACHE_DIR="${NUMBA_CACHE_DIR:-$PROJECT_DIR/outputs/.numba_cache}"
 export MPLCONFIGDIR="${MPLCONFIGDIR:-$PROJECT_DIR/outputs/.matplotlib}"
 mkdir -p "$NUMBA_CACHE_DIR" "$MPLCONFIGDIR"
 exec "$PROJECT_DIR/run_combined_training.sh" "$command_name" \
-  --config "$PROJECT_DIR/configs/layered_combined_server_full.json"
+  --config "$PROJECT_DIR/configs/layered_combined_server_full.json" "${@:2}"

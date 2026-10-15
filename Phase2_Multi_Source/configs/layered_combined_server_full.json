@@ -1,7 +1,7 @@
 {
-  "name": "phase2_layered_combined_server_full",
+  "name": "phase2_layered_combined_h20_v2",
   "data_root": "data/raw/phase2-multi-source",
-  "output_root": "outputs/experiments/layered_combined_server_full_v1",
+  "output_root": "outputs/experiments/layered_combined_h20_v2",
   "split_seed": 20260923,
   "scene_counts": {
     "train": 8000,
@@ -13,9 +13,14 @@
     "validation": "all",
     "test": "all"
   },
-  "window_sizes": [16, 32, 64, 128],
+  "window_sizes": [
+    16,
+    32,
+    64,
+    128
+  ],
   "teacher": {
-    "spacing": 16,
+    "spacing": 8,
     "temperature": 0.05,
     "tolerance": 1e-12,
     "max_layers": 32,
@@ -23,27 +28,42 @@
     "beta": 0.0,
     "boundary_lambda": 2.0,
     "boundary_sigma": 1.0,
-    "backend": "auto",
+    "backend": "cuda",
     "shadow_screening": true,
     "save_plots": false,
-    "combined_rule": "equal_layer_mixture"
+    "combined_rule": "normalized_elementwise_max",
+    "gpu_batch_size": 16384,
+    "gpu_pixel_chunk": 16384,
+    "gpu_verify_candidates": 0,
+    "parallel_window_prefetch": 4,
+    "gpu_min_batch_size": 1024,
+    "gpu_pair_budget": 134217728
   },
   "training": {
-    "seeds": [0],
-    "epochs": 100,
-    "patience": 15,
-    "batch_size": 4,
-    "learning_rate": 0.0003,
+    "seeds": [
+      0
+    ],
+    "epochs": 150,
+    "patience": 25,
+    "batch_size": 96,
+    "learning_rate": 0.0004,
     "weight_decay": 0.0001,
     "grad_clip": 1.0,
-    "hidden": 64,
-    "fourier_frequencies": 6,
+    "hidden": 256,
+    "fourier_frequencies": 7,
     "candidate_chunk": 512,
-    "progress_every_batches": 100,
+    "progress_every_batches": 25,
     "num_threads": 8,
     "device": "cuda",
     "use_obstacle": false,
     "pixel_coordinates": true,
-    "normalization_support": "world"
+    "normalization_support": "world",
+    "architecture": "large",
+    "attention_heads": 8,
+    "amp_dtype": "bfloat16",
+    "deterministic_algorithms": false,
+    "cudnn_benchmark": true,
+    "fused_optimizer": true,
+    "prefetch_batches": 8
   }
 }

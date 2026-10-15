@@ -12,6 +12,7 @@ for item in (P1/'src',P2/'src',P2/'vendor/rind-dataset',HERE.parent):
 
 from rind_phase2.data import Phase2Dataset
 from train_combined import CombinedRecords,read_config,context
+from layered_residual import combine_layer_probabilities
 
 
 def main():
@@ -36,7 +37,7 @@ def main():
                                       int(dataset.manifest['global_size']))
     if a.teacher_only:
         metadata={'scene_id':entry['scene_id'],'view_id':entry['view_id'],'test_index':a.index,
-                  'teacher_only':True,'teacher_rule':'equal-weight layer mixture',
+                  'teacher_only':True,'teacher_rule':'normalized elementwise maximum',
                   'truth_used_for_inference':False,'teacher_layer_visualization':layer_visuals}
         (directory/'metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
         print(directory);return
@@ -50,7 +51,7 @@ def main():
         xy=torch.as_tensor(sample['candidate_xy'][None],dtype=torch.float32)
         support=torch.as_tensor(sample['support'][None],dtype=torch.bool)
         predicted=model.predict(response,obstacle,window,xy,support)['student_prob'][0].numpy()
-    with np.load(run_dir/'combined.npz') as z:
+    with np.load(run_dir/'layer-01.npz',allow_pickle=False) as z:
         grid_index=z['grid_index'];x_axis=z['x_axis'];y_axis=z['y_axis']
     shape=(len(y_axis),len(x_axis))
     def raster(values,fill=np.nan):
@@ -59,7 +60,7 @@ def main():
     plot_matched(directory/'teacher_student.png',sample,teacher,student,truth,int(dataset.manifest['global_size']))
     metadata={'scene_id':entry['scene_id'],'view_id':entry['view_id'],'test_index':a.index,
               'checkpoint_epoch':checkpoint['epoch'],'teacher_probability_sum':float(sample['teacher_prob'].sum()),
-              'student_probability_sum':float(predicted.sum()),'teacher_rule':'equal-weight layer mixture',
+              'student_probability_sum':float(predicted.sum()),'teacher_rule':'normalized elementwise maximum',
               'truth_used_for_inference':False,'teacher_layer_visualization':layer_visuals}
     np.savez_compressed(directory/'teacher_student.npz',teacher_prob=sample['teacher_prob'],student_prob=predicted,
         candidate_xy=sample['candidate_xy'],valid=sample['valid'],response=sample['response'],obstacle=sample['obstacle'],window=sample['window'])
@@ -171,9 +172,14 @@ def plot_teacher_layers(directory,run_dir,sample,truth,world):
         path=directory/f'teacher_peeling_page_{page:02d}.png';fig.savefig(path,dpi=170);plt.close(fig)
         overview.append(path.name)
     probability_pages=[]
-    with np.load(run_dir/'combined.npz',allow_pickle=False) as combined:
-        grid_index=combined['grid_index'];x_axis=combined['x_axis'];y_axis=combined['y_axis']
-        combined_probability=combined['probability']
+    probability_layers=[np.asarray(layer['probability'],dtype=np.float64)
+                        for _,layer in layers if 'probability' in layer]
+    if not probability_layers:
+        raise ValueError('teacher book has no saved layer probabilities')
+    first_probability_layer=next(layer for _,layer in layers if 'probability' in layer)
+    grid_index=first_probability_layer['grid_index']
+    x_axis=first_probability_layer['x_axis'];y_axis=first_probability_layer['y_axis']
+    combined_probability=combine_layer_probabilities(probability_layers)
     probability_maps=[('Combined teacher',combined_probability)]+[
         (f"Layer {i}: a={detail['intensity']:.6g}",layer['probability'])
         for i,(detail,layer) in enumerate(layers,1) if 'probability' in layer]
@@ -219,7 +225,7 @@ def plot_matched(path,sample,teacher,student,truth,world):
     fig.colorbar(local_image,ax=axes[0],label='Observed additive response')
     vmax=max(float(np.nanmax(teacher)),float(np.nanmax(student)),np.finfo(float).tiny)
     x,y,L=sample['window']
-    for ax,image,title in ((axes[1],teacher,'Teacher: equal-weight layer mixture'),(axes[2],student,'Student probability')):
+    for ax,image,title in ((axes[1],teacher,'Teacher: normalized elementwise max'),(axes[2],student,'Student probability')):
         im=ax.imshow(image,origin='upper',extent=(0,world,world,0),cmap=cmap,vmin=0,vmax=vmax,interpolation='nearest')
         ax.add_patch(Rectangle((x,y),L,L,fill=False,edgecolor='cyan',linewidth=1.2))
         if len(truth):ax.scatter(truth[:,0],truth[:,1],marker='x',c='lime',s=35,label='Generating sources (evaluation only)')

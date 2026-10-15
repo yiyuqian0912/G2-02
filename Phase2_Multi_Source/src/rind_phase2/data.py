@@ -120,6 +120,25 @@ class Phase2Dataset:
         scene = self.get_scene(scene_id)
         return np.column_stack((scene["drivers"], scene["driver_strengths"]))
 
+    def get_obstacle_tokens(self, scene_id):
+        """Return padded full-scene obstacle geometry without source labels.
+
+        The result contains the exact primitive type/parameter rows used by
+        rendering plus a padding mask. It intentionally excludes drivers,
+        strengths, visibility channels, and responses.
+        """
+        self._check_selected(scene_id)
+        count = int(self._base.obstacle_counts[scene_id])
+        capacity = int(self._base.obstacle_types.shape[1])
+        mask = np.arange(capacity, dtype=np.int64) < count
+        return {
+            "geometry_types": np.asarray(
+                self._base.obstacle_types[scene_id], dtype=np.int64).copy(),
+            "geometry_params": np.asarray(
+                self._base.obstacle_params[scene_id], dtype=np.float32).copy(),
+            "geometry_mask": mask,
+        }
+
     def get_view_tree(self, scene_id):
         self._check_selected(scene_id)
         return self._base.get_view_tree(scene_id)

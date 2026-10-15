@@ -1,0 +1,57 @@
+{
+  "name": "phase2_layer_student_v4_aligned_fp32",
+  "data_root": "data/raw/phase2-multi-source",
+  "teacher_experiment_root": "outputs/full_training_h20_v2",
+  "output_root": "outputs/layer_student_v4",
+  "target_semantics": "one Phase1-style source-location distribution for each binary residual layer",
+  "layer_filter": {
+    "maximum_training_physical_cost": 0.01,
+    "skip_all_zero": true,
+    "skip_all_one": true
+  },
+  "training": {
+    "seeds": [
+      0
+    ],
+    "epochs": 100,
+    "patience": 15,
+    "batch_size": 96,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "grad_clip": 1.0,
+    "hidden": 128,
+    "fourier_frequencies": 6,
+    "candidate_chunk": 4096,
+    "progress_every_batches": 10,
+    "num_threads": 8,
+    "device": "cuda",
+    "use_obstacle": false,
+    "pixel_coordinates": true,
+    "normalization_support": "world",
+    "architecture": "baseline",
+    "attention_heads": 1,
+    "amp_dtype": "none",
+    "fused_optimizer": false,
+    "deterministic_algorithms": false,
+    "cudnn_benchmark": true,
+    "prefetch_batches": 8,
+    "gpu_devices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "evaluation": {
+    "candidate_chunk": 4096,
+    "combine_rule": "normalized_elementwise_max",
+    "nms_radius": 16.0,
+    "distance_thresholds": [
+      8.0,
+      16.0,
+      32.0
+    ]
+  }
+}

@@ -1,2 +1,24 @@
 # macOS metadata
 .DS_Store
+
+# Local environments, generated datasets, checkpoints and transfer bundles
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+.uv-cache/
+*.zip
+*.tar.gz
+*.pt
+*.pth
+*.npz
+*.npy
+data/**
+!data/**/
+!data/**/.gitkeep
+outputs/**
+!outputs/**/
+!outputs/**/.gitkeep
+phase2_visualization_*_recovered/
+runtime_cache/

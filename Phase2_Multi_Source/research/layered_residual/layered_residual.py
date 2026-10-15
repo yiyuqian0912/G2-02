@@ -48,13 +48,13 @@ def minimum_positive_regions(values, *, tolerance=1e-12):
 
 
 def combine_layer_probabilities(probabilities):
-    """Return an equal-weight mixture of aligned, normalized layer masses.
+    """Return the normalized elementwise maximum of aligned layer masses.
 
-    Every recovered layer contributes exactly ``1 / number_of_layers`` of the
-    final categorical target.  The result means: choose one recovered effective
-    contribution uniformly, then sample its position from that layer's Phase-I
-    distribution.  It is not a multi-source joint posterior or an occupancy
-    probability.
+    Every layer is normalized before combination, so no layer is scaled by its
+    recovered intensity or by the number of candidates assigned to it.  The
+    maximum preserves a strong location hypothesis from any independent layer;
+    the final normalization makes the result a display/summary distribution.
+    It is not a multi-source joint posterior or an occupancy probability.
     """
     arrays=[np.asarray(p,dtype=np.float64) for p in probabilities]
     if not arrays or any(p.ndim!=1 or p.shape!=arrays[0].shape for p in arrays):
@@ -65,10 +65,10 @@ def combine_layer_probabilities(probabilities):
     totals=stack.sum(axis=1,dtype=np.float64)
     if not np.allclose(totals,1.,rtol=0,atol=1e-10):
         raise ValueError('every layer probability must sum to one')
-    combined=np.mean(stack,axis=0,dtype=np.float64)
+    combined=np.max(stack,axis=0)
     total=combined.sum(dtype=np.float64)
     if not np.isfinite(total) or total<=0:
-        raise ValueError('equal-layer mixture has no probability mass')
+        raise ValueError('normalized elementwise maximum has no probability mass')
     return combined/total
 
 
@@ -90,7 +90,11 @@ def screen_candidates_by_observed_shadow(evaluator, grid, observed, obstacle, *,
     if not np.isfinite(observed).all() or tolerance<0 or not np.isfinite(tolerance):
         raise ValueError('finite response and nonnegative finite tolerance required')
     shadow=(~obstacle)&(observed<=tolerance)
-    geometry_valid=np.asarray(evaluator.positions_valid(grid.candidate_xy),dtype=bool)
+    if (getattr(evaluator,'resolved_backend',None)=='cuda' and
+            hasattr(evaluator,'gpu_positions_valid')):
+        geometry_valid=np.asarray(evaluator.gpu_positions_valid(grid.candidate_xy),dtype=bool)
+    else:
+        geometry_valid=np.asarray(evaluator.positions_valid(grid.candidate_xy),dtype=bool)
     if geometry_valid.shape!=(len(grid.candidate_xy),):
         raise ValueError('candidate geometry validity is misaligned')
     retained=geometry_valid.copy()
@@ -213,26 +217,56 @@ def _phase1_layers_from_one_uniform_pass(
     obstacle=np.asarray(obstacle,dtype=bool)
     if any(target.shape!=observed.shape for target in targets) or obstacle.shape!=observed.shape:
         raise ValueError('layer targets, observed response, and obstacle mask must align')
-    weights=[boundary_weight_map(target,boundary_lambda=boundary_lambda,
-                                 boundary_sigma=boundary_sigma) for target in targets]
-    geometry_valid=np.asarray(evaluator.positions_valid(grid.candidate_xy),dtype=bool)
+    gpu_fast=(getattr(evaluator,'resolved_backend',None)=='cuda' and beta==0 and
+              hasattr(evaluator,'gpu_layer_response_costs'))
+    weights=(None if gpu_fast else
+             [boundary_weight_map(target,boundary_lambda=boundary_lambda,
+                                  boundary_sigma=boundary_sigma) for target in targets])
+    geometry_valid=np.asarray(
+        evaluator.gpu_positions_valid(grid.candidate_xy) if gpu_fast
+        else evaluator.positions_valid(grid.candidate_xy),dtype=bool)
     if geometry_valid.shape!=(len(grid.candidate_xy),):
         raise ValueError('candidate geometry validity is misaligned')
     retained=geometry_valid.copy()
     costs=np.full((len(targets),len(geometry_valid)),np.inf,dtype=np.float64)
     shadow=(~obstacle)&(observed<=tolerance)
-    for index in np.flatnonzero(geometry_valid):
-        unit=np.asarray(evaluator.visibility_at(grid.candidate_xy[index]))
-        if unit.shape!=observed.shape:
-            raise ValueError('candidate visibility shape does not match observation')
-        if shadow_screening and np.any(unit[shadow]>tolerance):
-            retained[index]=False
-            continue
-        for layer_index,(target,weight) in enumerate(zip(targets,weights)):
-            value=alpha*response_cost(target,unit,weight)
-            if beta>0:
-                value+=beta*edge_cost(target,unit)
-            costs[layer_index,index]=value
+    valid_indices=np.flatnonzero(geometry_valid)
+    # CUDA fast path keeps visibility masks, shadow screening, and all layer
+    # response costs on-device.  Only O(n*r) scalar costs return to the CPU.
+    if gpu_fast:
+        batch_retained,batch_costs,gpu_probabilities=evaluator.gpu_layer_response_costs(
+            grid.candidate_xy[valid_indices],np.stack(targets),None,shadow,
+            shadow_screening=shadow_screening,alpha=alpha,temperature=temperature,
+            boundary_lambda=boundary_lambda,boundary_sigma=boundary_sigma,
+            positions_prevalidated=True)
+        retained[valid_indices]=batch_retained
+        costs[:,valid_indices]=batch_costs
+        costs[:,~retained]=np.inf
+        probabilities_on_gpu=np.zeros_like(costs)
+        probabilities_on_gpu[:,valid_indices]=gpu_probabilities
+        visibility_batches=()
+    elif hasattr(evaluator,'iter_visibility_batches'):
+        visibility_batches=evaluator.iter_visibility_batches(grid.candidate_xy[valid_indices])
+    else:
+        # Preserve the small mockable Phase-I evaluator contract used by tests
+        # and external callers; production JointResponseEvaluator supplies the
+        # batched method and selects CUDA when configured.
+        visibility_batches=((start,np.asarray([
+            evaluator.visibility_at(grid.candidate_xy[index])]))
+            for start,index in enumerate(valid_indices))
+    for start,unit_batch in visibility_batches:
+        batch_indices=valid_indices[start:start+len(unit_batch)]
+        for index,unit in zip(batch_indices,unit_batch):
+            if unit.shape!=observed.shape:
+                raise ValueError('candidate visibility shape does not match observation')
+            if shadow_screening and np.any(unit[shadow]>tolerance):
+                retained[index]=False
+                continue
+            for layer_index,(target,weight) in enumerate(zip(targets,weights)):
+                value=alpha*response_cost(target,unit,weight)
+                if beta>0:
+                    value+=beta*edge_cost(target,unit)
+                costs[layer_index,index]=value
     geometry_count=int(np.count_nonzero(geometry_valid))
     retained_count=int(np.count_nonzero(retained))
     if not retained_count:
@@ -243,7 +277,10 @@ def _phase1_layers_from_one_uniform_pass(
             'shadow_pixels':int(np.count_nonzero(shadow)),
             'geometry_valid_candidates':geometry_count,'retained_candidates':0,
             'rejected_candidates':geometry_count,'retained_fraction':0.}
-    probabilities=[teacher_probabilities(row,retained,temperature=temperature) for row in costs]
+    if 'probabilities_on_gpu' in locals():
+        probabilities=[row for row in probabilities_on_gpu]
+    else:
+        probabilities=[teacher_probabilities(row,retained,temperature=temperature) for row in costs]
     rejected=geometry_count-retained_count
     screening={'performed':True,'enabled':bool(shadow_screening),
                'rule':('reject candidate if its unit visibility is positive at any free observed-zero pixel'
@@ -271,9 +308,15 @@ def _constraints(regions, trace, residual, obstacle, tolerance):
 def recover(dataset, scene_id, view_id, *, spacing=16, temperature=.01,
             tolerance=1e-12, alpha=1., beta=0., boundary_lambda=0., boundary_sigma=1.,
             max_layers=32, backend='auto', joint_samples=0, seed=20261012,
-            shadow_screening=True):
+            shadow_screening=True, gpu_batch_size=64, gpu_pixel_chunk=4096,
+            gpu_verify_candidates=2, gpu_device=None, gpu_min_batch_size=1024,
+            gpu_pair_budget=134217728):
     started = time.perf_counter()
-    evaluator = JointResponseEvaluator(dataset, scene_id, view_id, backend=backend)
+    evaluator = JointResponseEvaluator(
+        dataset, scene_id, view_id, backend=backend,
+        gpu_batch_size=gpu_batch_size, gpu_pixel_chunk=gpu_pixel_chunk,
+        gpu_verify_candidates=gpu_verify_candidates,gpu_device=gpu_device,
+        gpu_min_batch_size=gpu_min_batch_size,gpu_pair_budget=gpu_pair_budget)
     domain = CandidateDomain(tuple(evaluator.observation['window']), evaluator.world_size, False)
     grid = uniform_grid(domain, spacing)
     obstacle = np.asarray(evaluator.observation['obstacle'], bool)
@@ -372,7 +415,7 @@ def recover(dataset, scene_id, view_id, *, spacing=16, temperature=.01,
               "layers_recovered":len(successful), "partial_combined_distribution":status!='complete',
               "final_mae":float(np.mean(np.abs(reconstructed-original))),
               "residual_max":float(np.max(residual)), "spacing":float(spacing),
-              "combined_distribution_rule":"equal-weight mixture across recovered layer probabilities",
+              "combined_distribution_rule":"normalized elementwise maximum across recovered layer probabilities",
               "temperature":float(temperature), "phase1_cost":{"alpha":alpha,"beta":beta,
               "boundary_lambda":boundary_lambda,"boundary_sigma":boundary_sigma},
               "layer_selection":"minimum residual strictly above tolerance; zero-response regions excluded",
@@ -391,6 +434,14 @@ def recover(dataset, scene_id, view_id, *, spacing=16, temperature=.01,
               "candidate_score_evaluations_saved_by_shadow_screen":int(
                   screening['rejected_candidates']*len(successful)),
               "unique_visibility_renders":evaluator.num_source_renders,
+              "teacher_backend":evaluator.resolved_backend,
+              "gpu_device":evaluator.gpu_device,
+              "gpu_render_batches":evaluator.gpu_render_batches,
+              "gpu_requested_batch_size":evaluator.gpu_batch_size,
+              "gpu_effective_batch_size":evaluator.gpu_effective_batch_size,
+              "gpu_oom_retries":evaluator.gpu_oom_retries,
+              "gpu_validation_cpu_renders":evaluator.gpu_validation_cpu_renders,
+              "gpu_scored_candidate_layers":evaluator.gpu_scored_candidate_layers,
               "layer_membership_conflicts":int(sum(len(x['trace']['conflict']) for x in layers)),
               "proof_status":{"subtraction_nonnegative":"checked exactly within tolerance",
               "layer_response":"unambiguous BFS-positive support; disconnected, conflicting, and unvisited regions are processed later",
@@ -398,8 +449,7 @@ def recover(dataset, scene_id, view_id, *, spacing=16, temperature=.01,
               "BFS_transition_interpretation":"conditional heuristic; ambiguity retained",
               "decomposition_correctness":"not proved"}}
     report['combined_probability_sum'] = None if combined is None else float(combined.sum())
-    report['combined_layer_weights'] = ([] if not successful else
-                                        [1./len(successful)]*len(successful))
+    report['combined_layer_weights'] = None
     # Truth is read only after inference has finished and only for diagnostics.
     truth_masks = np.asarray(dataset.get_channels(scene_id, view_id)) > 0
     truth_diag = []
@@ -474,7 +524,7 @@ def plot_run(output):
         if not path.exists():
             continue
         with np.load(path) as z: layers.append({k:z[k] for k in z.files})
-    maps=[('Combined equal-layer mixture',combined['probability'])]+[
+    maps=[('Combined normalized elementwise max',combined['probability'])]+[
         (f"Layer {i+1}, a={report['layers'][i]['intensity']:.6g}",x.get('probability',np.array([])))
         for i,x in enumerate(layers)]
     maps=[x for x in maps if x[1].size]

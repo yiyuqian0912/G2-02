@@ -4,6 +4,8 @@
 
 完成逐层剥离后，教师只遍历一次统一全场候选网格。每个候选的单位可见性只渲染一次；同一个可见性掩码先接受共享阴影筛选，再同时与所有层的二值响应比较。对于原始观测中“自由像素且总响应为 0”的位置，正强度加性模型保证任意真实源都必须不可见；因此，任何会照亮至少一个这类像素的候选位置都被永久排除。障碍物内部的零值不参与该约束。筛选只依赖原始观测和教师侧正向渲染，不读取真实源标签。
 
+服务器配置把候选端的整条批量流水线放到 CUDA：候选障碍物合法性、二值可见性、原始阴影筛选、所有层的加权响应代价和温度 softmax 都在 GPU 上完成，只把最终合法性、代价和概率小数组传回主进程保存。多个 GPU 同时处理不同真实视窗，每张卡内部再批量处理候选。CPU 只负责读取数据、逐层区域图控制和文件写入，不再遍历候选掩码或逐候选计算代价。每个窗口最先渲染的一个候选仍由原 CPU 渲染器复核一次；一旦不一致就立即停止。没有 CUDA 时，明确选择 `backend=auto` 可继续使用原 Numba/CPU 路径。
+
 ## 算法
 
 每轮只在自由像素中选择严格大于容差的最低正残差 `a`。响应为 0 的阴影／背景区域不是贡献层，不参与最低值和种子选择；但它仍作为当前层响应为 0 的观测约束参与 Phase1 候选评分。同值不连通区域保留不同 ID，种子取行优先最早的一个。BFS 只维护“当前层是否仍然存在”，不恢复其他贡献的标签集合：
@@ -80,23 +82,24 @@ Phase1 可调参数直接暴露：`--alpha`、`--beta`、`--boundary-lambda`、`
 - `window_sizes` 控制允许扫描的窗口规格。各规格的候选池独立打乱后轮流扫描，避免只由某一种尺寸先填满配额；
 - `teacher` 控制逐层教师的候选间距、温度、损失和最多层数；
 - `teacher.shadow_screening=true` 启用严格的原始阴影候选筛选；当前无噪声、正强度模型建议保持开启；
+- `teacher.backend=cuda` 启用 GPU 候选流水线；`gpu_batch_size` 控制每卡每批候选数，`gpu_pixel_chunk` 控制每次处理的窗口自由像素数，`gpu_verify_candidates` 控制每个窗口用 CPU 复核的候选数；实际卡数通过运行命令的 `--gpus N` 指定；
 - `teacher.save_plots=false` 不为每条教师记录自动生成 PNG；全量服务器实验应关闭，否则图片会占用大部分磁盘，训练目标和数值记录仍完整保存；
 - `training` 控制 Phase1 `SourceEnergyField` 的网络宽度、Fourier 特征、批量、学习率和早停；
-- `combined_rule` 必须是 `equal_layer_mixture`。每层在最终目标中的总质量固定为 `1/r`。
+- `combined_rule` 必须是 `normalized_elementwise_max`。各层先分别归一化，随后逐点取最大值并对结果重新归一化。
 
-学生训练结构与 Phase1 对齐。逐层教师保留 Phase2 使用的 spacing=16 全场候选网格，以提供比 spacing=64 更细的位置概率监督；有限网格不要求存在零误差候选。
+学生训练接口与 Phase1 对齐。正式大模型配置使用 spacing=8 全场候选网格，每个视窗最多有 16,384 个候选，是 spacing=16 的四倍；有限网格不要求存在零误差候选。Fourier 频率设为 7，最高频率在该网格上仍满足每周期至少 4 个采样点。
 
 | 参数 | Phase1 | Phase2 |
 |---|---:|---:|
-| candidate spacing | 64 | 16 |
+| candidate spacing | 64 | 8 |
 | teacher temperature | 0.05 | 0.05 |
 | `alpha / beta` | 1.0 / 0.0 | 1.0 / 0.0 |
 | `boundary_lambda / boundary_sigma` | 2.0 / 1.0 | 2.0 / 1.0 |
-| epochs / patience | 30 / 8 | 30 / 8 |
-| batch size | 4 | 4 |
-| AdamW learning rate / weight decay | 0.001 / 0.0001 | 0.001 / 0.0001 |
-| hidden / Fourier frequencies | 64 / 4 | 64 / 4 |
-| candidate chunk | 256 | 256 |
+| epochs / patience | 30 / 8 | 150 / 25 |
+| batch size | 4 | 96（六卡，每卡约 16） |
+| AdamW learning rate / weight decay | 0.001 / 0.0001 | 0.0004 / 0.0001 |
+| hidden / Fourier frequencies | 64 / 4 | 256 / 7 |
+| candidate chunk | 256 | 512 |
 | student obstacle input | false | false |
 | pixel-coordinate channels | true | true |
 | student normalization support | world | world |
@@ -127,7 +130,9 @@ Phase1 可调参数直接暴露：`--alpha`、`--beta`、`--boundary-lambda`、`
 ./run_combined_training.sh all --config configs/layered_combined_smoke.json
 ```
 
-窗口筛选只检查自由像素：自由像素全部大于容差的全亮窗口、全部不大于容差的全暗窗口，以及没有自由像素的窗口都不会生成训练记录；教师失败的窗口同样不进入训练集合。整数 `record_counts` 会继续扫描直到收集到精确目标；`"all"` 会耗尽该 split 的全部真实窗口。筛选数量保存在 `records.json` 的 `skip_counts` 中。
+窗口筛选只检查自由像素：自由像素全部大于容差的全亮窗口、全部不大于容差的全暗窗口，以及没有自由像素的窗口都不会生成训练记录；教师失败的窗口同样不进入训练集合。整数 `record_counts` 会继续扫描直到收集到精确目标；`"all"` 会耗尽该 split 的全部真实窗口。
+
+`"all"` 不是把原始窗口总数直接当成训练样本数。每个 split 开始时，日志会显示 `raw windows` 及各 size 的数量；扫描日志显示 `raw checked/总数`、`eligible seen` 和 `completed training records`；split 结束时才得到实际进入学生训练的精确记录数。`records.json` 的 `counts` 保存最终训练／验证／测试记录数，`split_statistics` 保存各 split 的原始总数、实际检查数、合格数、教师未完成数和跳过数，`skip_counts` 提供全局跳过汇总。
 
 输出位于配置的 `output_root`：教师书在 `teachers/`，划分和跳过原因在 `records.json`，训练协议在 `protocol.json`，模型在 `models/seed_*/best.pt`，训练统计在 `training_summary.json`。
 
@@ -141,7 +146,9 @@ tail -f outputs/experiments/layered_combined_2000_v4_one_pass/progress.jsonl
 
 ## 服务器全量训练
 
-全量配置为 `configs/layered_combined_server_full.json`：按 scene_id 固定划分 8000/1000/1000 个场景，扫描 16、32、64、128 四种窗口的全部真实记录，过滤后保留所有成功教师。原始扫描总体分别为 235145、28683、28233 个窗口；最终训练记录数由真实过滤与教师完成状态决定，写入 `records.json`，不会用原始窗口数冒充样本数。配置关闭逐记录 PNG，使用 CUDA、batch size 4、100 epochs 和 patience 15。
+全量配置为 `configs/layered_combined_server_full.json`：按 scene_id 固定划分 8000/1000/1000 个场景，扫描 16、32、64、128 四种窗口的全部真实记录，过滤后保留所有成功教师。原始扫描总体分别为 235145、28683、28233 个窗口；最终训练记录数由真实过滤与教师完成状态决定，写入 `records.json`，不会用原始窗口数冒充样本数。配置关闭逐记录 PNG，使用 CUDA、六卡总 batch size 96、150 epochs 和 patience 25。教师阶段每卡独立处理一个视窗；学生阶段使用 PyTorch DataParallel 将 batch 分到同一组 GPU。checkpoint 始终保存基础模型参数，不带多卡包装前缀。
+
+正式学生为可配置的 `large` 架构：256 维隐藏特征、深层残差卷积观察编码器、三次下采样、8 头候选注意力，以及加深的窗口、坐标和能量网络。`baseline` 仍保留 Phase1 原结构并可严格加载旧 checkpoint。当前 `record_counts` 已是三个 split 的 `"all"`，所以数据量的增加来自更密的物理监督以及全部合格真实窗口，不通过复制记录增加表面样本量。
 
 服务器准备环境和安装数据：
 
@@ -151,27 +158,27 @@ uv sync --locked --extra train --extra diagnostics --extra browser
 ./scripts/install_data.sh RIND-adaptive-v3-10000scenes.zip
 ```
 
-推荐把 CPU 教师准备和 GPU 学生训练分开执行，并放在 `tmux` 中：
+推荐把 GPU 教师准备和 GPU 学生训练分开执行，并放在 `tmux` 中：
 
 ```bash
 tmux new -s rind-phase2
-./run_server_full.sh prepare
-./run_server_full.sh train
+./run_server_full.sh prepare --gpus 6
+./run_server_full.sh train --gpus 6
 ```
 
 也可以连续运行：
 
 ```bash
-./run_server_full.sh all
+./run_server_full.sh all --gpus 6
 ```
 
 实时查看进度：
 
 ```bash
-tail -f outputs/experiments/layered_combined_server_full_v1/progress.jsonl
+tail -f outputs/experiments/layered_combined_h20_v2/progress.jsonl
 ```
 
-中断后重新运行同一命令即可。教师阶段复用已完成的 scene/view 目录；训练阶段从 `last.pt` 恢复优化器、epoch 和随机数状态。若服务器显存很小，在第一次执行 `prepare` 前把配置中的 `batch_size` 改为 2；若显存充足，也可在实验开始前提高到 8。实验开始后保持配置不变，以维持协议和断点签名一致。
+中断后重新运行同一命令即可。教师阶段复用已完成的 scene/view 目录；训练阶段从 `last.pt` 恢复优化器、epoch 和随机数状态。正式配置针对最大 128×128 视窗使用 `gpu_batch_size=16384`、`gpu_pair_budget=134217728`（按自由像素数自适应，OOM 自动最低退到 1024） 和 `gpu_pixel_chunk=16384`。教师显存不足时会自动将候选批量从当前自适应批量依次减半，最低 1024；学生显存不足时把总 `training.batch_size` 从 96 依次降到 48、24。`--gpus N`、批量和像素块都进入实验协议，恢复时必须使用相同参数。
 
 对测试集第 0 个窗口生成 Phase1 风格的教师／学生对比，并额外查询逐像素学生分布：
 
@@ -236,3 +243,9 @@ spacing=16、默认 Phase1 代价：
 | 48/15 | 4 | 2 | complete | 0 |
 
 这四个是接口与行为检查，不是总体完成率。K=3/4 只恢复两层符合“有效贡献不等于真实源数量”的定义。scene 39/view 8 的 200 个同池联合 Monte Carlo 候选最低 MAE 为 0.005792，而逐层重建为 0；样本规模太小，不能用于性能结论。
+
+### H20 执行优化
+
+正式配置为六张 96 GB H20 启用 16384 最大候选批量、134,217,728 pair budget 和 1024 最低自动降档。教师的二值可见性加权 L1 代价通过等价的 float64 GEMM 同时计算全部层；几何判断仍为 float64。学生使用 BF16 autocast、float32 概率归一化、fused AdamW、TF32、cuDNN benchmark 和总 batch size 96。为追求吞吐关闭 bitwise deterministic 慢路径，但 scene split、样本顺序种子和教师目标仍被记录。正式 H20 输出写入 `outputs/experiments/layered_combined_h20_v2/`，不与旧实现混合。
+
+训练数据加载使用 8 个有序预取线程，在当前 CUDA batch 运行时读取和解压下一批 `combined.npz`。教师状态及全亮/全暗检查只在训练集合初始化时验证一次，不再在每个 epoch 重复读取和重算。

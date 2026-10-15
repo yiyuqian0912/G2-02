@@ -1,0 +1,67 @@
+{
+  "name": "phase2_layer_student_v6_geometry_residual",
+  "data_root": "data/raw/phase2-multi-source",
+  "teacher_experiment_root": "outputs/full_training_h20_v2",
+  "output_root": "outputs/layer_student_v6_geometry_residual",
+  "target_semantics": "one Phase1-style source-location distribution per binary residual layer; v4 blind energy plus a zero-initialized full-geometry residual correction",
+  "layer_filter": {
+    "maximum_training_physical_cost": 0.01,
+    "skip_all_zero": true,
+    "skip_all_one": true
+  },
+  "training": {
+    "seeds": [
+      0
+    ],
+    "epochs": 180,
+    "patience": 40,
+    "batch_size": 384,
+    "learning_rate": 0.001,
+    "base_learning_rate": 0.0001,
+    "geometry_learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "grad_clip": 1.0,
+    "hidden": 128,
+    "fourier_frequencies": 6,
+    "candidate_chunk": 4096,
+    "progress_every_batches": 5,
+    "num_threads": 16,
+    "device": "cuda",
+    "initial_checkpoint": "outputs/layer_student_v4/models/seed_{seed}/best.pt",
+    "geometry_warmup_epochs": 8,
+    "use_obstacle": false,
+    "use_scene_geometry": true,
+    "geometry_fusion": "residual",
+    "geometry_attention_heads": 4,
+    "geometry_layers": 1,
+    "geometry_dropout": 0.1,
+    "pixel_coordinates": true,
+    "normalization_support": "world",
+    "architecture": "baseline",
+    "attention_heads": 1,
+    "amp_dtype": "none",
+    "fused_optimizer": true,
+    "deterministic_algorithms": false,
+    "cudnn_benchmark": true,
+    "prefetch_batches": 8,
+    "gpu_devices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "geometry_cross_attention_heads": 4
+  },
+  "evaluation": {
+    "candidate_chunk": 4096,
+    "combine_rule": "normalized_elementwise_max",
+    "nms_radius": 16.0,
+    "distance_thresholds": [
+      8.0,
+      16.0,
+      32.0
+    ]
+  }
+}

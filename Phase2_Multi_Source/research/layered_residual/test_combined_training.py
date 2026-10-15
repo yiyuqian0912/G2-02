@@ -34,7 +34,7 @@ class CombinedTargetTests(unittest.TestCase):
                 'teacher':{'spacing':16,'temperature':.05,'boundary_sigma':1.,
                            'alpha':1.,'beta':0.,'boundary_lambda':0.,
                            'shadow_screening':True,'save_plots':False,
-                           'combined_rule':'equal_layer_mixture'},
+                           'combined_rule':'normalized_elementwise_max'},
                 'training':{'epochs':1,'patience':1,'batch_size':1,'hidden':8,
                             'num_threads':1,'candidate_chunk':16,'progress_every_batches':1,
                             'fourier_frequencies':1,'learning_rate':1e-3,'grad_clip':1.,
@@ -47,18 +47,15 @@ class CombinedTargetTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'positive integers or "all"'):
                 read_config(path)
 
-    def test_each_layer_contributes_equal_probability_mass(self):
+    def test_normalized_elementwise_max_preserves_each_layers_strong_locations(self):
         first=np.array([.7,.2,.1,0.])
         second=np.array([.1,.3,.1,.5])
         actual=combine_layer_probabilities([first,second])
-        expected=(first+second)/2
+        expected=np.maximum(first,second)
+        expected=expected/expected.sum()
         np.testing.assert_allclose(actual,expected)
         self.assertTrue(np.isclose(actual.sum(),1.))
-        np.testing.assert_allclose(actual,[.4,.25,.1,.25])
-        # The two explicit layer contributions each integrate to exactly 1/2.
-        np.testing.assert_allclose(first/2 + second/2,actual)
-        self.assertAlmostEqual(float((first/2).sum()),.5)
-        self.assertAlmostEqual(float((second/2).sum()),.5)
+        np.testing.assert_allclose(actual,[.4375,.1875,.0625,.3125])
 
     def test_window_class_uses_free_pixels_only_and_skips_uniform_views(self):
         self.assertEqual(_window_class(ToyDataset([[1.,1.],[1.,1.]]),0,0,1e-12),'all_lit')
@@ -66,7 +63,7 @@ class CombinedTargetTests(unittest.TestCase):
         self.assertEqual(_window_class(ToyDataset([[0.,1.],[0.,0.]]),0,0,1e-12),'eligible')
         self.assertEqual(_window_class(ToyDataset([[9.,1.],[1.,1.]],[[1,0],[0,0]]),0,0,1e-12),'all_lit')
 
-    def test_equal_layer_mixture_rejects_misaligned_empty_or_unnormalized_inputs(self):
+    def test_normalized_max_rejects_misaligned_empty_or_unnormalized_inputs(self):
         for values in ([],[np.ones(2),np.ones(3)]):
             with self.assertRaises(ValueError):
                 combine_layer_probabilities(values)

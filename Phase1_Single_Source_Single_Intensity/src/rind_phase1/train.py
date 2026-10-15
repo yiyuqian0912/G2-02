@@ -1,5 +1,7 @@
 """Training on canonical records, with native-size batches and scene-disjoint splits."""
 import argparse
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 import numpy as np
@@ -20,12 +22,26 @@ def collate_records(records):
         for key in ('candidate_xy','valid','teacher_prob'):
             batch[key][i,:m] = torch.as_tensor(r[key])
         batch['support'][i,:m] = torch.as_tensor(r.get('support',r['valid']))
+    geometry_keys=('geometry_types','geometry_params','geometry_mask')
+    present=[all(key in record for key in geometry_keys) for record in records]
+    if any(present) and not all(present):
+        raise ValueError('scene geometry must be present for every record in a batch')
+    if all(present):
+        batch.update(
+            geometry_types=torch.as_tensor(
+                np.stack([r['geometry_types'] for r in records]),dtype=torch.long),
+            geometry_params=torch.as_tensor(
+                np.stack([r['geometry_params'] for r in records]),dtype=torch.float32),
+            geometry_mask=torch.as_tensor(
+                np.stack([r['geometry_mask'] for r in records]),dtype=torch.bool))
     return batch
 
 
-def batches(records, batch_size, rng=None):
+def batches(records, batch_size, rng=None, prefetch=0):
     if batch_size <= 0:
         raise ValueError('batch_size must be positive')
+    if type(prefetch) is not int or prefetch<0:
+        raise ValueError('prefetch must be a nonnegative integer')
     buckets = {}
     sizes=records.window_sizes if hasattr(records,'window_sizes') else [int(r['window'][2]) for r in records]
     for i,size in enumerate(sizes):
@@ -37,29 +53,79 @@ def batches(records, batch_size, rng=None):
         groups.extend(bucket[i:i+batch_size] for i in range(0,len(bucket),batch_size))
     if rng is not None:
         rng.shuffle(groups)
-    for group in groups:
-        yield collate_records([records[i] for i in group])
+    def load(group):
+        return collate_records([records[i] for i in group])
+    if not prefetch:
+        for group in groups:yield load(group)
+        return
+    # NumPy NPZ decompression and file reads release the GIL.  A small ordered
+    # future queue overlaps them with the current CUDA batch without changing
+    # sample order or loading the complete dataset into RAM.
+    with ThreadPoolExecutor(max_workers=prefetch,thread_name_prefix='rind-batch') as pool:
+        pending=deque()
+        iterator=iter(groups)
+        for _ in range(min(prefetch,len(groups))):
+            pending.append(pool.submit(load,next(iterator)))
+        while pending:
+            future=pending.popleft()
+            try:group=next(iterator)
+            except StopIteration:group=None
+            if group is not None:pending.append(pool.submit(load,group))
+            yield future.result()
 
 
 def run_epoch(model, records, batch_size=4, optimizer=None, rng=None, grad_clip=None,
-              candidate_chunk=None, progress_callback=None):
+              candidate_chunk=None, progress_callback=None, amp_dtype=None,
+              prefetch_batches=0):
     model.train(optimizer is not None)
     total, count = 0., 0
     device = next(model.parameters()).device
+    if amp_dtype not in (None,'none','bfloat16','float16'):
+        raise ValueError('amp_dtype must be none, bfloat16 or float16')
+    amp_enabled=device.type=='cuda' and amp_dtype not in (None,'none')
+    amp_active=amp_enabled
+    amp_torch_dtype=(torch.bfloat16 if amp_dtype=='bfloat16' else torch.float16)
     with torch.set_grad_enabled(optimizer is not None):
-        for batch_index,batch in enumerate(batches(records,batch_size,rng),start=1):
-            batch = {k:v.to(device) for k,v in batch.items()}
-            if candidate_chunk:
-                from torch.utils.checkpoint import checkpoint
-                encoded=model.encode_observation(batch['response'],batch['obstacle'],batch['window'])
-                parts=[]
-                for start in range(0,batch['candidate_xy'].shape[1],candidate_chunk):
-                    xy=batch['candidate_xy'][:,start:start+candidate_chunk]
-                    parts.append(checkpoint(model.score_encoded,encoded,xy,use_reentrant=False) if optimizer is not None else model.score_encoded(encoded,xy))
-                energy=torch.cat(parts,dim=1)
+        for batch_index,batch in enumerate(batches(records,batch_size,rng,prefetch_batches),start=1):
+            if device.type=='cuda':
+                batch={k:v.pin_memory().to(device,non_blocking=True) for k,v in batch.items()}
             else:
-                energy = model(**{k:batch[k] for k in ('response','obstacle','window','candidate_xy')})
-            log_p, _ = student_distribution(energy,batch['support'])
+                batch={k:v.to(device) for k,v in batch.items()}
+            def forward(use_amp):
+                with torch.autocast(device_type=device.type,dtype=amp_torch_dtype,enabled=use_amp):
+                    geometry=tuple(batch.get(key) for key in
+                                   ('geometry_types','geometry_params','geometry_mask'))
+                    if candidate_chunk:
+                        from torch.utils.checkpoint import checkpoint
+                        encoded=model.encode_observation(
+                            batch['response'],batch['obstacle'],batch['window'],*geometry)
+                        parts=[]
+                        for start in range(0,batch['candidate_xy'].shape[1],candidate_chunk):
+                            xy=batch['candidate_xy'][:,start:start+candidate_chunk]
+                            parts.append(checkpoint(model.score_encoded,encoded,xy,use_reentrant=False) if optimizer is not None else model.score_encoded(encoded,xy))
+                        return torch.cat(parts,dim=1)
+                    arguments={k:batch[k] for k in ('response','obstacle','window','candidate_xy')}
+                    if geometry[0] is not None:
+                        arguments.update(geometry_types=geometry[0],geometry_params=geometry[1],
+                                         geometry_mask=geometry[2])
+                    return model(**arguments)
+            energy=forward(amp_active)
+            finite_energy=torch.isfinite(energy[batch['support']]).all()
+            if not bool(finite_energy):
+                if not amp_active:
+                    raise ValueError('nonfinite valid energies in full-precision forward at batch {}'.format(batch_index))
+                # A single unstable mixed-precision batch must not poison the
+                # optimizer. Recompute it in FP32 and keep FP32 for the rest of
+                # this epoch. The next epoch may try AMP again from finite weights.
+                print('[stability] batch {} produced nonfinite {} energies; retrying in FP32 and disabling AMP for this epoch'.format(
+                    batch_index,amp_dtype),flush=True)
+                amp_active=False
+                energy=forward(False)
+                if not bool(torch.isfinite(energy[batch['support']]).all()):
+                    raise ValueError('nonfinite valid energies remain after FP32 retry at batch {}'.format(batch_index))
+            # Always normalize 16k-way candidate distributions in float32;
+            # BF16 is used only for the expensive student network operations.
+            log_p, _ = student_distribution(energy.float(),batch['support'])
             loss = -(batch['teacher_prob'].detach() * log_p.masked_fill(~batch['support'],0)).sum(-1).mean()
             if not torch.isfinite(loss):
                 raise ValueError('nonfinite training/validation loss')
@@ -69,6 +135,10 @@ def run_epoch(model, records, batch_size=4, optimizer=None, rng=None, grad_clip=
                 if grad_clip is not None:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip, error_if_nonfinite=True)
                 optimizer.step()
+                for name,parameter in model.named_parameters():
+                    if not bool(torch.isfinite(parameter).all()):
+                        raise ValueError('optimizer produced nonfinite parameter {} at batch {}'.format(
+                            name,batch_index))
             total += loss.item()*len(energy)
             count += len(energy)
             if progress_callback is not None:
