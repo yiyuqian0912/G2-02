@@ -168,13 +168,16 @@ def make_joint_support(source_sets, *, base_mass, metadata=None):
     return JointSupport(padded, counts, np.array(weights), np.array(multiplicity, dtype=np.int64), details)
 
 
-def sample_joint_support(grid, *, source_counts, samples_per_count, count_prior=None, seed):
-    """Stratified Monte Carlo: iid uniform grid locations and U[0,1) strengths.
+def sample_joint_support(grid, *, source_counts, samples_per_count, count_prior=None, seed,
+                         strength_mode="uniform-0-1"):
+    """Stratified Monte Carlo with the declared source-strength prior.
 
     Sources are drawn with replacement, then canonicalized. This samples the
     unordered measure induced by iid ordered draws, including multiplicities;
     it does not assign equal mass to enumerated unordered configurations.
     """
+    if strength_mode not in ("uniform-0-1", "fixed-one"):
+        raise ValueError("strength_mode must be uniform-0-1 or fixed-one")
     counts = np.asarray(source_counts)
     if (counts.ndim != 1 or not len(counts) or counts.dtype.kind not in "iu" or
             np.any(counts <= 0) or len(np.unique(counts)) != len(counts)):
@@ -203,14 +206,17 @@ def sample_joint_support(grid, *, source_counts, samples_per_count, count_prior=
     for count, size, probability in zip(counts, sizes, prior):
         rng = np.random.Generator(np.random.PCG64(np.random.SeedSequence([int(seed), int(count)])))
         locations = rng.integers(len(pool), size=(int(size), int(count)))
-        strengths = rng.random((int(size), int(count)))
+        strengths = (np.ones((int(size), int(count))) if strength_mode == "fixed-one"
+                     else rng.random((int(size), int(count))))
         for xy, intensity in zip(pool[locations], strengths):
             sets.append(np.column_stack((xy, intensity)))
             weights.append(float(probability) / int(size))
     metadata = {"search_mode": "stratified_uniform_joint_monte_carlo", "grid": grid.metadata(),
                 "source_counts": counts.tolist(), "samples_per_count": sizes.tolist(),
                 "source_count_prior": prior.tolist(), "seed": int(seed), "rng": "PCG64; SeedSequence([seed,K])",
-                "strength_sampling": "iid uniform [0,1)", "location_sampling": "iid uniform valid grid; with replacement",
+                "strength_mode": strength_mode,
+                "strength_sampling": "fixed strength 1" if strength_mode == "fixed-one" else "iid uniform [0,1)",
+                "location_sampling": "iid uniform valid grid; with replacement",
                 "sampling_measure": "count prior times iid position/strength prior; empirical Monte Carlo support",
                 "base_mass_rule": "pi_K / N_K per draw; aggregate exact permutation duplicates",
                 "completeness": "all declared joint proposals evaluated; NOT exhaustive joint-space coverage"}

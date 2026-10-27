@@ -19,6 +19,12 @@ def audit_metadata(dataset):
     separate sampled check; this function does not claim to rerender every pixel.
     """
     ds=dataset._base
+    if dataset.manifest.get('variant') == 'multi-source-unit-random':
+        from rind_phase2.unit_checks import audit
+        report=audit(dataset.root,physical_samples=1,write_reports=False)
+        return {'all_scenes_audited':ds.num_scenes,'all_views_audited':len(dataset),
+                'reference_sets_sampled_world_audit':report['physical_references_checked'],
+                'all_windows_informative':report['all_windows_informative']}
     histogram={}
     reference_total=0
     reference_max_error=0.0
@@ -110,7 +116,10 @@ def check_data(root=None,*,full_audit=False,check_torch=False,workers=0):
     over_one=False
     for sid in selected:
         scene=ds.get_scene(sid)
-        assert len(list(ds.iter_view_leaves(sid)))==len(scene['local_views'])
+        if ds.manifest.get('view_sampling') == 'random-informative':
+            assert len(list(ds.iter_windows(sid)))==len(scene['local_views'])
+        else:
+            assert len(list(ds.iter_view_leaves(sid)))==len(scene['local_views'])
         for side in np.unique(scene['local_views'][:,2]):
             vid=int(np.flatnonzero(scene['local_views'][:,2]==side)[0])
             observed=ds.get_observation(sid,vid)
@@ -138,7 +147,7 @@ def check_data(root=None,*,full_audit=False,check_torch=False,workers=0):
             'references_rerendered':witnesses_checked,'max_reference_cost':max_reference_cost,
             'response_above_one_observed':over_one,'torch_batches_checked':check_torch}
     print(json.dumps(report,indent=2))
-    print('PASS: multi-source installation, channels, local masks, subsets, size batches, trees, witnesses and rerendering.')
+    print('PASS: multi-source installation, channels, local masks, subsets, size batches, window metadata, witnesses and rerendering.')
     return report
 
 

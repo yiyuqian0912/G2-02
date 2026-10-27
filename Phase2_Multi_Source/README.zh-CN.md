@@ -6,6 +6,12 @@
 
 ## 实际数据设定
 
+**新增固定强度随机窗口版已完成：100,000 场景、每场景 256 个窗口，共 25,600,000 个观测。** 每源强度为 1，窗口边长为 **64、128、256、512**，起点随机，不使用四分树。非障碍物采样点的响应必须有变化，排除全亮、全暗及恒定中间亮度。四种尺寸尽量均衡，无合法位置的尺寸由其他尺寸补足。ZIP 为 **1.55 GiB**，安装后约 **62.41 GiB**。[完整说明、安装、DataLoader 与验收记录](docs/dataset-unit-random-100k.md)。入口仍为 `./scripts/install_data.sh`、`./scripts/browser.sh` 和 `Phase2Dataset`。
+
+调用方式保持一致，需使用**本次更新后的 Phase II 仓库代码（含 vendor 读取器）**；无需独立配套项目或新增依赖。数据 ZIP 不会自动升级旧 main 的读取代码。
+
+下面是仍可读取的**原随机强度四分树版本**：
+
 - 发布包：10,000 个场景、367,109 个 source-free 局部窗口；安装后由数据校验器核对这些计数。
 - 每场景随机 1–4 个源，每源强度独立采样于 [0,1)。可见强度相加，响应允许大于 1。
 - 动态四分树最小 size=16；含任意源节点继续分，无源节点停止，含源最小叶子不作为观测。每场景窗口数量不固定。
@@ -62,7 +68,7 @@ uv sync --locked --extra train --extra browser --extra diagnostics
 无需完整数据即可运行仓库的小场景测试：
 
 ```bash
-PYTHONPATH=.:src .venv/bin/python -m unittest discover -s tests -q
+PYTHONPATH=.:src:../Phase1_Single_Source_Single_Intensity/src .venv/bin/python -m unittest discover -s tests -q
 ./run_training.sh --check
 ```
 

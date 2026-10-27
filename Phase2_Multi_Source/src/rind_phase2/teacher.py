@@ -84,7 +84,8 @@ def generate_joint_teacher(dataset, scene_id, view_id, *, spacing, temperature, 
                                        max_source_renders=max_source_renders)
     grid = uniform_source_grid(evaluator.domain, evaluator, spacing=spacing)
     support = sample_joint_support(grid, source_counts=source_counts, samples_per_count=samples_per_count,
-                                   count_prior=count_prior, seed=seed)
+                                   count_prior=count_prior, seed=seed,
+                                   strength_mode=dataset.manifest.get("driver_strength_mode", "uniform-0-1"))
     result = evaluate_joint_support(support, evaluator, max_evaluations=max_evaluations)
     return record_from_search(dataset, scene_id, view_id, evaluator, grid, result,
                               temperature=temperature, max_evaluations=max_evaluations,

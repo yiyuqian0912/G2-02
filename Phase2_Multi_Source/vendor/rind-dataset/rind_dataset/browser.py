@@ -4,7 +4,7 @@ Uses Flask + Pillow + vanilla HTML/CSS/JS. Completely local, zero external CDNs.
 Provides:
 - Paginated Gallery mode with thumbnails
 - Scene Detail mode with a sampled global preview, continuous geometry overlay,
-  adaptive view selector, diagnostic metrics, and local view filters.
+  random window selector, diagnostic metrics, and local view filters.
 """
 
 import argparse
@@ -218,6 +218,12 @@ def create_app(dataset_path: str) -> Flask:
             is_mixed = (lc0 > 0 and lc1 > 0)
             is_all_resp = (lc1 == area)
             is_no_resp = (lc1 == 0)
+            values = crop[crop_free]
+            is_informative = bool(values.size and np.max(values) > np.min(values))
+            if ds.manifest.get("view_sampling") == "random-informative":
+                is_mixed = is_informative
+                is_all_resp = bool(values.size and np.all(values == response_scale))
+                is_no_resp = bool(values.size and np.all(values == 0))
 
             view_diagnostics.append({
                 "view_id": v,
@@ -232,6 +238,9 @@ def create_app(dataset_path: str) -> Flask:
                 "has_driver": bool(has_driver),
                 "num_drivers_in_view": num_drivers_in_view,
                 "is_mixed": bool(is_mixed),
+                "is_informative": is_informative,
+                "response_min_free": float(np.min(values)) if values.size else None,
+                "response_max_free": float(np.max(values)) if values.size else None,
                 "is_all_response": bool(is_all_resp),
                 "is_no_response": bool(is_no_resp),
             })
@@ -295,8 +304,8 @@ def create_app(dataset_path: str) -> Flask:
             "scene_id": scene_id,
             "view_id": view_id,
             "view": ds.local_views[scene_id, view_id].tolist(),
-            "equivalence": ("sampled-view" if ds.candidate_layout == "single-position-list"
-                            else "continuous-field"),
+            "equivalence": ("sampled-world" if ds.candidate_layout == "scene-source-sets" else
+                            "sampled-view" if ds.candidate_layout == "single-position-list" else "continuous-field"),
             "candidates": [candidate.tolist() for candidate in ds.get_candidates(scene_id, view_id)],
         })
 
@@ -866,7 +875,7 @@ function renderOverlays() {
   const showAll = document.getElementById('toggle-all').checked;
   const showDriver = document.getElementById('toggle-driver').checked;
 
-  // 1. All adaptive views
+  // 1. All random windows
   if (showAll) {
     state.sceneData.local_views.forEach(orig => {
       const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');

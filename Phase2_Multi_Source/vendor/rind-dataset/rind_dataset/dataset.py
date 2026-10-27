@@ -31,6 +31,11 @@ class RINDDataset:
         elif self.candidate_layout == "padded-source-sets":
             for name in ("view_candidates", "candidate_counts", "candidate_numbers"):
                 setattr(self, name, np.load(self.root / f"{name}.npy", mmap_mode="r"))
+        elif self.candidate_layout == "scene-source-sets":
+            self.reference_sources = np.load(self.root / "reference_sources.npy", mmap_mode="r")
+            if self.reference_sources.shape != (self.num_scenes, self.manifest["candidate_capacity"],
+                                                 self.manifest["max_drivers"], 2):
+                raise ValueError("Invalid scene-level unit-source references")
         else:
             raise ValueError(f"Unknown candidate layout: {self.candidate_layout}")
         self.view_offsets = np.concatenate(([0], np.cumsum(self.view_counts, dtype=np.int64)))
@@ -95,6 +100,8 @@ class RINDDataset:
         bottom-right. Only metadata is built; response rasters stay lazy.
         """
         self._check_scene(scene_id)
+        if self.manifest.get("view_sampling") == "random-informative":
+            raise ValueError("Random windows have no quadtree; use get_scene()['local_views']")
         count = int(self.driver_counts[scene_id])
         points = np.asarray(self.drivers[scene_id, :count], dtype=np.float64)
         min_size = int(self.manifest["min_view_size"])
@@ -147,6 +154,10 @@ class RINDDataset:
         self._check_scene(scene_id)
         if view_id < 0 or view_id >= int(self.view_counts[scene_id]):
             raise IndexError("View ID out of range")
+        if self.candidate_layout == "scene-source-sets":
+            count = int(self.driver_counts[scene_id])
+            return [np.column_stack((positions[:count], np.ones(count)))
+                    for positions in self.reference_sources[scene_id]]
         if self.candidate_layout == "single-position-list":
             positions = self.reference_positions[scene_id, view_id]
             return [np.array([[position[0], position[1], 1.0]], dtype=np.float64)

@@ -33,12 +33,16 @@ class Phase2Dataset:
                 f"RIND data not installed at {self.root}. Place the multi-source ZIP "
                 "in the project root and run ./scripts/install_data.sh, or pass root=...")
         m = json.loads((self.root / "manifest.json").read_text(encoding="utf-8"))
-        if (not isinstance(m, dict) or m.get("schema_version") != 3 or
-                not isinstance(m.get("max_drivers"), int) or m["max_drivers"] < 2 or
-                m.get("response_type") != "additive-driver-intensity" or
-                m.get("driver_strength_mode", "uniform-0-1") != "uniform-0-1" or
-                m.get("candidate_layout", "padded-source-sets") != "padded-source-sets"):
-            raise ValueError("Multi-source Phase II requires schema-v3 additive random-strength data")
+        if isinstance(m, dict) and m.get("variant") == "multi-source-unit-random":
+            from rind_phase2.unit_schema import validate_manifest
+            validate_manifest(m)
+        else:
+            if (not isinstance(m, dict) or m.get("schema_version") != 3 or
+                    not isinstance(m.get("max_drivers"), int) or m["max_drivers"] < 2 or
+                    m.get("response_type") != "additive-driver-intensity" or
+                    m.get("driver_strength_mode", "uniform-0-1") != "uniform-0-1" or
+                    m.get("candidate_layout", "padded-source-sets") != "padded-source-sets"):
+                raise ValueError("Multi-source Phase II requires schema-v3 additive random-strength data")
         self._base = RINDDataset(self.root)
         if scene_ids is None:
             self.scene_ids = np.arange(self.num_scenes, dtype=np.int64)
@@ -94,8 +98,10 @@ class Phase2Dataset:
     def get_candidates(self, scene_id, view_id):
         """Incomplete reference witnesses [K,3] float64: (x,y,strength).
 
-        These are not search proposals or probability labels. Some witnesses
-        use K+1 co-located sources, even though generating scenes use at most K.
+        These are not search proposals or probability labels. Legacy
+        random-strength witnesses can use K+1 co-located sources.
+        Unit-strength random-window witnesses retain K unit sources and reproduce
+        the entire sampled world; all ten are shared by the scene's windows.
         """
         self._check_selected(scene_id)
         return self._base.get_candidates(scene_id, view_id)
@@ -138,6 +144,12 @@ class Phase2Dataset:
                 self._base.obstacle_params[scene_id], dtype=np.float32).copy(),
             "geometry_mask": mask,
         }
+
+    def iter_windows(self, scene_id):
+        """Yield (view_id, [x,y,L]) metadata for either window generation policy."""
+        self._check_selected(scene_id)
+        for view_id, window in enumerate(self._base.get_scene(scene_id)["local_views"]):
+            yield view_id, window.astype(np.int64)
 
     def get_view_tree(self, scene_id):
         self._check_selected(scene_id)

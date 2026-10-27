@@ -8,19 +8,22 @@ from pathlib import Path, PurePosixPath
 import shutil
 import stat
 import tempfile
+import uuid
 import zipfile
 
 import numpy as np
 from rind_dataset import RINDDataset
 from rind_dataset.constants import PARAM_WIDTH
 from rind_phase2.data import PROJECT_ROOT, default_data_root
+from rind_phase2.unit_schema import ARRAYS as UNIT_ARRAYS, validate_manifest as validate_unit_manifest
 
 
 ARRAYS = ("drivers", "driver_counts", "driver_strengths", "obstacle_counts",
           "obstacle_types", "obstacle_params", "obstacle_group_ids", "obstacle_bits",
           "visibility_bits", "local_views", "view_counts", "view_candidates",
           "candidate_counts", "candidate_numbers")
-OPTIONAL_FILES = ("generation_stats.json", "reference_generation_stats.json")
+OPTIONAL_FILES = ("generation_stats.json", "reference_generation_stats.json",
+                  "build_provenance.json", "validation_report.json")
 
 
 def file_sha256(path):
@@ -32,6 +35,8 @@ def file_sha256(path):
 
 
 def _valid_manifest(manifest):
+    if isinstance(manifest, dict) and manifest.get("variant") == "multi-source-unit-random":
+        return validate_unit_manifest(manifest)
     if not isinstance(manifest, dict):
         raise ValueError("Dataset manifest must be a JSON object")
     if (manifest.get("schema_version") != 3 or type(manifest.get("max_drivers")) is not int or
@@ -54,6 +59,9 @@ def validate_installed(root):
     root = Path(root)
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     _valid_manifest(manifest)
+    if manifest.get("variant") == "multi-source-unit-random":
+        from rind_phase2.unit_schema import validate_arrays
+        return validate_arrays(root)
     ds = RINDDataset(root)
     s, w, v = ds.num_scenes, ds.global_size, manifest["view_capacity"]
     m, c = manifest["max_drivers"], manifest["candidate_capacity"]
@@ -107,9 +115,10 @@ def _dataset_members(archive):
             continue
         matches.append((PurePosixPath(info.filename).parent, manifest))
     if len(matches) != 1:
-        raise ValueError("ZIP must contain exactly one multi-source dataset with reference source sets")
+        raise ValueError("ZIP must contain exactly one multi-source dataset with reference positions")
     prefix, manifest = matches[0]
-    names = ["manifest.json"] + [f"{name}.npy" for name in ARRAYS]
+    arrays = UNIT_ARRAYS if manifest.get("variant") == "multi-source-unit-random" else ARRAYS
+    names = ["manifest.json"] + [f"{name}.npy" for name in arrays]
     available = archive.namelist()
     names += [name for name in OPTIONAL_FILES if str(prefix / name) in available]
     members = [str(prefix / name) for name in names]
@@ -160,13 +169,25 @@ def choose_archive(project_root):
     raise ValueError("Place one multi-source ZIP in the project root, or pass its path explicitly")
 
 
-def install_data(archive_path, destination, *, keep_archive=False, expected_sha256=None):
+def install_data(archive_path, destination, *, keep_archive=False, expected_sha256=None, replace=False):
     destination = Path(destination).expanduser().resolve()
-    if destination.exists():
-        counts = validate_installed(destination)
-        print(f"Data already installed: {destination} ({counts['num_scenes']} scenes). ZIP retained.")
-        return destination
     archive_path = Path(archive_path).expanduser().resolve()
+    if destination.exists():
+        installed = json.loads((destination / "manifest.json").read_text())
+        _valid_manifest(installed)
+        if not replace:
+            counts = validate_installed(destination)
+            with zipfile.ZipFile(archive_path) as archive:
+                _, requested = _dataset_members(archive)
+            if requested != installed:
+                raise ValueError(
+                    f"Installed dataset has {counts['num_scenes']} scenes, while the supplied release has "
+                    f"{requested['num_scenes']} scenes or different metadata. Use --data-root for a separate "
+                    "installation, or --replace for a verified replacement with an old-data backup. ZIP retained.")
+            print(f"Data already installed: {destination} ({counts['num_scenes']} scenes). ZIP retained.")
+            return destination
+        if archive_path.is_relative_to(destination):
+            raise ValueError("Move the ZIP outside the installed data directory before using --replace")
     sidecar = Path(str(archive_path) + ".sha256")
     if expected_sha256 is None and sidecar.is_file():
         expected_sha256 = sidecar.read_text(encoding="utf-8").split()[0]
@@ -190,13 +211,26 @@ def install_data(archive_path, destination, *, keep_archive=False, expected_sha2
                 if digest.hexdigest() != hashes[member]:
                     raise ValueError(f"Dataset checksum mismatch: {output.name}; ZIP retained")
         counts = validate_installed(staging)
+        backup = (destination.with_name(f"{destination.name}.backup-{uuid.uuid4().hex[:12]}")
+                  if destination.exists() else None)
         record = {"archive_name": archive_path.name, "archive_sha256": archive_digest,
                   "schema_version": 3, **counts}
+        if backup is not None:
+            record["previous_dataset_backup"] = str(backup)
         lockfile = PROJECT_ROOT / "uv.lock"
         if lockfile.is_file():
             record["environment_lock_sha256"] = file_sha256(lockfile)
         (staging / "installation.json").write_text(json.dumps(record, indent=2) + "\n")
-        os.replace(staging, destination)
+        try:
+            if backup is not None:
+                os.replace(destination, backup)
+            os.replace(staging, destination)
+        except BaseException:
+            if backup is not None and backup.exists() and not destination.exists():
+                os.replace(backup, destination)
+            raise
+        if backup is not None:
+            print(f"Previous dataset preserved at: {backup}")
     finally:
         if staging.exists():
             shutil.rmtree(staging)
@@ -206,7 +240,7 @@ def install_data(archive_path, destination, *, keep_archive=False, expected_sha2
             sidecar.unlink()
         print(f"Removed verified ZIP: {archive_path.name}")
     print(f"Ready: {destination}\n{counts['num_scenes']} scenes, {counts['num_views']} views, "
-          f"{counts['references_per_view_range']} reference source sets per view.")
+          f"{counts.get('references_per_view', counts.get('references_per_view_range'))} references per view.")
     return destination
 
 
@@ -216,16 +250,18 @@ def main():
     parser.add_argument("--data-root", default=str(default_data_root()))
     parser.add_argument("--keep-archive", action="store_true", help="Keep ZIP after a successful installation")
     parser.add_argument("--sha256", help="Optional expected SHA256 of the complete ZIP")
+    parser.add_argument("--replace", action="store_true",
+                        help="Verify the new release, preserve the current data as a sibling backup, then replace")
     args = parser.parse_args()
     try:
         destination = Path(args.data_root).expanduser().resolve()
-        if destination.exists():
+        if destination.exists() and args.archive is None and not args.replace and not list(PROJECT_ROOT.glob("*.zip")):
             validate_installed(destination)
             print(f"Data already installed: {destination}")
             return
         archive = args.archive if args.archive else choose_archive(PROJECT_ROOT)
         install_data(archive, destination, keep_archive=args.keep_archive,
-                     expected_sha256=args.sha256)
+                     expected_sha256=args.sha256, replace=args.replace)
     except (OSError, ValueError, KeyError, IndexError, zipfile.BadZipFile) as exc:
         parser.exit(1, f"Data installation failed: {exc}\n")
 

@@ -9,5 +9,11 @@
     "dataset.py": "20bcffa2b88faf1b559372d8314e44564833b069890ffcfd4d8d963eaa7ddb73",
     "adaptive.py": "d8fefcf3d4519912c196c0230838d9d6d5a563b2df0c1548ae3a05300868ecf9",
     "browser.py": "115886f6c954904f01de43f491d6c2caffdc498a77360f57a73b83b20d978e4e"
-  }
+  },
+  "local_changes": [
+    "scene-source-sets reference layout",
+    "random-window tree rejection",
+    "Browser sampled-world equivalence label",
+    "Browser informative free-pixel response diagnostics"
+  ]
 }
