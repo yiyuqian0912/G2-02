@@ -1,0 +1,63 @@
+{
+  "name": "phase2_local_decomposition_100k_finetune",
+  "task": "decomposition_only",
+  "data_root": "data/raw/phase2-merged-110k",
+  "output_root": "outputs/masks_only_100k",
+  "label_preparation": {
+    "reuse_from": "outputs/masks_only_v1",
+    "seed": 20261028,
+    "record_counts": {"train": 100000, "validation": 2000, "test": 2000},
+    "window_sizes": [16, 32, 64, 128],
+    "max_views_per_scene": 32,
+    "chunk_size": 64,
+    "tolerance": 1e-12
+  },
+  "model": {
+    "max_slots": 32,
+    "hidden": 384,
+    "fourier_frequencies": 6,
+    "decomposition_hidden": 128,
+    "slot_decoder_layers": 2,
+    "slot_attention_heads": 8,
+    "use_obstacle": false,
+    "use_local_obstacle": false
+  },
+  "training": {
+    "seeds": [0],
+    "epochs": 100,
+    "patience": 15,
+    "batch_size": 32,
+    "target_global_batch_size": 256,
+    "candidate_chunk": 512,
+    "learning_rate": 0.00005,
+    "weight_decay": 0.0001,
+    "grad_clip": 1.0,
+    "mask_warmup_epochs": 0,
+    "locator_frozen_epochs": 0,
+    "amp_dtype": "bfloat16",
+    "device": "cuda",
+    "num_threads": 8,
+    "prefetch_batches": 2,
+    "progress_every_batches": 20,
+    "fused_optimizer": true,
+    "activation_checkpoint_candidates": false,
+    "activation_checkpoint_locator_encoder": false,
+    "initial_decomposition_checkpoint": "outputs/masks_only_v1/models/seed_0/best.pt",
+    "evaluate_initial_checkpoint": true,
+    "evaluate_after_training": true,
+    "evaluation_bootstrap_repetitions": 1000
+  },
+  "loss": {
+    "mask_weight": 1.0,
+    "dice_weight": 1.0,
+    "intensity_weight": 0.25,
+    "presence_weight": 1.0,
+    "empty_presence_weight": 0.25,
+    "location_weight": 0.0,
+    "reconstruction_weight": 1.0,
+    "residual_weight": 0.25,
+    "negative_residual_weight": 0.1,
+    "count_weight": 0.25,
+    "match_location_weight": 0.0
+  }
+}

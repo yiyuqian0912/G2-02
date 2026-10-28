@@ -1,0 +1,104 @@
+{
+  "data_path": "/Users/yiyuqian0912/Desktop/G2-02/Phase2_Multi_Source/data/raw/phase2-multi-source",
+  "num_scenes": 10000,
+  "num_configurations": 10000,
+  "total_views": 367109,
+  "counts_by_K": {
+    "1": 2521,
+    "2": 2441,
+    "3": 2556,
+    "4": 2482
+  },
+  "counts_by_size": {
+    "16": 74888,
+    "32": 74546,
+    "64": 73401,
+    "128": 69226,
+    "256": 54547,
+    "512": 20501
+  },
+  "strength_min": 2.244653636285232e-05,
+  "strength_max": 0.9999771938719876,
+  "min_distinct_subset_sum_gap": 1.398722507306438e-05,
+  "duplicate_source_position_scenes": 0,
+  "positions_all_integer": false,
+  "manifest": {
+    "dataset_name": "RIND adaptive additive",
+    "schema_version": 3,
+    "num_scenes": 10000,
+    "global_size": 1024,
+    "min_view_size": 16,
+    "view_capacity": 73,
+    "max_drivers": 4,
+    "candidate_capacity": 6,
+    "master_seed": 20260923,
+    "generation": {
+      "drivers": [
+        1,
+        4
+      ],
+      "min_logical_obstacles": 4,
+      "max_logical_obstacles": 16,
+      "max_primitives_per_scene": 48,
+      "config": {
+        "drivers": {
+          "min_count": 1,
+          "max_count": 4
+        },
+        "min_logical_obstacles": 4,
+        "max_logical_obstacles": 16,
+        "max_primitives_per_scene": 48,
+        "obstacle_generation": {
+          "single_primitive_probability": 0.6,
+          "compound_probability": 0.4
+        },
+        "primitive_family_probabilities": {
+          "rectangle": 0.25,
+          "ellipse": 0.15,
+          "triangle": 0.15,
+          "polygon": 0.45
+        },
+        "compound_probabilities": {
+          "l_shape": 0.18,
+          "t_shape": 0.18,
+          "u_shape": 0.18,
+          "cross": 0.12,
+          "dumbbell": 0.12,
+          "bent_wall": 0.1,
+          "irregular_cluster": 0.12
+        },
+        "rectangle": {
+          "axis_aligned_probability": 0.25,
+          "min_width": 32.0,
+          "max_width": 192.0,
+          "min_height": 32.0,
+          "max_height": 192.0
+        },
+        "ellipse": {
+          "min_diameter_x": 32.0,
+          "max_diameter_x": 192.0,
+          "min_diameter_y": 32.0,
+          "max_diameter_y": 192.0
+        },
+        "triangle": {
+          "min_scale": 32.0,
+          "max_scale": 192.0,
+          "min_area": 256.0
+        },
+        "polygon": {
+          "min_vertices": 5,
+          "max_vertices": 12,
+          "min_scale": 48.0,
+          "max_scale": 200.0,
+          "min_area": 384.0,
+          "concave_probability": 0.75
+        }
+      }
+    },
+    "cell_sampling": "cell-center",
+    "array_indexing": "yx",
+    "bit_order": "little",
+    "response_type": "additive-driver-intensity",
+    "view_boundary_rule": "half-open; split boundaries go right/bottom"
+  }
+}

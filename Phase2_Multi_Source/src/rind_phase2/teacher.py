@@ -101,7 +101,7 @@ def record_from_search(dataset, scene_id, view_id, evaluator, grid, result, *, t
     if installation.is_file():
         provenance["archive_sha256"] = json.loads(installation.read_text())["archive_sha256"]
     code_hashes = {name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest()
-                   for name in ("data.py", "physics.py", "search.py", "teacher.py", "regions.py", "layered_teacher.py")}
+                   for name in ("data.py", "physics.py", "search.py", "teacher.py", "regions.py", "region_geometry.py", "layered_teacher.py")}
     vendor = PROJECT_ROOT / "vendor/rind-dataset"
     for name in ("SOURCE_SNAPSHOT.json", "rind_dataset/dataset.py", "rind_dataset/runtime.py",
                  "rind_dataset/render.py", "rind_dataset/geometry.py", "rind_dataset/constants.py"):
@@ -112,7 +112,9 @@ def record_from_search(dataset, scene_id, view_id, evaluator, grid, result, *, t
                 "max_source_renders": None if max_source_renders is None else int(max_source_renders),
                 "environment": {"python": platform.python_version(), "numpy": np.__version__},
                 "code_sha256": code_hashes}
-    settings["uv_lock_sha256"] = hashlib.sha256((PROJECT_ROOT / "uv.lock").read_bytes()).hexdigest()
+    lock_path = PROJECT_ROOT / "uv.lock"
+    settings["uv_lock_sha256"] = (hashlib.sha256(lock_path.read_bytes()).hexdigest()
+                                  if lock_path.is_file() else None)
     config_id = _digest(settings)
     if run_id is not None and (not isinstance(run_id, str) or not run_id.strip()):
         raise ValueError("run_id must be a nonempty string")

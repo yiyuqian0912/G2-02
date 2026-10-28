@@ -1,0 +1,17 @@
+{
+  "python": "3.14.1 (v3.14.1:57e0d177c26, Dec  2 2025, 08:45:31) [Clang 16.0.0 (clang-1600.0.26.6)]",
+  "numpy": "2.5.3",
+  "numba": "0.67.0",
+  "matplotlib": "3.11.2",
+  "sha256": {
+    "/Users/yiyuqian0912/Desktop/G2-02/Phase1_Single_Source_Single_Intensity/research/boundary_switches/checks.py": "54cb353faf55bc048a9b3d03cba292a5d603169cf4cc9fe86a17e93b4c2c547c",
+    "/Users/yiyuqian0912/Desktop/G2-02/Phase1_Single_Source_Single_Intensity/research/boundary_switches/summarize.py": "ef104990f063a6991ad390430b555908871337770bae13c773689ff97c87bcfb",
+    "/Users/yiyuqian0912/Desktop/G2-02/Phase1_Single_Source_Single_Intensity/research/boundary_switches/audit_data.py": "33fc5f6db306e7a902652951f77dcf655a4a69a64cbe6c3a95361cf8aa477b78",
+    "/Users/yiyuqian0912/Desktop/G2-02/Phase1_Single_Source_Single_Intensity/research/boundary_switches/analyze.py": "adb562804d5fac2c89a0de1d491a789c408396941c2422174961aeeab16e260d",
+    "/Users/yiyuqian0912/Desktop/G2-02/Phase2_Multi_Source/vendor/rind-dataset/rind_dataset/geometry.py": "f1ffc7d205e4bc8440fa93c50d01970af570c554685f2f7b002baeae7fb0d230",
+    "/Users/yiyuqian0912/Desktop/G2-02/Phase2_Multi_Source/vendor/rind-dataset/rind_dataset/render.py": "690aad4961553e04ca1ecacef0ae18c1a613a44edea905be389e410893f3fb8b",
+    "/Users/yiyuqian0912/Desktop/G2-02/Phase2_Multi_Source/vendor/rind-dataset/rind_dataset/runtime.py": "f00c8a140fb2f06d9921adab483e468440d7976d3bd8bc192f532b1d2097d868",
+    "/Users/yiyuqian0912/Desktop/G2-02/Phase2_Multi_Source/vendor/rind-dataset/rind_dataset/dataset.py": "507881cf4d404674fdeae4d789301a90e66fc4b9eae2bcaa348943d00784d4b6",
+    "/Users/yiyuqian0912/Desktop/G2-02/Phase2_Multi_Source/vendor/rind-dataset/rind_dataset/constants.py": "e1bce72c3c0a31a3357bfc54fe0ab5275047d0771f6adb44928c72216acc3385"
+  }
+}

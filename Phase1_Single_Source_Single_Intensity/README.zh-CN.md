@@ -16,7 +16,26 @@ uv sync --locked --extra train --extra browser --extra diagnostics
 ./scripts/install_data.sh
 ```
 
-已有数据保存在 `data/raw/phase1-single-source/`。数据包下载：[单源 RIND](https://drive.google.com/file/d/1_zerwmggBskUtPtkhWTb6Xqs4kIU5L5I/view?usp=sharing)。安装器校验数据；默认在首次安装成功后删除原 ZIP，需保留时加 `--keep-archive`。重复安装不覆盖已安装实例。数据生成器不是本仓库的正式训练入口，当前训练读取已生成的单源发布包。
+已有 1 万场景数据保存在 `data/raw/phase1-single-source/`。扩充后的推荐发布包是 [RIND 10 万场景单源数据](https://drive.google.com/file/d/1a5VzelIpI985KijwGGq4AlfoJ5Wd9vWv/view?usp=sharing)，文件名为 `RIND-adaptive-v3-100000scenes-single.zip`，Drive 元数据大小为 923,018,027 bytes。旧的 1 万场景包继续用于复现既有实验，不会被安装器覆盖。
+
+将扩充包安装到独立目录，避免与旧数据混用：
+
+```bash
+./scripts/install_data.sh /path/to/RIND-adaptive-v3-100000scenes-single.zip \
+  --data-root data/raw/phase1-single-source-100k --keep-archive
+```
+
+8×H20 上运行本次多尺度边界模型与新版 CUDA 教师。模型使用原始/2×/4×边界、独立边界分支、4/2/2 角色注意力，以及候选到观察 token 的二维相对位置编码；见 [10 万场景服务器训练说明](docs/SERVER_100K_MULTISCALE.zh-CN.md)：
+
+```bash
+./run_phase1_100k.sh prepare --gpus 8
+./run_phase1_100k.sh train --gpus 8
+./run_phase1_100k.sh evaluate --gpus 8
+```
+
+旧 `full_training_h20_v2` 的已完成残差层可以作为额外单贡献样本追加到训练集；详见服务器说明中的“append layer cache”。程序只追加旧 train split，并保持新版 validation/test 独立。
+
+安装器以压缩包内部 `manifest.json` 为准核验场景数、schema、数组形状与逐文件 SHA256；文件名中的“100000”不是代码信任的计数。仓库提供 [`configs/splits/phase1_100k_v3.json`](configs/splits/phase1_100k_v3.json)，用紧凑的固定种子生成 80,000/10,000/10,000 个互斥场景池。数据生成器不是本仓库的正式训练入口，当前训练读取已生成的单源发布包。
 
 查看**已有训练结果**：
 
@@ -57,7 +76,7 @@ uv sync --locked --extra train --extra browser --extra diagnostics
 
 ## 数据与输入分别用来做什么
 
-发布包含 10,000 个场景、180,000 个 source-free 观测。每场景 18 个窗口：size=16、32、64、128、256、512 各 3 个。仅含源的四分树节点继续细分，无源节点立即保留；达到最小 size 的含源叶子被排除。模型不读取整棵树或真实源坐标。
+旧发布包含 10,000 个场景、180,000 个 source-free 观测。扩充包预期包含 100,000 个场景，实际总窗口数在安装后由 manifest 和读取器报告。每个兼容发布包的窗口仍由同一动态四分树规则产生：仅含源的节点继续细分，无源节点立即保留；达到最小 size 的含源叶子被排除。模型不读取整棵树或真实源坐标。
 
 | 输入 | 作用 | 怎么使用 |
 |---|---|---|
@@ -67,7 +86,7 @@ uv sync --locked --extra train --extra browser --extra diagnostics
 | 固定 source intensity | 保持正向过程可比，避免把强度变化误判为空间变化 | 当前发布包和重渲染均固定为 1，不作为待估参数 |
 | random seed | 重现模型初始化、batch 顺序和窗口选择 | 训练 seeds 负责重复实验；v2 窗口选择使用固定清单中的 window_seed |
 | quadtree 设置 | 决定数据生成阶段有哪些 source-free 窗口 | 当前发布包最小 size=16；训练只选择现成窗口。修改生成规则需要新数据版本 |
-| split 设置/清单 | 隔离场景，防止同一几何泄漏 | v2 读取 `configs/splits/phase1_fixed_v2.json`；取各池前 N 个场景 |
+| split 设置/清单 | 隔离场景，防止同一几何泄漏 | 旧 1 万场景实验读取 `phase1_fixed_v2.json`；扩充包读取 `phase1_100k_v3.json`；均从固定池头部取 N 个场景 |
 | `response[size,size]` | 提供可见/遮挡响应与边界形状 | 原始分辨率送入学生；教师与重渲染结果比较 |
 | `window=[x,y,size]` | 将局部像素放回世界，提供位置和尺度 | 局部像素 `[row,col]` 对应 `[x+col+0.5,y+row+0.5]`；size 也用于组批 |
 | `candidate_xy[N,2]` | 指定要检验的源假设 | 教师逐点重渲染，学生逐点给能量；不是源坐标标签 |

@@ -1,7 +1,9 @@
 import unittest
 import torch
 
-from rind_phase1.model import SourceEnergyField,fuse_view_log_probabilities
+from rind_phase1.model import (SourceEnergyField,fuse_view_log_probabilities,
+                               MultiScaleBoundaryFeatures,RoleAttention,
+                               stable_scaled_dot_product_attention)
 from rind_phase1.train import batches
 
 
@@ -14,6 +16,19 @@ def inputs(size=16,candidates=11,batch=2):
 
 
 class LargeModelTests(unittest.TestCase):
+    def test_stable_attention_matches_reference_and_backpropagates(self):
+        torch.manual_seed(41)
+        query=torch.randn(2,3,11,8,requires_grad=True)
+        key=torch.randn(2,3,7,8,requires_grad=True)
+        value=torch.randn(2,3,7,8,requires_grad=True)
+        actual=stable_scaled_dot_product_attention(query,key,value,query_chunk=4)
+        expected=torch.nn.functional.scaled_dot_product_attention(query,key,value)
+        torch.testing.assert_close(actual,expected,rtol=2e-5,atol=2e-6)
+        actual.square().mean().backward()
+        for tensor in (query,key,value):
+            self.assertIsNotNone(tensor.grad)
+            self.assertTrue(torch.isfinite(tensor.grad).all())
+
     def test_large_model_scores_and_normalizes_candidates(self):
         model=SourceEnergyField(hidden=64,fourier_frequencies=3,architecture='large',
                                 attention_heads=8,pixel_coordinates=True,
@@ -34,6 +49,88 @@ class LargeModelTests(unittest.TestCase):
             chunked=torch.cat([model.score_encoded(encoded,xy[:,start:start+4])
                                for start in range(0,xy.shape[1],4)],dim=1)
         torch.testing.assert_close(chunked,full)
+
+    def test_multiscale_boundary_model_scores_and_chunks(self):
+        torch.manual_seed(17)
+        model=SourceEnergyField(
+            hidden=64,fourier_frequencies=3,architecture='multiscale_boundary',
+            attention_heads=8,pixel_coordinates=True,normalization_support='world').eval()
+        response,obstacle,window,xy=inputs(size=32,candidates=13,batch=2)
+        response[:,8:20,12:]=1
+        with torch.no_grad():
+            full=model(response,obstacle,window,xy)
+            encoded=model.encode_observation(response,obstacle,window)
+            chunked=torch.cat([model.score_encoded(encoded,xy[:,start:start+5])
+                               for start in range(0,xy.shape[1],5)],dim=1)
+        self.assertEqual(full.shape,(2,13))
+        self.assertTrue(torch.isfinite(full).all())
+        torch.testing.assert_close(chunked,full)
+
+    def test_multiscale_boundary_uses_window_relative_geometry(self):
+        torch.manual_seed(23)
+        model=SourceEnergyField(hidden=64,fourier_frequencies=2,
+                                architecture='multiscale_boundary',attention_heads=8).eval()
+        response,obstacle,window,xy=inputs(size=16,candidates=7,batch=1)
+        response[:,4:12,8:]=1
+        shifted_window=window.clone();shifted_window[:,:2]+=128
+        shifted_xy=xy+128
+        with torch.no_grad():
+            original=model(response,obstacle,window,xy)
+            shifted=model(response,obstacle,shifted_window,shifted_xy)
+        # Relative geometry is preserved but absolute world geometry changes.
+        self.assertFalse(torch.equal(original,shifted))
+
+    def test_multiscale_attention_roles_are_separate(self):
+        model=SourceEnergyField(hidden=64,architecture='multiscale_boundary',attention_heads=8)
+        self.assertEqual(model.boundary_attention.heads,4)
+        self.assertEqual(model.region_attention.heads,2)
+        self.assertEqual(model.global_attention.heads,2)
+        names=set(dict(model.named_parameters()))
+        self.assertIn('boundary_attention.query.weight',names)
+        self.assertIn('region_attention.query.weight',names)
+        self.assertIn('global_attention.query.weight',names)
+        self.assertNotIn('attention.keys.weight',names)
+
+    def test_multiscale_requires_declared_eight_heads(self):
+        with self.assertRaisesRegex(ValueError,'exactly eight'):
+            SourceEnergyField(hidden=64,architecture='multiscale_boundary',attention_heads=4)
+
+    def test_boundary_features_do_not_invent_crop_frame_edges(self):
+        encoder=MultiScaleBoundaryFeatures()
+        constant=torch.ones(2,1,32,32)[:,0]
+        feature=encoder(constant)
+        torch.testing.assert_close(feature,torch.zeros_like(feature))
+
+    def test_role_attention_uses_candidate_to_token_relative_geometry(self):
+        torch.manual_seed(29)
+        attention=RoleAttention(64,4).eval()
+        query=torch.randn(1,3,64);tokens=torch.randn(1,5,64)
+        keys,values=attention.encode(tokens)
+        candidate=torch.tensor([[[.1,.2],[.4,.6],[.8,.3]]])
+        token=torch.tensor([[[.05,.1],[.2,.7],[.5,.5],[.7,.2],[.9,.9]]])
+        with torch.no_grad():
+            original=attention.attend(query,keys,values,candidate,token)
+            changed=attention.attend(query,keys,values,candidate+.07,token)
+            translated=attention.attend(query,keys,values,candidate+.07,token+.07)
+        self.assertFalse(torch.equal(original,changed))
+        torch.testing.assert_close(original,translated,rtol=1e-4,atol=5e-6)
+
+    def test_every_multiscale_branch_receives_gradient(self):
+        torch.manual_seed(31)
+        model=SourceEnergyField(hidden=64,fourier_frequencies=2,
+                                architecture='multiscale_boundary',attention_heads=8)
+        response,obstacle,window,xy=inputs(size=16,candidates=7,batch=1)
+        response[:,3:11,7:]=1
+        model(response,obstacle,window,xy).square().mean().backward()
+        prefixes=('image_encoder.boundary.','image_encoder.region.','image_encoder.global_branch.',
+                  'boundary_attention.','region_attention.','global_attention.',
+                  'relative_query.','token_position.','role_gates.')
+        for prefix in prefixes:
+            gradients=[parameter.grad for name,parameter in model.named_parameters()
+                       if name.startswith(prefix)]
+            self.assertTrue(gradients,prefix)
+            self.assertTrue(any(gradient is not None and torch.isfinite(gradient).all() and
+                                bool(torch.any(gradient!=0)) for gradient in gradients),prefix)
 
     def test_default_architecture_keeps_legacy_state_dictionary(self):
         implicit=SourceEnergyField(hidden=8,fourier_frequencies=2)

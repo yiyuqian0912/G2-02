@@ -64,7 +64,7 @@ Record arrays are `sources[N,K_max,3]`, `source_counts[N]`, `base_mass[N]`, `mul
 
 ## Remaining research modules
 
-`model.py`, `train.py`, and `evaluate.py` remain future work. Joint teacher generation and inspection are usable now; adaptive search and student interfaces need their own research decisions while keeping student conditioning local.
+Early unimplemented joint-energy placeholders were removed during repository cleanup. The active model, trainer and evaluation live in `research/implicit_slots/decomposition_model.py`, `train_decomposition.py` and `evaluate_masks.py`. They learn effective contribution masks/strengths/existence, rather than the complete joint source-set posterior described by this teacher interface. See `MASKS_ONLY.zh-CN.md` and `DECOMPOSITION_TRAINING.zh-CN.md` for their actual input/output contracts.
 
 `configs/phase2.json` records current data semantics and leaves research settings unresolved. Source count and strength ranges describe generation, not an automatic inverse-domain restriction. `quadtree_prior=false` and `source_location_scope=outside_observation_window` describe the main task.
 

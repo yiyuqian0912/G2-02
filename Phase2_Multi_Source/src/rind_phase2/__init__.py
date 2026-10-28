@@ -1,4 +1,4 @@
-"""Multi-source observations and a sampled joint physical-compatibility teacher.
+"""Multi-source RIND data, geometry and physical teachers.
 
-Student architecture, training and adaptive search remain research tasks.
+Current student training lives in research/implicit_slots/.
 """

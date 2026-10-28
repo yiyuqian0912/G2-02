@@ -1,0 +1,114 @@
+{
+  "name": "phase1_100k_multiscale_h20_memmap",
+  "data_root": "data/raw/phase1-single-source-100k",
+  "output_root": "outputs/experiments/phase1_100k_multiscale_h20_memmap",
+  "split_seed": 20261021,
+  "scene_counts": {
+    "train": 80000,
+    "validation": 10000,
+    "test": 10000
+  },
+  "window_sizes": [
+    16,
+    32,
+    64,
+    128
+  ],
+  "views_per_size": 1,
+  "exclude_constant_windows": true,
+  "teacher": {
+    "spacing": 16.0,
+    "temperature": 0.05,
+    "alpha": 1.0,
+    "boundary_lambda": 2.0,
+    "boundary_sigma": 1.0,
+    "backend": "cuda",
+    "gpu_devices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "gpu_batch_size": 8192,
+    "gpu_pixel_chunk": 16384,
+    "gpu_pair_budget": 268435456,
+    "parallel_window_prefetch": 2,
+    "compress_records": false,
+    "record_storage": "memmap",
+    "shard_commit_interval": 128,
+    "progress_every_records": 128
+  },
+  "variants": {
+    "response": {
+      "beta": 0.0
+    },
+    "edge": {
+      "beta": 0.1
+    }
+  },
+  "training": {
+    "seeds": [
+      0
+    ],
+    "epochs": 100,
+    "patience": 18,
+    "batch_size": 768,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.0001,
+    "grad_clip": 1.0,
+    "hidden": 384,
+    "fourier_frequencies": 6,
+    "architecture": "multiscale_boundary",
+    "attention_heads": 8,
+    "device": "cuda",
+    "gpu_devices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "num_threads": 24,
+    "use_obstacle": false,
+    "pixel_coordinates": true,
+    "normalization_support": "world",
+    "candidate_chunk": 1024,
+    "amp_dtype": "bfloat16",
+    "fused_optimizer": true,
+    "deterministic_algorithms": false,
+    "cudnn_benchmark": true,
+    "channels_last": true,
+    "prefetch_batches": 16,
+    "cache_records_in_memory": true,
+    "cache_appended_layers_in_memory": false,
+    "append_layer_cache_roots": [
+      "../Phase2_Multi_Source/outputs/full_training_h20_v2"
+    ],
+    "append_layer_maximum_cost": 0.01,
+    "progress_every_batches": 25
+  },
+  "evaluation": {
+    "compatibility_threshold": 0.01,
+    "prediction_chunk": 2048,
+    "plot_count": 100,
+    "probe_spacing": 8,
+    "probe_observations": 32,
+    "run_search_comparison": false
+  },
+  "search_comparison": {
+    "coarse_stride": 2,
+    "retain_fraction": 0.5,
+    "exploration_fraction": 0.1,
+    "seed": 0,
+    "max_observations": 16
+  },
+  "protocol_version": 2,
+  "split_manifest": "configs/splits/phase1_100k_v3.json"
+}

@@ -1,5 +1,7 @@
 # Multi-source task and physical semantics
 
+This document defines the imported data and joint physical teacher. Current residual-decomposition student training is documented in [MASKS_ONLY.zh-CN.md](MASKS_ONLY.zh-CN.md); the full localization connection is described in [DECOMPOSITION_TRAINING.zh-CN.md](DECOMPOSITION_TRAINING.zh-CN.md).
+
 [English guide](../README.md) · [中文指南](../README.zh-CN.md) · [Interfaces](interfaces.md)
 
 ## Observation

@@ -1,4 +1,4 @@
-> 上游分支历史实测记录。当前移植仅验证合成 fixture 测试；完整多源发布包未在 Phase II 目录重新安装验证。来源见 [upstream.md](upstream.md)。
+> 以下是2026-10-09的上游分支历史记录，保留当时的范围与待办；不是当前训练状态。当前代码、数据接入和已完成实验见 [项目状态](../../docs/PROJECT_STATUS.zh-CN.md) 与 [Phase2入口](../README.zh-CN.md)。来源见 [upstream.md](upstream.md)。
 
 # 验证记录（2026-10-09）
 

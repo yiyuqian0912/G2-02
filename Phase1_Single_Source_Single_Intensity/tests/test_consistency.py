@@ -10,7 +10,7 @@ import torch
 from rind_phase1.data import PROJECT_ROOT, Phase1Dataset
 from rind_phase1.model import SourceEnergyField
 from rind_phase1.predict import predict
-from rind_phase1.protocol import fixed_selection, validate_research_config
+from rind_phase1.protocol import _scene_pools, fixed_selection, validate_research_config
 from rind_phase1.train import run_epoch, TeacherRecords
 from rind_phase1.interfaces import training_record
 from test_interfaces import fixture
@@ -76,6 +76,17 @@ class ConsistencyTests(unittest.TestCase):
         self.assertEqual(views['validation'], new_views['validation'])
         self.assertEqual(views['train'], new_views['train'][:len(views['train'])])
         self.assertFalse(set(after['train']) & set(after['test']))
+
+    def test_compact_seeded_scene_pools_are_complete_and_reproducible(self):
+        manifest = dict(pool_method='seeded_permutation', pool_seed=17,
+                        scene_pool_counts=dict(train=8, validation=1, test=1))
+        first = _scene_pools(manifest, 10)
+        second = _scene_pools(manifest, 10)
+        self.assertEqual(first, second)
+        self.assertEqual({name: len(ids) for name, ids in first.items()},
+                         dict(train=8, validation=1, test=1))
+        self.assertEqual(set(first['train'] + first['validation'] + first['test']), set(range(10)))
+        self.assertFalse(set(first['train']) & set(first['test']))
 
     def test_alias_guard(self):
         c = json.loads((PROJECT_ROOT/'configs/experiment_consistent.json').read_text())

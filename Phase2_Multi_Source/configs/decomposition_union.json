@@ -1,0 +1,25 @@
+{
+  "base_config": "configs/decomposition_student.json",
+  "data_root": "data/raw/phase2-merged-110k",
+  "teacher_experiment_root": "outputs/decomposition_teachers_union",
+  "output_root": "outputs/response_decomposition_union_v2",
+  "new_teacher": {
+    "base_teacher_root": "outputs/full_training_h20_v2",
+    "base_scene_count": 10000,
+    "seed": 20261028,
+    "inherit_base_physics": true,
+    "record_counts": {"train": 100000, "validation": 10000, "test": 10000},
+    "window_sizes": [64, 128],
+    "max_views_per_scene": 8,
+    "gpu_batch_size": 4096,
+    "physics": {
+      "spacing": 8,
+      "temperature": 0.05,
+      "alpha": 1.0,
+      "beta": 0.0,
+      "boundary_lambda": 2.0,
+      "boundary_sigma": 1.0,
+      "max_layers": 32
+    }
+  }
+}

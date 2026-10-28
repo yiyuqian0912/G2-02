@@ -1,19 +1,20 @@
-# RIND Phase II — Multi-source localization
+# RIND Phase2
 
-[中文说明](README.zh-CN.md) · [Provenance](docs/upstream.md) · [Method](docs/method.md) · [Interfaces](docs/interfaces.md)
+[中文说明](README.zh-CN.md) · [Current decomposition training](docs/MASKS_ONLY.zh-CN.md) · [100k-window expansion](docs/MASKS_EXPANDED.zh-CN.md)
 
-Imported from Yushu's `yushu/phase1-multi-source` branch, retaining the Phase I module layout in a sibling project. Package: `rind_phase2`; dataset class: `Phase2Dataset`.
+The current student reads the original multi-source local response and predicts overlapping effective-contribution masks, positive strengths and slot existence. Supervision uses the existing minimum-positive residual/BFS decomposition. It does not use source identities to decide the labels, and mask-only training does not render candidate positions or instantiate the Phase1 locator.
 
-Working modules: installation, additive observations, data browser, joint-source rerendering, joint candidate sampling, physical teacher and diagnostics. The release describes 1–4 random-strength sources, additive response and variable-count source-free quadtree windows. Source intensities and count uncertainty are part of the inverse hypotheses.
-
-The original joint-posterior student remains a placeholder. The independent `research/layered_residual/` path now provides layered teachers, a single combined full-field student target, training, reports, and an interactive test-set browser. This field is a contribution-location distribution, not a joint multi-source posterior.
+From the repository root:
 
 ```bash
-uv sync --locked --extra train --extra browser --extra diagnostics
-PYTHONPATH=.:src .venv/bin/python -m unittest discover -s tests -q
-./run_training.sh --check
+./run_masks_tmux.sh start all --gpus auto
+./run_masks_expanded_tmux.sh start all --gpus auto
 ```
 
-Install the multi-source ZIP with `./scripts/install_data.sh PATH --keep-archive`; open the raw data browser with `./scripts/browser.sh` (localhost:8768). `RIND_MULTI_DATA_ROOT` can point to an existing multi-source installation. See the Chinese guide for responsibilities and next steps.
+Use the second command only after the base `masks_only_v1` cache and best model exist. It expands the actual training windows from20k to100k while preserving the original2k validation and2k test windows. The20k run is complete; the expanded workflow is available but its full server result has not yet been established.
 
-After layered training, run `./view_results.sh` and open `http://127.0.0.1:8768` to browse observations, teacher/student fields, and every residual peel.
+`research/implicit_slots/` contains the current model, label/cache preparation, trainer and metrics. `src/rind_phase2/` provides physical rendering, geometry and data tools. `dataset_update/` installs the new release and preserves geometry-based split isolation. `research/layered_residual/` keeps prior localization experiments and browsers.
+
+The full localization pipeline remains available through `run_decomposition*_tmux.sh` at repository root. Old localization browsers require the matching original artifacts; they do not automatically visualize the new mask-only student.
+
+Raw data, weights and generated outputs are not stored in Git. Arithmetic decomposition labels are effective contributions, not a guarantee of unique physical-source recovery. See the project status and phase-specific documents for completed experiments and limitations.

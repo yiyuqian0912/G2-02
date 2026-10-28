@@ -1,93 +1,65 @@
-# RIND Phase II：多源位置与强度推断
+# RIND Phase2：多源响应分层与定位
 
-以 Yushu 的 `yushu/phase1-multi-source` 分支为基础，目录与单源 Phase I 平级，模块职责保持一致。[来源与移植记录](docs/upstream.md)。
+[项目总览](../README.zh-CN.md) · [当前解耦训练](docs/MASKS_ONLY.zh-CN.md) · [10万窗口扩展](docs/MASKS_EXPANDED.zh-CN.md) · [完整定位流程](docs/DECOMPOSITION_TRAINING.zh-CN.md)
 
-**当前推荐版本：**先将每个多源局部响应剥离为二值有效贡献层，再使用共享的 Phase I 单源学生分别预测各层的全场位置概率，最后以归一化逐点最大值生成单窗口汇总图。v4 是实际应用的无全场几何基线；v6 是从 v4 warm-start、零初始化几何修正的完整几何 oracle/ablation。完整多源联合后验仍未实现，当前输出明确标为贡献位置汇总场。
+Phase2的目标是处理正强度、多源线性叠加响应。当前主线先让学生从完整局部响应预测有效贡献的二值掩码、强度和存在性；然后研究复用Phase1单贡献定位器。学生默认不读取全场障碍物几何。
 
-## 实际数据设定
+## 当前工作流
 
-- 发布包：10,000 个场景、367,109 个 source-free 局部窗口；安装后由数据校验器核对这些计数。
-- 每场景随机 1–4 个源，每源强度独立采样于 [0,1)。可见强度相加，响应允许大于 1。
-- 动态四分树最小 size=16；含任意源节点继续分，无源节点停止，含源最小叶子不作为观测。每场景窗口数量不固定。
-- 一个逆问题候选是一整组 `(x,y,intensity)`，允许考虑不同源数。交换源顺序不改变物理含义。
-- 参考解包括同位置强度拆分，可能有 5 个源；生成范围 1–4 不自动等于所有逆解的源数量上限。
+局部总响应 → 最低正残差/BFS标签 → 重叠槽位掩码、强度与存在性监督 → 验证集选模 → 固定测试集评估。
 
-## 目录与 Phase I 对应
+在G2-02根目录执行：
 
-| 文件夹/入口 | 作用与当前状态 |
+```bash
+./run_masks_tmux.sh start all --gpus auto
+./run_masks_tmux.sh status
+```
+
+2万窗口版本已完成；配置为 `configs/masks_only.json`，输出为 `outputs/masks_only_v1/`。已收到的测试摘要：软Dice=0.8902，有效层数准确率=79.95%，响应重建绝对MAE=0.01773；最佳epoch=37。强度损失不等同于强度MAE，软Dice也不等同于整窗解耦成功率。
+
+已存在旧缓存和最佳权重时，用扩展版本：
+
+```bash
+./run_masks_expanded_tmux.sh start all --gpus auto
+./run_masks_expanded_tmux.sh status
+```
+
+扩展目标为100000/2000/2000个实际完成的train/validation/test窗口，复用旧训练前缀并锁定旧评估集。从旧最佳模型微调，训练完成后自动生成 `evaluation/decomposition_metrics.json` 和中文报告。更多参数见扩展说明；10万窗口的正式训练结果尚待回收。
+
+## 目录与文件职责
+
+| 路径 | 做什么 |
 |---|---|
-| `src/rind_phase2/` | 主实现；包名独立，不修改 `rind_phase1` |
-| `data.py` / `install_data.py` / `browser.py` | 已导入多源读取、安装和原始数据浏览 |
-| `physics.py` / `search.py` / `teacher.py` | 已导入整组源物理代价、联合采样、教师分布与保存 |
-| `diagnostics.py` / `checks.py` | 已导入源数量/二维投影、参考解和数据/教师检查 |
-| `interfaces.py` | 新增学生交接草案，校验强度、变长源数量及零 padding；不代表学生已实现 |
-| Phase I `model.py` / `train.py` | 当前共享单源学生；Phase II 的每个残差层复用同一个条件能量模型 |
-| `protocol.py` / `sampling.py` / `experiments.py` | 冻结实验、学生侧联合查询与编排；仅配置查看已可用 |
-| `evaluate.py` / `part_e/` | 保留 Phase I 的评价/联调结构；联合指标与无序源匹配待实现 |
-| `view_layer_results.sh` / Phase I `tools/phase2_v4_browser.py` | 当前逐层学生浏览器；兼容 v4、v5、v6，可自选视窗和层并显示剥离过程、教师/学生概率及形状指标 |
-| `results_browser.py` / `view_results.sh` | 旧的 combined-field 学生浏览器，仅用于复现实验 |
-| `research/layered_residual/` / `run_layer_student.sh` | 当前逐层教师、共享单源学生、断点续训、全面指标和几何置乱审计入口 |
-| `run_server_full.sh` / `configs/layered_combined_server_full.json` | 8000/1000/1000 scene 划分的服务器全量入口；扫描选定尺寸的全部真实窗口 |
-| `scripts/` / `run_training.sh` | 原始联合源集合教师与尚未完成的联合后验学生草案；不用于当前逐层学生正式训练 |
-| `configs/phase2.json` | 上游多源数据与教师约定，未确定的正式参数留空 |
-| `configs/experiment_multisource.json` | 新实验草案；源数量先验、采样参数、训练参数待定 |
-| `configs/splits/` | 等待新数据身份与正式 scene 清单；不复制单源 IDs |
-| `tests/` | 上游小场景数据/物理/联合教师测试及新增接口/骨架测试 |
-| `vendor/` | 分支自带读取器/渲染器快照，保留来源 |
-| `student_baseline/` | 仅预留多源基线位置，没有单源旧代码 |
-| `data/` / `outputs/` | 隔离的多源数据与结果目录，仅占位文件进入 Git |
+| `research/implicit_slots/decomposition_model.py` | 原始多源响应编码、可重叠槽位、强度/存在性输出、匹配和监督损失 |
+| `research/implicit_slots/mask_only_data.py` | 低成本局部残差标签、二值掩码和连续训练缓存，不生成位置概率 |
+| `research/implicit_slots/expand_masks.py` | 复用旧缓存，追加新窗口，保持评估集固定并支持恢复 |
+| `research/implicit_slots/train_decomposition.py` | 解耦与完整定位两种模式的训练、选模和断点 |
+| `research/implicit_slots/evaluate_masks.py` | 解耦掩码、层数、强度与重建指标 |
+| `research/implicit_slots/evaluate_decomposition.py` | 完整定位模式的分层/位置指标，区别实际预测和oracle诊断 |
+| `research/implicit_slots/slot_*.py`、`train_slots.py` | 早期概率槽位基线与共享接口，保留实验复现 |
+| `research/layered_residual/` | 残差教师、逐层物理评分、旧层定位实验和结果浏览 |
+| `src/rind_phase2/` | 多源读取、正确加权叠加、几何遮挡、联合候选教师和检查工具 |
+| `dataset_update/` | 新数据安装、随机强度派生、重复几何安全划分与联合读取 |
+| `configs/` | 当前和历史实验配置；当前默认以masks开头的配置为准 |
+| `tests/`、研究模块中的 `test_*.py` | 数据、物理、标签、缓存、模型和命令入口的回归检查 |
+| `docs/` | 当前运行说明、方法限制、数据说明及历史实验记录 |
 
-## 安装与开始验证
+`src/rind_phase2`负责物理和数据，并不再保留无法运行的联合学生占位模块；当前学生在 `research/implicit_slots` 中。早期 `part_e/` 空接口与空基线目录已移除。原实现可从Git历史恢复，研究结论见保留的文档。
 
-```bash
-cd ../Phase2_Multi_Source
-uv sync --locked --extra train --extra browser --extra diagnostics
-# 多源 ZIP 放在本项目目录，或传入完整路径；建议保留下载包。
-./scripts/install_data.sh /path/to/RIND-adaptive-v3-10000scenes.zip --keep-archive
-./scripts/browser.sh --no-open
-```
+## 数据与评估约定
 
-原始数据浏览默认 **http://127.0.0.1:8768**，避免与 Phase I 结果浏览的 8767 冲突。多源数据目录为 `data/raw/phase2-multi-source/`；已有多源数据可通过 `RIND_MULTI_DATA_ROOT` 指向，无需重复安装。不要指向单源发布包。
+- 已有旧1万随机强度多源配置；新发布包含10万配置、每配置256个随机窗口，原发布为单位强度。
+- 安装器保留原始数据，并创建随机(0,1)强度派生版本；正式联合目录为 `data/raw/phase2-merged-110k`。
+- 同一障碍物几何在不同发布出现时保持同split。11万配置不是11万独立几何。
+- 总响应必须逐源按强度加权再相加；底层多源OR渲染不能直接当作加权响应。
+- 当前窗口筛选保留同时有自由零响应与正响应的窗口；全正响应窗口沿用原协议跳过。
+- 局部分层不读真实源编号或位置来决定传播。有效贡献强度可以大于1，有效层数不等于真实源数。
+- 算术重建正确不保证每层可由单个物理源实现。严格整窗成功率与多源定位闭环尚需验证。
 
-训练完成后打开当前逐层学生结果浏览器：
+数据安装见 [dataset_update](dataset_update/README.zh-CN.md)。已有缓存可直接训练/评估，不需要重渲染位置教师。
 
-```bash
-./view_layer_results.sh --student-run layer_student_v4
-```
+## 已有可视化与历史实验
 
-浏览器默认地址为 **http://127.0.0.1:8768**。页面可以按窗口 size、恢复层数和测试视窗筛选，并逐层查看剥离前残差、二值层响应、实际减量、剥离后残差、教师概率和学生概率。查看 v6 时改为 `--student-run layer_student_v6_geometry_residual`；浏览器会根据 checkpoint 自动提供完整障碍物几何。若原始数据浏览器占用端口，可加入 `--port 8769`。
+`./view_layer_results.sh`、`./view_results.sh` 保留旧定位实验的测试窗口浏览和逐层剥离可视化；需对应的原数据、教师缓存和checkpoint。它们不应被当成当前纯解耦模型的自动可视化。
 
-下载链接及安装空间、读取代码示例见 [数据指南](docs/dataset-guide.zh-CN.md)。没有自动下载或解压完整数据。
-
-无需完整数据即可运行仓库的小场景测试：
-
-```bash
-PYTHONPATH=.:src .venv/bin/python -m unittest discover -s tests -q
-./run_training.sh --check
-```
-
-当前逐层学生可以直接训练；完整多源联合后验学生仍未实现。服务器全量流程、记录筛选和恢复方式见[逐层残差说明](research/layered_residual/README.zh-CN.md#服务器全量训练)。
-
-## 方法边界
-
-v4 学生的单层输入是 **二值残差层响应 + window**，不读取源真值、分源通道或完整障碍物几何。v6 额外读取完整障碍物 primitive，只作为 oracle/ablation。多视窗无几何融合只使用各层概率场和有效贡献强度进行保守关联，不读取真实源编号。
-
-教师 `q_i ∝ base_mass_i × exp(-C_i/tau)`。这里 base_mass 表示源数量先验与采样测度，**不是空间面积权重**。跨不同 K 的比较不能删掉它，也不能分别 softmax 后直接比较。
-
-[方法](docs/method.md) · [接口与字段用途](docs/interfaces.md) · [实验计划](docs/experiments.zh-CN.md) · [多源图像解释](docs/dense_probability.zh-CN.md)
-
-
-## 逐层残差教师
-
-当前方法先在局部残差区域图中逐层恢复二值贡献响应并完成剥离；所有层确定后，只遍历一次全场均匀候选位置。每个候选的单源可见性只渲染一次，再分别与所有层比较并独立归一化。训练时每层都是一条 Phase I 风格监督记录；展示多层结果时使用归一化逐点最大值，保留任一层的强位置假设。
-
-```bash
-./run_layer_student.sh index --config configs/layer_student.json
-./run_layer_student.sh train --config configs/layer_student.json --gpus 6
-./run_layer_student.sh metrics --config configs/layer_student.json \
-  --seed 0 --device cuda --bootstrap-repetitions 1000
-```
-
-完整几何残差实验把配置替换为 `configs/layer_student_geometry_residual.json`。它从 v4 最佳 checkpoint 开始，epoch 0 与 v4 完全一致；完整设计与当前结果见 [v4–v6 实验报告](docs/RIND_Phase2_v4_完整实验设计与结果.md)。
-
-完整算法、训练参数、服务器命令、逐层可视化和失败语义见[逐层残差说明](research/layered_residual/README.zh-CN.md)。旧的联合随机教师入口继续保留作为对照。
+早期层定位、几何消融、集合训练探索及联合穷举工具保留用于研究复现；历史报告见 [v4–v6记录](docs/RIND_Phase2_v4_完整实验设计与结果.md)。这些流程不替代当前推荐入口。

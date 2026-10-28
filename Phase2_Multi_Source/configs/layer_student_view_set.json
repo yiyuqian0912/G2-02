@@ -1,0 +1,40 @@
+{
+  "name": "phase2_layer_student_v7_view_set",
+  "data_root": "data/raw/phase2-multi-source",
+  "teacher_experiment_root": "outputs/full_training_h20_v2",
+  "layer_index_root": "outputs/layer_student_v4",
+  "output_root": "outputs/layer_student_v7_view_set",
+  "initial_checkpoint": "outputs/layer_student_v4/models/seed_{seed}/best.pt",
+  "association": {
+    "minimum_score": 0.55,
+    "intensity_log_scale": 0.25,
+    "exact_intensity_minimum_score": 0.15,
+    "intensity_relative_tolerance": 1e-06,
+    "informativeness_scale": 0.05
+  },
+  "training": {
+    "seeds": [0],
+    "epochs": 60,
+    "patience": 15,
+    "scenes_per_batch": 32,
+    "max_views_per_track": 4,
+    "layer_loss_weight": 1.0,
+    "set_loss_weight": 0.5,
+    "redundancy_discount": 0.5,
+    "maximum_layer_ce_increase": 0.05,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "grad_clip": 1.0,
+    "candidate_chunk": 4096,
+    "progress_every_batches": 10,
+    "num_threads": 16,
+    "prefetch_workers": 16,
+    "prefetch_batches": 2,
+    "device": "cuda",
+    "normalization_support": "world",
+    "amp_dtype": "bfloat16",
+    "fused_optimizer": true,
+    "cudnn_benchmark": true,
+    "gpu_devices": [0, 1, 2, 3, 4, 5]
+  }
+}

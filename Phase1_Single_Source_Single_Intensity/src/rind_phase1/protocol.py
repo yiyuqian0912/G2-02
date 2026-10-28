@@ -6,12 +6,37 @@ from .data import PROJECT_ROOT
 from .sampling import require_resolved_sampling
 
 
+def _scene_pools(manifest, num_scenes):
+    """Resolve explicit legacy pools or a compact seeded-permutation manifest."""
+    if 'scene_pools' in manifest:
+        return manifest['scene_pools']
+    if manifest.get('pool_method') != 'seeded_permutation':
+        raise ValueError('split manifest needs scene_pools or pool_method=seeded_permutation')
+    counts = manifest.get('scene_pool_counts')
+    if (not isinstance(counts, dict) or set(counts) != {'train', 'validation', 'test'} or
+            any(type(counts[name]) is not int or counts[name] < 1
+                for name in ('train', 'validation', 'test')) or
+            sum(counts.values()) != num_scenes):
+        raise ValueError('scene_pool_counts must be positive train/validation/test counts covering the release')
+    seed = manifest.get('pool_seed')
+    if type(seed) is not int or seed < 0:
+        raise ValueError('pool_seed must be a nonnegative integer')
+    order = np.random.default_rng(seed).permutation(num_scenes).tolist()
+    train_end = counts['train']
+    validation_end = train_end + counts['validation']
+    return {
+        'train': order[:train_end],
+        'validation': order[train_end:validation_end],
+        'test': order[validation_end:],
+    }
+
+
 def fixed_selection(config,dataset):
     path=PROJECT_ROOT/config['split_manifest']
     manifest=json.loads(path.read_text())
     if manifest['num_scenes'] != dataset.num_scenes:
         raise ValueError('split manifest dataset size mismatch')
-    pools=manifest['scene_pools']
+    pools=_scene_pools(manifest,dataset.num_scenes)
     seen=set()
     for name in ('train','validation','test'):
         ids=pools[name]

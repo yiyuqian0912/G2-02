@@ -21,6 +21,7 @@ outputs/**
 !/configs/experiment_consistent.json
 !/configs/experiment_round1.json
 !/configs/experiment_train5000.json
+!/configs/experiment_100k_multiscale_h20.json
 /docs/consistency-review.zh-CN.md
 
 # Model weights and numerical artifacts are not source code.

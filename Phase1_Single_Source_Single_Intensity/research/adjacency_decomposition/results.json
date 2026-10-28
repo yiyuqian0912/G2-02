@@ -1,0 +1,171 @@
+{
+  "scope": "constructed geometry; fixed finite candidate domain, not generator statistics",
+  "world_size": 1024,
+  "window": [
+    288,
+    288,
+    16
+  ],
+  "sources": [
+    [
+      308,
+      317
+    ],
+    [
+      260,
+      256
+    ],
+    [
+      267,
+      278
+    ]
+  ],
+  "strengths": [
+    0.3,
+    0.2,
+    0.4
+  ],
+  "rectangle_params": [
+    [
+      280.0,
+      273.0,
+      3.0,
+      4.0,
+      0.0
+    ],
+    [
+      278.0,
+      301.0,
+      4.0,
+      6.0,
+      0.0
+    ]
+  ],
+  "patterns": {
+    "3": {
+      "pixels": 3,
+      "response": 0.5
+    },
+    "5": {
+      "pixels": 183,
+      "response": 0.7
+    },
+    "7": {
+      "pixels": 70,
+      "response": 0.9
+    }
+  },
+  "legal_neighbor_edges": 480,
+  "mixed_edges": 0,
+  "reference_numba_exact_rational_agree": true,
+  "recovered_strengths": [
+    0.2,
+    0.4,
+    0.2999999999999999
+  ],
+  "reconstruction_max_error": 1.1102230246251565e-16,
+  "greedy_minimum": 0.5,
+  "greedy_minimum_is_true_effective_strength": false,
+  "source_pool_size": 920,
+  "fixed_pair_pixel_indices": [
+    225,
+    241
+  ],
+  "mixed_witness": {
+    "enter_source": [
+      260,
+      318
+    ],
+    "leave_source": [
+      256,
+      266
+    ],
+    "pixel_centers": [
+      [
+        289.5,
+        302.5
+      ],
+      [
+        289.5,
+        303.5
+      ]
+    ],
+    "visibility": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ]
+    ]
+  },
+  "p_plus": 0.010869565217391304,
+  "p_minus": 0.014130434782608696,
+  "monte_carlo": [
+    {
+      "k": 1,
+      "trials": 100000,
+      "theory": 0.0,
+      "observed": 0.0,
+      "bound": 0.0,
+      "changed_trials": 2551,
+      "conditional_theory": 0.0,
+      "conditional_observed": 0.0,
+      "monte_carlo_standard_error": 0.0
+    },
+    {
+      "k": 2,
+      "trials": 100000,
+      "theory": 0.0003071833648393696,
+      "observed": 0.00032,
+      "bound": 0.00030718336483931944,
+      "changed_trials": 4932,
+      "conditional_theory": 0.006221435237253048,
+      "conditional_observed": 0.006488240064882401,
+      "monte_carlo_standard_error": 5.541561180928489e-05
+    },
+    {
+      "k": 3,
+      "trials": 100000,
+      "theory": 0.0009100307183365075,
+      "observed": 0.00086,
+      "bound": 0.0009215500945179584,
+      "changed_trials": 7329,
+      "conditional_theory": 0.012442205933248542,
+      "conditional_observed": 0.011734206576613454,
+      "monte_carlo_standard_error": 9.53521138951933e-05
+    },
+    {
+      "k": 4,
+      "trials": 100000,
+      "theory": 0.0017973594827062067,
+      "observed": 0.00188,
+      "bound": 0.0018431001890359168,
+      "changed_trials": 9647,
+      "conditional_theory": 0.018661822426793925,
+      "conditional_observed": 0.01948792370685187,
+      "monte_carlo_standard_error": 0.00013394510000728406
+    }
+  ],
+  "finite_pool_check": {
+    "n": 16,
+    "joint_configs": 4096,
+    "factor_candidate_comparisons": 48,
+    "feasible_joint_configs": 9,
+    "retained_joint_configs": 9,
+    "all_feasible_retained": true,
+    "max_sample_reconstruction_error": 0.0,
+    "known_strengths": true,
+    "scope": "only declared finite pool and fixed labelled strengths"
+  },
+  "timing": {
+    "initial_render_including_jit_seconds": 4.053597165970132,
+    "reference_and_rational_verification_seconds": 0.013428625010419637,
+    "label_recovery_seconds": 0.0015888339839875698,
+    "pool_render_seconds": 0.016728958988096565,
+    "factor_matching_seconds": 1.4666002243757248e-05,
+    "finite_joint_exhaustion_seconds": 0.01199929101858288
+  }
+}

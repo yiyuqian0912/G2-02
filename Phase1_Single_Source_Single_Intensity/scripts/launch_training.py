@@ -36,6 +36,8 @@ def parser():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     p.add_argument('--run-name', default='round1_terminal', help='Experiment name; use a new name when changing a started run')
     p.add_argument('--config', type=Path, help='Optional JSON template for a new run')
+    p.add_argument('--data-root', type=Path, help='Override dataset root, including an absolute local-NVMe path')
+    p.add_argument('--output-root', type=Path, help='Override output root, including an absolute local-NVMe path')
     p.add_argument('--set', dest='overrides', action='append', default=[], metavar='FIELD=JSON',
                    help='Override an existing field, e.g. --set training.weight_decay=0.001; repeatable')
     p.add_argument('--variant', choices=['response','edge'], default='response', help='Run response before the paired edge ablation')
@@ -52,6 +54,9 @@ def parser():
     p.add_argument('--window-sizes', type=int, nargs='+', choices=[16,32,64,128,256,512])
     p.add_argument('--spacing', type=positive_float, help='Candidate grid spacing in world coordinates')
     p.add_argument('--temperature', type=positive_float, help='Teacher softmax temperature')
+    p.add_argument('--gpus',type=positive_int,help='Use CUDA devices 0..N-1 for teacher rendering and training')
+    p.add_argument('--stage',choices=['all','plan','prepare','train','evaluate','summarize'],default='all',
+                   help='Run one resumable experiment stage')
     mode = p.add_mutually_exclusive_group()
     mode.add_argument('--check', action='store_true', help='Show/check effective settings; do not write files or train')
     mode.add_argument('--configure-only', action='store_true', help='Save settings without starting training')
@@ -68,6 +73,10 @@ def configure(args, project=PROJECT):
     config = json.loads(json.dumps(original)) if original is not None and args.config is None else json.loads(template.read_text())
     if original is None or args.config is not None:
         config.update(name=args.run_name,output_root=f'outputs/experiments/{args.run_name}')
+    if args.data_root is not None:
+        config['data_root']=str(args.data_root.expanduser().resolve())
+    if args.output_root is not None:
+        config['output_root']=str(args.output_root.expanduser().resolve())
     for argument, field in [('epochs','epochs'),('batch_size','batch_size'),('lr','learning_rate'),
                             ('patience','patience'),('seeds','seeds'),('device','device'),
                             ('threads','num_threads'),('hidden','hidden'),('fourier_frequencies','fourier_frequencies')]:
@@ -80,12 +89,17 @@ def configure(args, project=PROJECT):
     for key in ('spacing','temperature'):
         if getattr(args,key) is not None:
             config['teacher'][key] = getattr(args,key)
+    if args.gpus is not None:
+        config['training']['device']='cuda'
+        config['training']['gpu_devices']=list(range(args.gpus))
+        config['teacher']['backend']='cuda'
+        config['teacher']['gpu_devices']=list(range(args.gpus))
     for override in args.overrides:
         key, separator, raw = override.partition('=')
         if not separator:
             raise ValueError('--set requires FIELD=JSON')
-        if key in ('name','output_root'):
-            raise ValueError('Use --run-name to set the experiment name and output directory')
+        if key in ('name','output_root','data_root'):
+            raise ValueError('Use --run-name, --output-root, or --data-root for top-level paths')
         parts = key.split('.')
         node = config
         for part in parts[:-1]:
@@ -141,6 +155,14 @@ def configure(args, project=PROJECT):
         raise ValueError('window sizes must be unique')
     if config['training']['hidden'] < 2:
         raise ValueError('hidden must be at least 2')
+    architecture=config['training'].get('architecture','baseline')
+    heads=config['training'].get('attention_heads',1)
+    if architecture not in ('baseline','large','multiscale_boundary'):
+        raise ValueError('unknown training architecture')
+    if type(heads) is not int or heads<1 or config['training']['hidden']%heads:
+        raise ValueError('attention_heads must be a positive divisor of hidden')
+    if architecture=='multiscale_boundary' and (heads!=8 or config['training']['hidden']%16):
+        raise ValueError('multiscale_boundary requires attention_heads=8 and hidden divisible by 16')
     if config.get('protocol_version',1)>=2:
         from rind_phase1.protocol import validate_research_config
         validate_research_config(config)
@@ -188,17 +210,29 @@ def main():
         return
     output.mkdir(parents=True,exist_ok=True)
     print(f'Starting/resuming. Log: {output/"training.log"}',flush=True)
+    gpu_count=(len(config['training'].get('gpu_devices',[0]))
+               if config['training']['device']=='cuda' else 1)
+    def command(stage):
+        tail=['-m','rind_phase1.experiments',stage,'--config',str(path),'--variant',args.variant]
+        if stage=='train' and gpu_count>1:
+            return [sys.executable,'-u','-m','torch.distributed.run','--standalone',
+                    f'--nproc-per-node={gpu_count}',*tail]
+        return [sys.executable,'-u',*tail]
+    stages=([args.stage] if args.stage!='all' else
+            ['prepare','train','evaluate','summarize']+
+            (['search'] if config['evaluation'].get('run_search_comparison',False) else []))
     with (output/'training.log').open('a',buffering=1) as log:
-        process = subprocess.Popen([sys.executable,'-u','-m','rind_phase1.experiments','all',
-                                    '--config',str(path),'--variant',args.variant],
-                                   stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+        code=0
         try:
-            for line in process.stdout:
-                print(line,end='',flush=True)
-                log.write(line)
-            code = process.wait()
+            for stage in stages:
+                print(f'Launching stage={stage} with {gpu_count if stage=="train" else 1} process(es)',flush=True)
+                process=subprocess.Popen(command(stage),stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT,text=True)
+                for line in process.stdout:
+                    print(line,end='',flush=True);log.write(line)
+                code=process.wait()
+                if code:break
         except KeyboardInterrupt:
-            # Terminal SIGINT also reaches the child in the same foreground group.
             process.wait()
             raise SystemExit(130)
     if code:

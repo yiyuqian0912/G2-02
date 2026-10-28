@@ -2,6 +2,31 @@
 
 当前默认配置是 [`configs/experiment_consistent.json`](../configs/experiment_consistent.json)，协议 v2。旧 `experiment_round1.json` / `experiment_train5000.json` 保留用于解释已有实验，不代表新默认方法。
 
+## 扩充后的 10 万场景单源包
+
+扩充包下载地址为 [RIND-adaptive-v3-100000scenes-single.zip](https://drive.google.com/file/d/1a5VzelIpI985KijwGGq4AlfoJ5Wd9vWv/view?usp=sharing)。先安装到独立目录：
+
+```bash
+./scripts/install_data.sh /path/to/RIND-adaptive-v3-100000scenes-single.zip \
+  --data-root data/raw/phase1-single-source-100k --keep-archive
+```
+
+`configs/splits/phase1_100k_v3.json` 为该发布包定义固定的 80%/10%/10% 场景池。它只保存划分种子和各池数量，加载时确定性展开为互斥 scene ID；因此无需把 100,000 个编号直接提交到 Git。第一次建议先训练 **100,000 条观测**，而不是立刻使用全部窗口：
+
+```bash
+./run_training.sh --run-name single100k_obs100k \
+  --config configs/experiment_consistent.json \
+  --set data_root='"data/raw/phase1-single-source-100k"' \
+  --set split_manifest='"configs/splits/phase1_100k_v3.json"' \
+  --scene-counts 25000 2500 2500 \
+  --window-sizes 16 32 64 128 --set views_per_size=1 \
+  --epochs 60 --patience 12 --device cuda --threads 16
+```
+
+这里训练集为 25,000 个独立场景 × 4 个 size × 每个 size 1 个窗口 = 100,000 条观测；验证和测试各 10,000 条。扩大训练规模时只增加 `scene-counts` 的 train 值并使用新的 run name，固定池可保证 validation/test 不移动。该包用于增强单源／残差层学生；Phase II 的多源残差教师和多源测试仍读取多源发布包，不能把单源 ZIP 安装到多源数据目录。
+
+上面的命令沿用当前 Phase I 基线的 `hidden=64`、`fourier_frequencies=4`。若要把所得 checkpoint 作为 Phase II v4 的初始化，Phase I 与 Phase II 的模型结构参数必须完全一致；当前 v4 是 `hidden=128`、`fourier_frequencies=6`，不能直接加载上述默认权重。数据接入已经完成，跨阶段 warm-start 仍应作为一项单独、可比较的实验配置，不能把结构不兼容的 checkpoint 强行载入。
+
 ## 5000 个训练观测的建议起点
 
 在项目根目录运行：

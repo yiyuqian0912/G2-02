@@ -1,0 +1,13 @@
+{
+  "version": 3,
+  "num_scenes": 100000,
+  "window_seed": 20260923,
+  "pool_method": "seeded_permutation",
+  "pool_seed": 20261017,
+  "scene_pool_counts": {
+    "train": 80000,
+    "validation": 10000,
+    "test": 10000
+  },
+  "anchor": "Expanded 100000-scene single-source release; compact deterministic 80/10/10 scene split. Freeze before inspecting validation or test results."
+}

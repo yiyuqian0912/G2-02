@@ -1,0 +1,27 @@
+{
+  "0": {
+    "seed": 0,
+    "best_epoch": 37,
+    "test": {
+      "count": 0.6807253602147102,
+      "count_accuracy": 0.7995000001192093,
+      "count_mae": 0.269500000372529,
+      "intensity": 0.06882002555244253,
+      "location": 0.0,
+      "loss": 0.4063472487302497,
+      "mask": 0.1015103888119338,
+      "mask_dice": 0.890194733351469,
+      "matched_presence": 0.9186664283573628,
+      "negative_residual": 0.0020488089760765434,
+      "presence": 0.09278754161088727,
+      "reconstruction": 0.017726626660558395,
+      "residual": 0.02692586812376976
+    },
+    "records": {
+      "train": 20000,
+      "validation": 2000,
+      "test": 2000
+    },
+    "elapsed_seconds": 9138.260135088116
+  }
+}

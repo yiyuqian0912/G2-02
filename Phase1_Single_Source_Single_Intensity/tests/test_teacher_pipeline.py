@@ -13,6 +13,8 @@ from rind_phase1.search import CandidateDomain, deduplicate_candidates, uniform_
 from rind_phase1.teacher import (IncompleteSearchError, NoValidCandidatesError,
                                  generate_uniform_teacher, load_teacher_record,
                                  save_teacher_record, target_from_search, teacher_probabilities)
+from rind_phase1.gpu_teacher import _boundary_weights_cuda
+from rind_phase1.physics import boundary_weight_map
 
 
 class SyntheticEvaluator:
@@ -191,6 +193,20 @@ class TeacherPipelineTests(unittest.TestCase):
         self.assertTrue(np.any(np.all(record['candidate_xy'] == [7.5, 7.5], axis=1)))
         self.assertEqual(record['metadata']['settings']['support']['candidate_domain'], 'world_minus_window')
         self.assertFalse(record['metadata']['reference_solutions_used_as_targets'])
+
+    def test_cuda_teacher_path_matches_binary_visibility_contract_on_cpu(self):
+        record=generate_uniform_teacher(
+            LabelFreeDataset(),0,0,spacing=2,temperature=.1,backend='cuda',
+            gpu_device='cpu',gpu_batch_size=8,gpu_pixel_chunk=8,gpu_pair_budget=64)
+        self.assertTrue(record['evaluated'].all())
+        self.assertTrue(record['valid'].all())
+        # With no obstacles every candidate illuminates every observed pixel;
+        # the fixture observation is all dark, hence normalized L_resp is one.
+        np.testing.assert_allclose(record['physical_cost'],1.)
+        self.assertEqual(record['metadata']['settings']['physics']['resolved_backend'],'cuda')
+        self.assertEqual(record['metadata']['gpu_configured_batch_size'],8)
+        self.assertEqual(record['metadata']['gpu_effective_batch_size'],8)
+        self.assertEqual(record['metadata']['gpu_candidate_count'],len(record['candidate_xy']))
         self.assertGreater(np.count_nonzero(record['teacher_prob'] > 0), 1)
         with tempfile.TemporaryDirectory() as directory:
             path = save_teacher_record(record, Path(directory) / 'teacher.npz')
@@ -198,6 +214,23 @@ class TeacherPipelineTests(unittest.TestCase):
             np.testing.assert_array_equal(record['candidate_xy'], loaded['candidate_xy'])
             np.testing.assert_array_equal(record['teacher_prob'], loaded['teacher_prob'])
             self.assertEqual(record['metadata'], loaded['metadata'])
+
+    def test_torch_boundary_weights_match_exact_reference(self):
+        import torch
+        response=np.zeros((9,11),dtype=np.float64)
+        response[2:8,3:7]=1
+        _,weights=_boundary_weights_cuda(response,2.0,1.25,torch,torch.device('cpu'),64)
+        np.testing.assert_allclose(
+            weights.numpy(),boundary_weight_map(response,boundary_lambda=2.0,boundary_sigma=1.25),
+            rtol=0,atol=1e-14)
+
+    def test_uncompressed_teacher_record_round_trip(self):
+        record=generate_uniform_teacher(LabelFreeDataset(),0,0,spacing=2,temperature=.1)
+        with tempfile.TemporaryDirectory() as directory:
+            path=save_teacher_record(record,Path(directory)/'teacher.npz',compressed=False)
+            loaded=load_teacher_record(path)
+            np.testing.assert_array_equal(record['teacher_prob'],loaded['teacher_prob'])
+            self.assertEqual(record['metadata'],loaded['metadata'])
 
     def test_sampled_components_have_declared_four_neighbor_connectivity(self):
         grid = uniform_grid(self.parent, 1)

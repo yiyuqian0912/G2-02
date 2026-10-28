@@ -8,9 +8,12 @@ The current implementation includes native quadtree observations, boundary-weigh
 
 ```bash
 uv sync --locked --extra train --extra browser --extra diagnostics
-./scripts/install_data.sh # first installation, with the single-source ZIP in this directory
+./scripts/install_data.sh /path/to/RIND-adaptive-v3-100000scenes-single.zip \
+  --data-root data/raw/phase1-single-source-100k --keep-archive
 ./view_results.sh
 ```
+
+The recommended expanded single-source release is [RIND 100,000 scenes](https://drive.google.com/file/d/1a5VzelIpI985KijwGGq4AlfoJ5Wd9vWv/view?usp=sharing) (`RIND-adaptive-v3-100000scenes-single.zip`, 923,018,027 bytes according to Drive metadata). It installs beside the legacy 10,000-scene release. The installer trusts and validates the archive manifest and internal checksums rather than the filename.
 
 Open **http://127.0.0.1:8767**. Select a saved test scene/view to compare the local observation, actual dense model predictions, and original teacher samples. Query spacing is adjustable down to one source pixel. The matched-candidate mode uses identical coordinates and a shared probability color scale. Hover for values; export PNG or full-precision NPZ.
 

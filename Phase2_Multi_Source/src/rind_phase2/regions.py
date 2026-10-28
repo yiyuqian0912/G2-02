@@ -1,18 +1,13 @@
 """Response-region graph with continuous-geometry-safe four-neighbor edges."""
 from dataclasses import dataclass
-import inspect
 import numpy as np
 import rind_dataset.geometry as geo
+from .region_geometry import segment_intersects_obstacle as intersects
 try:
     from numba import njit
-    from numba.extending import register_jitable
-    for name, fn in list(vars(geo).items()):
-        if inspect.isfunction(fn) and fn.__module__ == geo.__name__:
-            register_jitable(fn)
 except ImportError:
     def njit(**kwargs):
         return lambda function: function
-intersects = geo.segment_intersects_obstacle
 
 @njit(cache=True)
 def find(par,a):
@@ -92,3 +87,43 @@ def response_regions(response, obstacle, origin, types, params, *, tolerance=1e-
                 neighbors[a].add(int(b)); neighbors[b].add(int(a))
     return ResponseRegions(labels.reshape(response.shape), values, pixels,
                            [sorted(n) for n in neighbors], int(blocked))
+
+
+def check_geometry_backend():
+    """Compile and verify the teacher adjacency path before starting workers."""
+    from rind_dataset.constants import PARAM_WIDTH
+    from .region_geometry import segment_intersects_obstacle
+    types = np.arange(4, dtype=np.uint8)
+    params = np.zeros((4, PARAM_WIDTH), dtype=np.float64)
+    params[0, :5] = [8.0, 8.0, 2.0, 4.0, 0.3]
+    params[1, :5] = [20.0, 8.0, 3.0, 2.0, -0.2]
+    params[2, :6] = [5.0, 20.0, 11.0, 19.0, 8.0, 25.0]
+    vertices = [(18.0, 18.0), (24.0, 18.0), (24.0, 24.0),
+                (21.0, 21.0), (18.0, 24.0)]
+    params[3, 0] = len(vertices)
+    params[3, 1:1 + 2 * len(vertices)] = np.asarray(vertices).ravel()
+    rng = np.random.default_rng(20261028)
+    segments = rng.uniform(0.0, 32.0, size=(32, 4))
+    checks = 0
+    for kind, row in zip(types, params):
+        for px, py, qx, qy in segments:
+            actual = segment_intersects_obstacle(px, py, qx, qy, int(kind), row)
+            expected = geo.segment_intersects_obstacle(px, py, qx, qy, int(kind), row)
+            if actual != expected:
+                raise RuntimeError(f"region geometry differs from canonical renderer for type {kind}")
+            checks += 1
+    thin = np.zeros((1, PARAM_WIDTH), dtype=np.float64)
+    thin[0, :5] = [1.0, 0.5, 0.1, 0.4, 0.0]
+    result = response_regions(np.ones((1, 2)), np.zeros((1, 2), dtype=bool),
+                              (0, 0), types[:1], thin)
+    if len(result.values) != 2 or result.excluded_edges != 1:
+        raise RuntimeError("thin obstacle was not excluded from free-space adjacency")
+    compiled = bool(getattr(graph, "nopython_signatures", ()))
+    try:
+        import numba
+        numba_version = numba.__version__
+    except ImportError:
+        numba_version = None
+    return {"geometry_checks": checks, "nopython_compiled": compiled,
+            "thin_obstacle_adjacency_checked": True,
+            "numpy_version": np.__version__, "numba_version": numba_version}
