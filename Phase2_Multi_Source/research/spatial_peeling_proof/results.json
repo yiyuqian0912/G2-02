@@ -1,0 +1,293 @@
+{
+  "seed": 20261027,
+  "scope": "synthetic examples and probability identities; not a dataset failure rate",
+  "upstream_unit_branch_commit": "77c03a031b923953197184ba16cf6dd6e55c5e48",
+  "fixed_strip": {
+    "phase_count": 4096,
+    "cases": [
+      {
+        "d": 0.0,
+        "h": 1.0,
+        "exact": 1.0,
+        "phase_quadrature": 1.0,
+        "error": 0.0
+      },
+      {
+        "d": 0.17,
+        "h": 1.0,
+        "exact": 0.83,
+        "phase_quadrature": 0.830078125,
+        "error": 7.812500000003997e-05
+      },
+      {
+        "d": -0.17,
+        "h": 1.0,
+        "exact": 0.83,
+        "phase_quadrature": 0.830078125,
+        "error": 7.812500000003997e-05
+      },
+      {
+        "d": 0.47,
+        "h": 1.0,
+        "exact": 0.53,
+        "phase_quadrature": 0.530029296875,
+        "error": 2.9296874999973355e-05
+      },
+      {
+        "d": -0.47,
+        "h": 1.0,
+        "exact": 0.53,
+        "phase_quadrature": 0.530029296875,
+        "error": 2.9296874999973355e-05
+      },
+      {
+        "d": 0.93,
+        "h": 1.0,
+        "exact": 0.06999999999999995,
+        "phase_quadrature": 0.070068359375,
+        "error": 6.835937500004885e-05
+      },
+      {
+        "d": -0.93,
+        "h": 1.0,
+        "exact": 0.06999999999999995,
+        "phase_quadrature": 0.070068359375,
+        "error": 6.835937500004885e-05
+      },
+      {
+        "d": 1.0,
+        "h": 1.0,
+        "exact": 0.0,
+        "phase_quadrature": 0.0,
+        "error": 0.0
+      },
+      {
+        "d": -1.0,
+        "h": 1.0,
+        "exact": 0.0,
+        "phase_quadrature": 0.0,
+        "error": 0.0
+      },
+      {
+        "d": 1.6,
+        "h": 1.0,
+        "exact": 0.0,
+        "phase_quadrature": 0.0,
+        "error": 0.0
+      },
+      {
+        "d": -1.6,
+        "h": 1.0,
+        "exact": 0.0,
+        "phase_quadrature": 0.0,
+        "error": 0.0
+      }
+    ],
+    "passed": true
+  },
+  "uniform_signed_gap": {
+    "quadrature_points": 20000,
+    "joint_draws_per_spacing": 30000,
+    "cases": [
+      {
+        "h": 0.1,
+        "L": 1.0,
+        "exact": 0.05,
+        "quadrature": 0.05,
+        "joint_scene_phase_monte_carlo": 0.04886666666666667,
+        "quadrature_error": 0.0,
+        "monte_carlo_error": 0.0011333333333333334
+      },
+      {
+        "h": 0.5,
+        "L": 1.0,
+        "exact": 0.25,
+        "quadrature": 0.25,
+        "joint_scene_phase_monte_carlo": 0.2504,
+        "quadrature_error": 0.0,
+        "monte_carlo_error": 0.00040000000000001146
+      },
+      {
+        "h": 1.0,
+        "L": 1.0,
+        "exact": 0.5,
+        "quadrature": 0.5,
+        "joint_scene_phase_monte_carlo": 0.5016666666666667,
+        "quadrature_error": 0.0,
+        "monte_carlo_error": 0.0016666666666667052
+      },
+      {
+        "h": 2.0,
+        "L": 1.0,
+        "exact": 0.75,
+        "quadrature": 0.75,
+        "joint_scene_phase_monte_carlo": 0.7499,
+        "quadrature_error": 0.0,
+        "monte_carlo_error": 9.999999999998899e-05
+      }
+    ],
+    "passed": true
+  },
+  "fixed_scene_crossing": {
+    "continuous_shared_segment": false,
+    "theorem_phase_probability": 1.0,
+    "cases": [
+      {
+        "h": 0.03125,
+        "phases": 512,
+        "false_connection_fraction": 1.0,
+        "min_bad_edges": 3,
+        "max_bad_edges": 3
+      },
+      {
+        "h": 0.015625,
+        "phases": 512,
+        "false_connection_fraction": 1.0,
+        "min_bad_edges": 3,
+        "max_bad_edges": 3
+      },
+      {
+        "h": 0.0078125,
+        "phases": 512,
+        "false_connection_fraction": 1.0,
+        "min_bad_edges": 3,
+        "max_bad_edges": 3
+      },
+      {
+        "h": 0.00390625,
+        "phases": 512,
+        "false_connection_fraction": 1.0,
+        "min_bad_edges": 3,
+        "max_bad_edges": 3
+      }
+    ],
+    "passed": true
+  },
+  "physical_random_source_crossing": {
+    "source_distribution": "independent uniform squares, half-width 1e-4, around (-3,-3),(-3,-6)",
+    "source_scene_draws": 24,
+    "point_comparisons": 2304,
+    "phase_trials_across_two_spacings": 1536,
+    "segment_renderer_vs_affine_mismatches": 0,
+    "false_connection_fraction": 1.0,
+    "observed_slope_gap_range": [
+      0.9997050502688549,
+      1.0003183883800892
+    ],
+    "max_abs_intersection_coordinate": 0.0009204948647078223,
+    "proved_probability_lower_bound": 0.0078125,
+    "interpretation": "finite synthetic diagnostics, not proof of the universal lower bound",
+    "passed": true
+  },
+  "finite_dictionary_peeling": {
+    "success": {
+      "status": "complete",
+      "residual": [
+        0,
+        0,
+        0
+      ],
+      "selected": [
+        [
+          1,
+          1,
+          0
+        ],
+        [
+          0,
+          1,
+          1
+        ]
+      ],
+      "trace": [
+        {
+          "anchor": [
+            0
+          ],
+          "mask": [
+            1,
+            1,
+            0
+          ],
+          "before": [
+            1,
+            2,
+            1
+          ],
+          "after": [
+            0,
+            1,
+            1
+          ]
+        },
+        {
+          "anchor": [
+            1,
+            2
+          ],
+          "mask": [
+            0,
+            1,
+            1
+          ],
+          "before": [
+            0,
+            1,
+            1
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "no_singleton": {
+      "status": "no_singleton",
+      "residual": [
+        2,
+        2,
+        0
+      ],
+      "selected": [],
+      "trace": []
+    },
+    "mixed_anchor": {
+      "status": "no_covering_mask",
+      "residual": [
+        1,
+        1
+      ],
+      "selected": [],
+      "trace": []
+    },
+    "nonidentifiable_anchor": {
+      "status": "nonidentifiable_mask",
+      "residual": [
+        1,
+        2,
+        1
+      ],
+      "selected": [],
+      "trace": []
+    },
+    "full_subtraction_residual": [
+      0,
+      1,
+      0,
+      0,
+      0
+    ],
+    "one_hop_residual": [
+      0,
+      1,
+      1,
+      1,
+      1
+    ],
+    "completion_after_incorrect_local_step": "no_covering_mask",
+    "passed": true
+  },
+  "all_passed": true
+}
