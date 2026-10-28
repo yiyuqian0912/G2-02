@@ -55,8 +55,8 @@ def build(output, root=ROOT):
         if name not in records:
             raise ValueError(f"package source missing: {name}")
     try:
-        commit = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-        dirty = bool(subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"], text=True).strip())
+        commit = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+        dirty = bool(subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"], text=True, stderr=subprocess.DEVNULL).strip())
     except (OSError, subprocess.CalledProcessError):
         commit, dirty = None, None
     manifest = json.dumps({"schema": "rind-source-package-v1", "commit": commit,

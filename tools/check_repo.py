@@ -27,11 +27,11 @@ def main():
     env["NUMBA_CACHE_DIR"] = env.get("RIND_CHECK_CACHE_ROOT", str(ROOT / "runtime_cache/checks/numba"))
     Path(env["NUMBA_CACHE_DIR"]).mkdir(parents=True, exist_ok=True)
     env["NUMBA_NUM_THREADS"] = "2"
-    try:
-        names = subprocess.check_output(["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard", "-z"]).split(b"\0")
-        scripts = sorted({ROOT / os.fsdecode(name) for name in names if name.endswith(b".sh") and (ROOT / os.fsdecode(name)).is_file()})
-    except (OSError, subprocess.CalledProcessError):
-        scripts = sorted(set(ROOT.glob('*.sh')) | set(PHASE1.glob('*.sh')) | set(PHASE2.glob('*.sh')))
+    # The same check runs inside a transfer package without a .git directory.
+    scripts = set(ROOT.glob('*.sh')) | set(PHASE1.glob('*.sh')) | set(PHASE2.glob('*.sh'))
+    for directory in (ROOT / 'tools', PHASE1 / 'scripts', PHASE2 / 'scripts', PHASE2 / 'dataset_update'):
+        scripts.update(directory.rglob('*.sh'))
+    scripts = sorted(scripts)
     for script in scripts:
         subprocess.run(["bash", "-n", str(script)], check=True)
     print(f"Shell syntax: {len(scripts)} entry points passed", flush=True)
