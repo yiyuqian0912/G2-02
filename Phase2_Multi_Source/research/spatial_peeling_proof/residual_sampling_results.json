@@ -1,0 +1,292 @@
+{
+  "seed": 20261027,
+  "scope": "finite declared-mask dictionaries; not a dataset rate",
+  "implementation_commit": "77c03a031b923953197184ba16cf6dd6e55c5e48",
+  "exact_decoupling": {
+    "candidate_positions": 8,
+    "pixels": 4,
+    "layers": 2,
+    "supports": [
+      [
+        0,
+        1
+      ],
+      [
+        2,
+        3
+      ]
+    ],
+    "overlap_pixels": [
+      1
+    ],
+    "support_tuples_checked": 4,
+    "maximum_reconstruction_mae": 0.0,
+    "passed": true
+  },
+  "joint_target_probabilities": {
+    "cases": [
+      {
+        "layer_count": 2,
+        "unordered": false,
+        "formula": {
+          "fraction": "1/16",
+          "value": 0.0625
+        },
+        "enumeration": {
+          "fraction": "1/16",
+          "value": 0.0625
+        },
+        "passed": true
+      },
+      {
+        "layer_count": 2,
+        "unordered": true,
+        "formula": {
+          "fraction": "1/8",
+          "value": 0.125
+        },
+        "enumeration": {
+          "fraction": "1/8",
+          "value": 0.125
+        },
+        "passed": true
+      },
+      {
+        "layer_count": 3,
+        "unordered": false,
+        "formula": {
+          "fraction": "1/64",
+          "value": 0.015625
+        },
+        "enumeration": {
+          "fraction": "1/64",
+          "value": 0.015625
+        },
+        "passed": true
+      },
+      {
+        "layer_count": 3,
+        "unordered": true,
+        "formula": {
+          "fraction": "3/64",
+          "value": 0.046875
+        },
+        "enumeration": {
+          "fraction": "3/64",
+          "value": 0.046875
+        },
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  "shared_pool_coverage": {
+    "iid_cases": [
+      {
+        "budget": 1,
+        "exact_shared_success": {
+          "fraction": "0",
+          "value": 0.0
+        },
+        "enumerated_success": {
+          "fraction": "0",
+          "value": 0.0
+        },
+        "independent_stream_success_not_shared": {
+          "fraction": "1/16",
+          "value": 0.0625
+        },
+        "union_failure_upper_bound": 1.0,
+        "passed": true
+      },
+      {
+        "budget": 2,
+        "exact_shared_success": {
+          "fraction": "1/8",
+          "value": 0.125
+        },
+        "enumerated_success": {
+          "fraction": "1/8",
+          "value": 0.125
+        },
+        "independent_stream_success_not_shared": {
+          "fraction": "49/256",
+          "value": 0.19140625
+        },
+        "union_failure_upper_bound": 1.0,
+        "passed": true
+      },
+      {
+        "budget": 3,
+        "exact_shared_success": {
+          "fraction": "9/32",
+          "value": 0.28125
+        },
+        "enumerated_success": {
+          "fraction": "9/32",
+          "value": 0.28125
+        },
+        "independent_stream_success_not_shared": {
+          "fraction": "1369/4096",
+          "value": 0.334228515625
+        },
+        "union_failure_upper_bound": 0.84375,
+        "passed": true
+      }
+    ],
+    "without_replacement": [
+      {
+        "budget": 1,
+        "formula": {
+          "fraction": "0",
+          "value": 0.0
+        },
+        "enumeration": {
+          "fraction": "0",
+          "value": 0.0
+        },
+        "passed": true
+      },
+      {
+        "budget": 2,
+        "formula": {
+          "fraction": "1/7",
+          "value": 0.14285714285714285
+        },
+        "enumeration": {
+          "fraction": "1/7",
+          "value": 0.14285714285714285
+        },
+        "passed": true
+      },
+      {
+        "budget": 4,
+        "formula": {
+          "fraction": "41/70",
+          "value": 0.5857142857142857
+        },
+        "enumeration": {
+          "fraction": "41/70",
+          "value": 0.5857142857142857
+        },
+        "passed": true
+      },
+      {
+        "budget": 8,
+        "formula": {
+          "fraction": "1",
+          "value": 1.0
+        },
+        "enumeration": {
+          "fraction": "1",
+          "value": 1.0
+        },
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  "approximate_error_budget": {
+    "tuples_checked_including_nonzero_decomposition_defect": 128,
+    "maximum_bound_violation": 0.0,
+    "swapped_layer_cancellation": {
+      "reconstruction_mae": 0.0,
+      "decomposition_defect": 0.0,
+      "layer_errors": [
+        0.5,
+        0.5
+      ],
+      "upper_bound": 1.0
+    },
+    "passed": true
+  },
+  "finite_temperature": {
+    "temperature": 0.3,
+    "threshold_per_layer": 0.25,
+    "off_exact_support_mass": [
+      0.38878772991848354,
+      0.38878772991848354
+    ],
+    "layer_mean_errors": [
+      0.16746131505343925,
+      0.16746131505343925
+    ],
+    "layer_tail_probabilities": [
+      0.2559718511209978,
+      0.2559718511209978
+    ],
+    "proved_layer_tail_bounds": [
+      1.0,
+      1.0
+    ],
+    "expected_global_mae": 0.2742619001608537,
+    "expected_mae_upper_bound": 0.3349226301068785,
+    "global_error_tail": 0.06487474196356231,
+    "union_tail_upper_bound": 0.5119437022419956,
+    "global_exact_probability_by_enumeration": 0.38690754519725334,
+    "all_selected_layers_exact_probability": 0.3735804390982006,
+    "passed": true
+  },
+  "seeded_sampling": {
+    "separate_rejection_runs": 20000,
+    "expected_position_draws": 8.0,
+    "mean_position_draws": 8.02335,
+    "joint_trials": 40000,
+    "joint_cases": [
+      {
+        "unordered": false,
+        "empirical": 0.061575,
+        "exact": 0.0625
+      },
+      {
+        "unordered": true,
+        "empirical": 0.123075,
+        "exact": 0.125
+      }
+    ],
+    "labeled_trials_for_95_percent_success": 47,
+    "passed": true
+  },
+  "operation_accounting": {
+    "shared_pass": {
+      "unique_position_render_events": 8,
+      "layer_score_evaluations": 16,
+      "score_pixel_comparisons": 64,
+      "joint_tuple_evaluations": 0
+    },
+    "cached_joint_baseline": {
+      "unique_position_render_events": 8,
+      "labeled_tuple_evaluations": 64,
+      "unordered_multisets": 36
+    },
+    "peeling_cost": "T_peel is excluded from these synthetic counters and remains explicit in the theorem",
+    "passed": true
+  },
+  "failure_cases": {
+    "rejected_decompositions": {
+      "uncovered_on_grid_binary_layer": "a layer has no exact candidate-grid support",
+      "nonunit_effective_layer": "layers must be aligned, nonzero unit-source masks",
+      "incorrect_layer_sum": "layer sum does not equal the observation",
+      "physically_impossible_layers_in_blocker_free_scene": "a layer has no exact candidate-grid support"
+    },
+    "local_subtraction_residual": [
+      0,
+      1,
+      1,
+      1,
+      1
+    ],
+    "correct_remaining_mask": [
+      0,
+      1,
+      0,
+      0,
+      0
+    ],
+    "mixed_anchor_status": "no_covering_mask",
+    "normalized_max_then_two_iid_draws_exact_probability": 0.5,
+    "one_draw_per_original_exact_layer_probability": 1.0,
+    "passed": true
+  },
+  "all_passed": true
+}
