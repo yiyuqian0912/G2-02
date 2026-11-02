@@ -7,6 +7,8 @@ from rind_phase3 import RIND3D
 from rind_phase3.oracle import PhysicalOracle
 from rind_phase3.physics import sample_probes, SparsePhysicalCost, full_window_cost
 from rind_phase3.teacher import OctreeTeacher, VariationRefinement
+from rind3d.geometry import load_geometry
+from rind.contracts import Leaf
 
 
 def main():
@@ -14,7 +16,10 @@ def main():
     p.add_argument("--root", required=True)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--cuda", action="store_true")
+    p.add_argument("--reference-probes", type=int, default=8)
     a = p.parse_args()
+    if not 1 <= a.reference_probes <= 32:
+        p.error("--reference-probes must be in [1,32]")
     if a.output.exists():
         raise FileExistsError(a.output)
     started = time.perf_counter()
@@ -23,9 +28,22 @@ def main():
     selected = {}
     rng = np.random.default_rng(20261102)
     with RIND3D(a.root, split=None) as data:
+        pool = {}
         for i, row in enumerate(data._reader.rows):
-            selected.setdefault(row["families"][0], (i, row))
+            entries = pool.setdefault(row["families"][0], [])
+            if len(entries) < 8:
+                bundle = load_geometry(
+                    data.teacher_scene(row["scene_id"]).geometry_path
+                )
+                complexity = sum(isinstance(x, Leaf) for x in bundle.references)
+                entries.append((complexity, i, row))
+        # A bounded correctness smoke, not a production throughput benchmark.
+        # Avoid paying arbitrary high-complexity CGAL union initialization here.
+        for family, entries in pool.items():
+            _, i, row = min(entries, key=lambda entry: (entry[0], entry[1]))
+            selected[family] = (i, row)
         for family, (scene_index, row) in sorted(selected.items()):
+            print("Starting family:", family, "scene ordinal:", scene_index, flush=True)
             with (
                 PhysicalOracle(data.teacher_scene(row["scene_id"])) as native,
                 PhysicalOracle(
@@ -53,11 +71,19 @@ def main():
                     observation = data[index]
                     probes = sample_probes(observation, count=32, seed=index)
                     costs, result = SparsePhysicalCost(native, probes).evaluate(sources)
+                    print("Native probes complete:", family, side, flush=True)
                     reference = canonical.evaluate_points(
-                        sources, probes.world_xyz, window=probes.window
+                        sources,
+                        probes.world_xyz[: a.reference_probes],
+                        window=probes.window,
                     )
-                    np.testing.assert_array_equal(result.response, reference.response)
-                    np.testing.assert_array_equal(result.solid, reference.solid)
+                    np.testing.assert_array_equal(
+                        result.response[:, : a.reference_probes], reference.response
+                    )
+                    np.testing.assert_array_equal(
+                        result.solid[: a.reference_probes], reference.solid
+                    )
+                    print("Canonical probes agree:", family, side, flush=True)
                     entry = {
                         "family": family,
                         "side": side,
@@ -68,6 +94,11 @@ def main():
                         "evaluated_pairs": result.evaluated_pairs,
                         "native_seconds": result.wall_seconds,
                         "canonical_seconds": reference.wall_seconds,
+                        "canonical_compared_receivers": min(
+                            a.reference_probes, len(probes.world_xyz)
+                        ),
+                        "canonical_compared_pairs": reference.evaluated_pairs,
+                        "canonical_geometry_initialization_seconds": canonical.context.canonical_init_seconds,
                         "all_point_labels_equal": True,
                     }
                     if family == sorted(selected)[0]:
@@ -75,6 +106,7 @@ def main():
                         if not len(valid):
                             raise RuntimeError("No valid deterministic smoke source")
                         full = full_window_cost(native, observation, sources[valid[0]])
+                        print("CPU local raster complete:", family, side, flush=True)
                         entry.update(
                             full_cost=full["cost"],
                             full_window_voxels=side**3,
@@ -119,6 +151,7 @@ def main():
         "dataset_name": "RIND3D",
         "real_observations": reports,
         "families": len(selected),
+        "scene_selection": "minimum component count among first eight scenes of each family; ties by ordinal; correctness smoke only",
         "sizes": [64, 128, 256],
         "no_hidden_sources_or_reference_pools_read": True,
         "oracle_scope": "certified point labels; full-window mismatch on three selected windows; no equivalent-source search/certification",

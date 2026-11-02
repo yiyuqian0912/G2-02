@@ -41,6 +41,23 @@ def test_invalid_sources_never_become_response_labels(box):
         assert result.validity.reasons[2] == "insufficient_clearance"
 
 
+def test_reference_receiver_masks_use_original_canonical_classifier(box, monkeypatch):
+    with PhysicalOracle(box, backend="cpu_reference", receiver_batch=1) as oracle:
+        canonical = oracle.context.canonical
+        original = canonical.reference.classify_points
+        sizes = []
+
+        def checked(points):
+            sizes.append(len(points))
+            return original(points)
+
+        monkeypatch.setattr(canonical.reference, "classify_points", checked)
+        result = oracle.evaluate_points([0.0625, 0.5, 0.5], [[0.5] * 3, [0.9] * 3])
+        assert sizes == [1, 1]
+        assert result.solid.tolist() == [True, False]
+        assert oracle.stats["canonical_membership_points"] == 2
+
+
 def test_cartesian_order_bounded_chunks_and_no_label_separation(box):
     p = np.array([[0.0625, 0.5, 0.5], [0.0625 + 2**-20, 0.5, 0.5]])
     q = np.array([[0.8, 0.5, 0.5], [0.1, 0.1, 0.1], [0.9, 0.9, 0.9]])

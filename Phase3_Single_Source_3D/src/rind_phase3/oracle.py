@@ -169,9 +169,19 @@ class PhysicalOracle:
         try:
             for offset in range(0, len(receivers), self.receiver_batch):
                 q = receivers[offset : offset + self.receiver_batch]
-                m = self.context.native.contains(q)
-                if np.any(~np.isin(m, [0, 1])):
-                    raise OracleFailure("Unresolved receiver membership")
+                if self.backend == "cpu_reference":
+                    reference = self.context.canonical
+                    membership = reference._values(
+                        reference.reference.classify_points(q)
+                    )
+                    if np.any(~np.isin(membership, [0, 1, 2])):
+                        raise OracleFailure("Canonical receiver membership unresolved")
+                    m = membership != 0  # FREE / INTERIOR / closed BOUNDARY
+                    self.stats["canonical_membership_points"] += len(q)
+                else:
+                    m = self.context.native.contains(q)
+                    if np.any(~np.isin(m, [0, 1])):
+                        raise OracleFailure("Unresolved receiver membership")
                 solid[offset : offset + len(q)] = m
             for i, p in enumerate(sources):
                 if not validity.valid[i]:
