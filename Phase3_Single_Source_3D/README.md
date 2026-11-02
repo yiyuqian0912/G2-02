@@ -8,7 +8,7 @@ The permanent dataset name is **RIND3D**. Scene count and scientific profile are
 
 ## Install and load
 
-The tested platform is Linux x86_64 with Python 3.12. Reading needs no CUDA, C++ build or generator. Start from this directory:
+The tested platform is Linux x86_64 with Python 3.12; the fresh-checkout reader/native/CUDA adapter checks also passed on Python 3.13. This does not establish support on other operating systems. Reading needs no CUDA, C++ build or generator. Start from this directory:
 
 ```bash
 uv sync --extra dev --extra train
@@ -46,7 +46,7 @@ uv run python examples/physical_query.py --index 0 --rerender
 uv run python examples/octree_smoke.py --output results/octree.json
 ```
 
-Native build prerequisites and dependency licenses are in [RIND3D_Generator](../RIND3D_Generator/README.md). Arbitrary source/receiver point queries use certified native CPU or the original canonical reference, in bounded Cartesian batches. They do **not** generate a complete field. Whole observation windows can additionally use the certified CUDA renderer with `--raster-backend cuda_certified --rerender`. Arbitrary-point CUDA is not provided in this adapter. Source acceptance, clearance, closed-segment contact and tangency semantics are preserved; unresolved physical results fail closed. See [PhysicalOracle](docs/PHYSICAL_ORACLE.md).
+Native build prerequisites and dependency licenses are in [RIND3D_Generator](../RIND3D_Generator/README.md). Arbitrary source/receiver point queries use certified native CPU or the original canonical reference, in bounded Cartesian batches. They do **not** generate a complete field. Whole observation windows can additionally use the certified CUDA renderer with `--raster-backend cuda_certified --rerender`; this requires both an NVIDIA driver and NVRTC, separately from CPU PyTorch. Arbitrary-point CUDA is not provided in this adapter. Source acceptance, clearance, closed-segment contact and tangency semantics are preserved; unresolved physical results fail closed. See [PhysicalOracle](docs/PHYSICAL_ORACLE.md).
 
 The octree starts with exactly eight 512³ source-space cubes, samples k=4 points per visited cube, evaluates sparse physical mismatch, then splits one selected cube into eight 256³ children. Defaults cap the diagnostic at 64 candidate attempts and 4,096 source/receiver pairs. Both breadth-first and exploratory cost-variation policies are available. Unvisited/uncertain cells are retained; no homogeneity or complete probability target is claimed. [Mathematical design](docs/ADAPTIVE_TEACHER.md) explains volume weighting and the distinction between physical cost variation and neural gradients.
 
@@ -58,6 +58,6 @@ RIND_TEST_CUDA=1 uv run pytest -q tests/test_oracle.py
 uv run python examples/real_smoke.py --root "$RIND3D_DATA_ROOT" --cuda --output results/real-smoke.json
 ```
 
-Native/data tests require the corresponding extras/build/data; unavailable optional capabilities are explicitly skipped. CUDA tests must run outside environments that hide the device. The real smoke covers nine families, all three window sizes, original-reference comparisons and a bounded octree. Keep outputs outside the immutable dataset. See [development boundaries](docs/DEVELOPMENT.md).
+Native/data tests require the corresponding extras/build/data; unavailable optional capabilities are explicitly skipped. CUDA tests must run outside environments that hide the device. The real smoke covers nine families, all three window sizes, original-reference comparisons and a bounded octree. It selects the least-component scene among the first eight of each family and compares eight original-reference receivers per window by default (`--reference-probes 32` enables the larger diagnostic). This bounds an integration check, not a production performance benchmark or a change to scientific acceptance. Original CGAL comparisons can still take minutes; use the native backend for routine teacher queries. Keep outputs outside the immutable dataset. See [development boundaries](docs/DEVELOPMENT.md).
 
 License and citation authors remain pending. The download URL and archive checksum are also packaged in `rind_phase3/release.json`; no permissive license is inferred from public access.

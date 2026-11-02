@@ -10,6 +10,27 @@ RIND studies source localization from local responses in a two-dimensional occlu
 
 The 20k-window decomposition run is complete. The 100k-window expansion workflow is available and reuses the old training prefix and locked validation/test sets. Completion of that larger experiment and the final multi-view localization system have not yet been established.
 
+## RIND3D — 3D Physical Reasoning Dataset
+
+**RIND3D v0.1 — Initial release containing 1,000 certified 3D scenes and 256,000 observation windows.** [Phase 3](Phase3_Single_Source_3D/README.md) adds restricted local-observation loading, certified physical queries and a bounded adaptive-octree demonstration. The completed dataset is available now; the 3D teacher/student design remains research in progress.
+
+[Download RIND3D-v0.1.tar.zst from Google Drive](https://drive.google.com/file/d/1PmMp39En-uc4QTgACd_EpS4mTZ3wO7yx/view?usp=drivesdk) · Anyone with the link — Viewer · 633,273,091 bytes.
+
+SHA256: `1f5a2ff2bd9ac4a479a074b33e0d06f160706e4369b199144ee117693913ee1e`
+
+```bash
+cd Phase3_Single_Source_3D
+uv sync --extra dev --extra train
+uv run python examples/download_dataset.py --output data
+export RIND3D_DATA_ROOT="$PWD/data/RIND3D-v0.1"
+uv run python examples/inspect_dataset.py
+uv run python examples/pytorch_dataloader.py --workers 2
+```
+
+Reading requires no GPU or generator build. Use the separate Phase 3 environment: its NumPy/native physics dependencies differ from the 2D stack. The public training archive includes canonical geometry and complete response/solid fields; the default Phase 3 student adapter exposes only window identity, origin/size, local response and local mask. Hidden sources and private references are excluded from the archive. This is the `full-field-training-v1` policy, rather than a blind hidden-field benchmark.
+
+The dataset's permanent name is **RIND3D**. Historical `Lite-Core-1K` identifiers remain internal scientific provenance. All nine certified geometry families, mixed lit/shadow sampling, 85/85/86 size quotas at 64/128/256 and stable 776/116/108 geometry-group splits are preserved. One private reference does not imply a unique source. License and citation metadata remain pending. See [coordinates and data](Phase3_Single_Source_3D/docs/DATASET.md), [PhysicalOracle](Phase3_Single_Source_3D/docs/PHYSICAL_ORACLE.md), [teacher design](Phase3_Single_Source_3D/docs/ADAPTIVE_TEACHER.md) and [integration acceptance](docs/RIND3D_INTEGRATION.md).
+
 ## Start
 
 ```bash
@@ -34,6 +55,8 @@ See [the expansion guide](Phase2_Multi_Source/docs/MASKS_EXPANDED.zh-CN.md) for 
 |---|---|
 | `Phase1_Single_Source_Single_Intensity/` | Single-contribution physics, models, training, evaluation and visualization |
 | `Phase2_Multi_Source/` | Multi-source data, residual labels, slot decomposition, training and evaluation |
+| `Phase3_Single_Source_3D/` | RIND3D data adapter, certified physical queries and exploratory single-source octree teacher |
+| `RIND3D_Generator/` | Self-contained canonical geometry, CPU/CUDA rendering, independent verification and resumable generation |
 | `tools/` | Repository checks and reproducible server packages |
 | `docs/` | Cross-phase status, compact results and maintenance notes |
 | `Literature_Review/` | Team literature reviews |

@@ -18,12 +18,27 @@ System prerequisites: C++20 compiler, CMake, GMP/GMPXX and MPFR development libr
 uv sync --extra dev --extra train
 ./scripts/build.sh
 uv run --no-sync python scripts/verify_source_copy.py
-uv run --no-sync python -m pytest -q
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --no-sync python -m pytest -q
 ```
 
 The optional `train` extra supplies CPU PyTorch needed by campaign build-identity/loader acceptance; it is not necessary for sparse native physics queries. The preserved legacy comparison tests skip if their separate experimental extensions have not been built. Production extensions are always built by the main package. Fresh builds need fresh scientific certification; the original frozen authority is never copied or relabeled.
 
-An NVIDIA GPU is optional. Certified CUDA uses NVRTC/driver API, rigorous directed binary64 intervals and exact CPU fallback for unknowns. Set `RIND_NVRTC_LIBRARY` if NVRTC is not discoverable. `cpu_reference` and `cpu_native_certified` remain available; `auto` checks capabilities. `cuda_certified` fails explicitly when unavailable.
+To include those two legacy native comparison implementations in the complete regression run, build their retained sources on the tested Linux platform:
+
+```bash
+for comparison in shadow_volumes cpu_cuda; do
+  cmake -S "experiments/$comparison" -B "build/acceptance-$comparison" \
+    -DPython_EXECUTABLE="$PWD/.venv/bin/python" \
+    -Dpybind11_DIR="$(.venv/bin/python -m pybind11 --cmakedir)" -DCMAKE_BUILD_TYPE=Release
+  cmake --build "build/acceptance-$comparison" --parallel 2
+  cp "build/acceptance-$comparison"/_*.so "experiments/$comparison/"
+done
+RIND_TEST_CUDA=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --no-sync python -m pytest -q
+```
+
+Omit the CUDA opt-in on CPU-only hosts. All generated shared libraries/build files stay ignored; they must not be committed.
+
+An NVIDIA GPU is optional. CUDA requires a compatible NVIDIA driver **and NVRTC**, for example from an installed CUDA Toolkit; the CPU PyTorch extra does not install that compiler. Certified CUDA uses the NVRTC/driver API, rigorous directed binary64 intervals and exact CPU fallback for unknowns. Set `RIND_NVRTC_LIBRARY` to your installed `libnvrtc.so` if NVRTC is not discoverable. `cpu_reference` and `cpu_native_certified` remain available; `auto` checks capabilities. `cuda_certified` fails explicitly when unavailable.
 
 ## Generation and recovery
 

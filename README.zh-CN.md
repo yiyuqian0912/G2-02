@@ -6,6 +6,29 @@
 
 当前主线分为两部分：Phase1学习单贡献的全场位置概率；Phase2先学习把原始多源响应解耦成若干有效贡献层，再复用Phase1定位。当前服务器已完成2万窗口的解耦训练；10万窗口扩展流程已交付，完整多源定位与多视窗闭环仍需验证。
 
+## RIND3D — 3D Physical Reasoning Dataset
+
+**RIND3D v0.1 首次发布包含 1,000 个经过认证的三维场景、256,000 个局部观测窗口。** [Phase3](Phase3_Single_Source_3D/README.md) 已接入数据读取、真实物理查询和有预算限制的自适应八叉树示例。数据已经生成，无需重新生成；三维学生和教师算法仍在研究阶段。
+
+[Google Drive 下载 RIND3D-v0.1.tar.zst](https://drive.google.com/file/d/1PmMp39En-uc4QTgACd_EpS4mTZ3wO7yx/view?usp=drivesdk)，权限为“任何拥有链接的人可查看”，文件大小 633,273,091 字节。
+
+SHA256：`1f5a2ff2bd9ac4a479a074b33e0d06f160706e4369b199144ee117693913ee1e`
+
+```bash
+cd Phase3_Single_Source_3D
+uv sync --extra dev --extra train
+uv run python examples/download_dataset.py --output data
+export RIND3D_DATA_ROOT="$PWD/data/RIND3D-v0.1"
+uv run python examples/inspect_dataset.py
+uv run python examples/pytorch_dataloader.py --workers 2
+```
+
+读取数据不需要 GPU 或生成器编译。Phase3 使用独立环境，避免与二维项目的 NumPy 和原生依赖冲突。公开包采用 `full-field-training-v1` 策略，含全场连续几何及完整响应/实体场；因此不能把整个包当成隐藏全场的盲测集。默认学生接口只返回场景/窗口 ID、位置、边长、局部响应和局部实体掩码，不返回全场几何、源位置、参考解或证据点。教师通过显式接口获取完整几何。
+
+数据集的永久名称是 **RIND3D**；历史清单内的 `Lite-Core-1K` 仅是内部生产配置和溯源标识，不改写科学哈希。当前数据保留九类认证几何、混合明暗采样，每场景 256 窗，边长 64/128/256 各 85/85/86 窗；按几何分组的训练/验证/测试场景数为 776/116/108。每窗的一份私有参考解不代表源唯一。许可证和引用署名待定。详细说明见[数据与坐标](Phase3_Single_Source_3D/docs/DATASET.md)、[物理接口](Phase3_Single_Source_3D/docs/PHYSICAL_ORACLE.md)及[自适应教师设计](Phase3_Single_Source_3D/docs/ADAPTIVE_TEACHER.md)。
+
+构建、完整回归、新克隆安装、真实数据物理对照和已知限制的实测记录见[三维集成验收与交接](docs/RIND3D_INTEGRATION.md)。
+
 ## 目录职责
 
 ```text
@@ -28,6 +51,8 @@ G2-02/
 │   ├── dataset_update/                 数据安装、随机强度派生与几何安全拼接
 │   └── configs/ scripts/ tests/ docs/   运行配置、辅助命令与实验记录
 ├── tools/                              检查仓库与构建服务器更新包
+├── Phase3_Single_Source_3D/             三维单源数据接口、物理教师查询与八叉树实验
+├── RIND3D_Generator/                    独立完整的三维生成、认证、CPU/CUDA及恢复源码
 ├── docs/                               跨阶段进展、结果摘要和整理记录
 ├── Literature_Review/                  组员文献与讨论
 └── G2_02_Initial_Proposal.pdf           原始proposal

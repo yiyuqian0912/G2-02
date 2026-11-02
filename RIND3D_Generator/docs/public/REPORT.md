@@ -1,6 +1,6 @@
-# RIND3D-Lite-Core-1K-v0.1 measured report
+# RIND3D v0.1 measured release report
 
-This report describes the original 1K production campaign. An explicitly named diagnostic subset or future composed release has its own authoritative counts in `manifest.json`. License and citation authors remain pending. This is a locally verified release candidate, not a claim of an online upload or a grant of redistribution rights.
+This report describes the original 1K production campaign, historically identified as `RIND3D-Lite-Core-1K-v0.1`. That is an internal provenance identifier; the permanent public dataset name is RIND3D. An explicitly named diagnostic subset or future composed release has its own authoritative counts in `manifest.json`. License and citation authors remain pending. This is a locally verified release candidate, not a claim of an online upload or a grant of redistribution rights.
 
 ## Actual data
 

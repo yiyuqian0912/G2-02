@@ -1,0 +1,279 @@
+{
+  "dataset_name": "RIND3D",
+  "release_version": "0.1",
+  "date": "2026-11-02",
+  "archive": {
+    "public_name": "RIND3D",
+    "public_archive_name": "RIND3D-v0.1.tar.zst",
+    "same_original_archive_bytes": true,
+    "bytes": 633273091,
+    "sha256": "1f5a2ff2bd9ac4a479a074b33e0d06f160706e4369b199144ee117693913ee1e",
+    "original_reader_wheel_verified": true,
+    "scientific_manifests_not_modified": true
+  },
+  "public_download": {
+    "drive_file_id": "1PmMp39En-uc4QTgACd_EpS4mTZ3wO7yx",
+    "share_url": "https://drive.google.com/file/d/1PmMp39En-uc4QTgACd_EpS4mTZ3wO7yx/view?usp=drivesdk",
+    "type": "anyone",
+    "role": "reader",
+    "allowFileDiscovery": false,
+    "complete_unauthenticated_download_sha256_verified": true
+  },
+  "tests": {
+    "legacy_2d": {
+      "passed": 202,
+      "skipped": 6,
+      "failed": 0,
+      "shell_entrypoints": 38
+    },
+    "relocated_generator": {
+      "passed": 348,
+      "skipped": 7,
+      "failed": 0,
+      "warnings": 4,
+      "seconds": 263.7,
+      "skip_reason": "Private original production/campaign artifacts are intentionally not copied; not a scientific-gate bypass."
+    },
+    "phase3_python312": {
+      "passed": 33,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 21.55
+    },
+    "fresh_checkout_python313": {
+      "passed": 33,
+      "skipped": 0,
+      "failed": 0,
+      "seconds": 21.78,
+      "canonical_native_probes": {
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    "read_only_before_native_install": {
+      "no_generator_or_canonical_modules_installed": true,
+      "cpu_pytorch": true,
+      "two_worker_dataloader": true,
+      "all_splits": true,
+      "unaligned_79_cubed_roi": true
+    }
+  },
+  "fresh_release_integrity": {
+    "release_id": "2f848bd747bc43d35d3551e7a47b53e298d2025502bf1c37b217c768047e3ada",
+    "kind": "full",
+    "scenes": 1000,
+    "included_scenes": 1000,
+    "windows": 256000,
+    "verified_files": 13013,
+    "full_sha": true,
+    "crc": false,
+    "wall_seconds": 8.38375545999952,
+    "python": "3.13.15 (main, Sep  1 2026, 14:18:08) [Clang 22.1.3 ]",
+    "no_field_generation": true
+  },
+  "scientific_fixture_certification": {
+    "dataset_name": "RIND3D",
+    "complete": true,
+    "protocol": "lite-scientific-fixtures-v0.1",
+    "families": [
+      "rotated_boxes",
+      "thin_slabs",
+      "prisms",
+      "wedges",
+      "convex_polyhedra",
+      "multiscale_convex",
+      "corridors",
+      "barriers",
+      "occluder_clusters"
+    ],
+    "resolutions": [
+      32,
+      64,
+      128
+    ],
+    "all_response_and_solid_bits_equal": true,
+    "hard_cases_passed": true,
+    "cpu_native_certified": true,
+    "cuda_certified": true,
+    "seconds": 595.0894478960017,
+    "relocated_scientific_identity": "e19b3004fc9e733cdb7cb345846c9ed14fea8eebd447a304f2ba41927a5aed3e",
+    "original_frozen_data_build": "b038ba8842f5ea5e059f42173dbbb840cdef4544e52f02dab3cec82f0d8e19a2",
+    "new_campaign_ready_authority": false,
+    "meaning": "Fixture certification on this relocated build, not copied frozen production campaign authority."
+  },
+  "real_data_physical_smoke": {
+    "complete": true,
+    "dataset_name": "RIND3D",
+    "families": 9,
+    "sizes": [
+      64,
+      128,
+      256
+    ],
+    "scene_selection": "minimum component count among first eight scenes of each family; ties by ordinal; correctness smoke only",
+    "no_hidden_sources_or_reference_pools_read": true,
+    "wall_seconds": 372.57559790600135,
+    "cpu_seconds": 372.510562793,
+    "peak_self_rss_bytes": 516100096,
+    "observations": 27,
+    "native_pairs": 3456,
+    "canonical_comparison_pairs": 864,
+    "all_original_reference_labels_equal": true,
+    "receiver_masks_independently_classified_by_original_canonical": true,
+    "ratio_range": [
+      0.0013885498046875,
+      0.9969685367711211
+    ],
+    "native_query_seconds": {
+      "median": 0.0007802010004525073,
+      "maximum": 0.002004594000027282
+    },
+    "original_reference_seconds": {
+      "median": 9.637224781999976,
+      "maximum": 35.650750471999345
+    },
+    "local_roi_checks": [
+      {
+        "family": "barriers",
+        "side": 64,
+        "full_cost": 0.6459791520354778,
+        "full_window_voxels": 262144,
+        "full_raster_seconds": 0.015394974001537776,
+        "cuda_full_raster_seconds": 0.4042709850000392,
+        "cuda_cpu_both_fields_equal": true
+      },
+      {
+        "family": "barriers",
+        "side": 128,
+        "full_cost": 0.8430477616793705,
+        "full_window_voxels": 2097152,
+        "full_raster_seconds": 0.0786543550020724,
+        "cuda_full_raster_seconds": 0.23798923900176305,
+        "cuda_cpu_both_fields_equal": true
+      },
+      {
+        "family": "barriers",
+        "side": 256,
+        "full_cost": 0.780099382847107,
+        "full_window_voxels": 16777216,
+        "full_raster_seconds": 0.20324583800174878,
+        "cuda_full_raster_seconds": 0.2559122720012965,
+        "cuda_cpu_both_fields_equal": true
+      }
+    ],
+    "octree": {
+      "execution_complete": true,
+      "teacher_support_complete": false,
+      "source_space_coverage_certified": false,
+      "candidate_attempts": 64,
+      "valid_candidate_evaluations": 62,
+      "physical_source_receiver_pairs": 3968,
+      "cells_visited": 16,
+      "cells_refined": 1,
+      "wall_seconds": 0.022836810003354913,
+      "cpu_seconds": 0.022820178000017677
+    }
+  },
+  "whole_octree_process": {
+    "wall_seconds": 0.4286470779989031,
+    "user_cpu_seconds": 0.356991,
+    "system_cpu_seconds": 0.07099799999999999,
+    "peak_child_rss_bytes": 92995584,
+    "returncode": 0,
+    "scope": "Entire octree example process, including interpreter/data loading, geometry acceptance, queries and diagnostic export."
+  },
+  "preservation": {
+    "original_local_main": "0908ceb7fe7ed8dcf89c1f1a69315e1168408e24",
+    "original_working_head": "1591783558e04e1188e97ee008932b11421db52b",
+    "preserved_branch": "tmp/pre-3d-integration",
+    "wip_commit": "8bfecd8f8c06cc85d834d3df11301dfcf32b879e",
+    "origin_main_base": "37b1f045d1c78ccc2b28364fa9e4bed5e6a65642",
+    "working_branch": "yushu/3d",
+    "original_changed_files_verified": 11,
+    "phase1_phase2_source_diff_from_base": false,
+    "original_source_files_verified": 292,
+    "scientific_predicate_renderer_gate_source_changed": false,
+    "original_archive_manifest_data_bytes_changed": false,
+    "dataset_regenerated": false
+  },
+  "remaining_scope": {
+    "public_dataset_license": "PENDING",
+    "citation": "PENDING",
+    "new_campaign_authority": "Not issued; fresh production requires its own full certification, quality and recovery gates.",
+    "teacher": "Diagnostic scaffold only; no completed probability target, neural model or equivalence-certificate claim.",
+    "cuda": "Local ROI renderer; arbitrary-point adapter uses CPU. NVRTC and compatible NVIDIA driver are external optional system dependencies."
+  },
+  "initial_real_data_visibility_smoke": {
+    "complete": true,
+    "dataset_name": "RIND3D",
+    "families": 9,
+    "sizes": [
+      64,
+      128,
+      256
+    ],
+    "scene_selection": "minimum component count among first eight scenes of each family; ties by ordinal; correctness smoke only",
+    "no_hidden_sources_or_reference_pools_read": true,
+    "wall_seconds": 373.2597879320019,
+    "cpu_seconds": 373.123653032,
+    "peak_self_rss_bytes": 516087808,
+    "observations": 27,
+    "native_pairs": 3456,
+    "canonical_comparison_pairs": 864,
+    "all_original_reference_labels_equal": true,
+    "ratio_range": [
+      0.0013885498046875,
+      0.9969685367711211
+    ],
+    "native_query_seconds": {
+      "median": 0.0007960540024214424,
+      "maximum": 0.0018917279994639102
+    },
+    "original_reference_seconds": {
+      "median": 9.625509666999278,
+      "maximum": 35.709412087999226
+    },
+    "local_roi_checks": [
+      {
+        "family": "barriers",
+        "side": 64,
+        "full_cost": 0.6459791520354778,
+        "full_window_voxels": 262144,
+        "full_raster_seconds": 0.015370657998573733,
+        "cuda_full_raster_seconds": 0.4111783709995507,
+        "cuda_cpu_both_fields_equal": true
+      },
+      {
+        "family": "barriers",
+        "side": 128,
+        "full_cost": 0.8430477616793705,
+        "full_window_voxels": 2097152,
+        "full_raster_seconds": 0.07885313799852156,
+        "cuda_full_raster_seconds": 0.24451632300042547,
+        "cuda_cpu_both_fields_equal": true
+      },
+      {
+        "family": "barriers",
+        "side": 256,
+        "full_cost": 0.780099382847107,
+        "full_window_voxels": 16777216,
+        "full_raster_seconds": 0.20182414300143137,
+        "cuda_full_raster_seconds": 0.24838429399824236,
+        "cuda_cpu_both_fields_equal": true
+      }
+    ],
+    "octree": {
+      "execution_complete": true,
+      "teacher_support_complete": false,
+      "source_space_coverage_certified": false,
+      "candidate_attempts": 64,
+      "valid_candidate_evaluations": 62,
+      "physical_source_receiver_pairs": 3968,
+      "cells_visited": 16,
+      "cells_refined": 1,
+      "wall_seconds": 0.02251064200027031,
+      "cpu_seconds": 0.022509592000005796
+    },
+    "initial_real_data_smoke_note": "This run independently compared original canonical visibility; receiver masks still used the native classifier. The final independently classified receiver-mask rerun is recorded separately."
+  }
+}
