@@ -1,0 +1,18 @@
+{
+  "policy_id": "rind-numeric-3-impl1",
+  "parent_policy_id": "rind-numeric-3",
+  "boundary_report_length_hex": "0x1.0000000000000p-34",
+  "epsilon_drv_hex": "0x1.0000000000000p-26",
+  "derived_geom_anchor_hex": "0x1.0000000000000p-10",
+  "response_abs_tolerance_hex": "0x1.b7cdfd9d7bdbbp-34",
+  "response_rel_tolerance_hex": "0x1.12e0be826d695p-30",
+  "max_precision_bits": 1024,
+  "max_subdivisions_per_item": 65536,
+  "max_subdivisions_per_batch": 67108864,
+  "max_arrangement_events_per_item": 1048576,
+  "max_solver_work_units_per_item": 4194304,
+  "exact_2d_outer_event_preflight": true,
+  "exact_2d_internal_cgal_calls_interruptible": false,
+  "summation_rule": "exact-rounded-sum-v1",
+  "budget_policy": "deterministic-counters-only"
+}

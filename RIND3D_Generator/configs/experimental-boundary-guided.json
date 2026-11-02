@@ -1,0 +1,21 @@
+{
+  "legacy_diagnostic": true,
+  "observation_contract": "legacy-discrete-32-64-128-256",
+  "experiment_version": "exact-boundary-witness-v1",
+  "initial_global_points": 256,
+  "global_batch_points": 128,
+  "max_global_points": 768,
+  "max_exact_points": 1024,
+  "refinement_queries_per_round": 128,
+  "refinement_steps_per_pair": 6,
+  "refinement_target_max_axis": 16,
+  "refinement_max_initial_axis": 256,
+  "pair_neighbors": 4,
+  "pair_bucket_side": 128,
+  "accepted_per_bucket_per_side": 1,
+  "accepted_per_pair_per_side": 1,
+  "minimum_center_distance": 64,
+  "center_distance_side_fraction": 0.5,
+  "origin_options": "inclusive-box-midpoint-and-corners",
+  "cold_start": true
+}

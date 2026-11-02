@@ -1,0 +1,93 @@
+format_version: 2
+dataset_profile: rind3d-lite-v0.1
+profile_version: '0.1'
+source_precision: float64
+response_storage: RINDPack-v1
+seed: 20261031
+resolution: 1024
+production_windows: 256
+window_sides:
+- 64
+- 128
+- 256
+pilot_side_counts:
+  64: 10
+  128: 11
+  256: 11
+production_side_counts:
+  64: 85
+  128: 85
+  256: 86
+placement_version: stored-index-window-first-v3
+information_block_side: 16
+max_candidates: 8
+min_source_separation: 0.03125
+include_true_source: true
+candidate_domain: world_outside_window
+driver_clearance_hex: 0x1.0000000000000p-26
+families:
+- thin_slabs
+- rotated_boxes
+- barriers
+- corridors
+- multiscale_convex
+- occluder_clusters
+renderer_backend: auto
+scientific_certificate: outputs/lite-v01-production/scientific-certification.json
+cuda_batch: 32
+checkpoint_bricks: 32
+generation_seconds: 180
+generation_points: 10000000000
+workers: 2
+queue_size: 4
+leaf_side: 8
+build_information_index: true
+source_attempts: 256
+pilot_source_attempts: 3
+pilot_seconds: 7200
+loader_workers: 2
+physical_verification_seconds: 300
+candidate_pool: 512
+global_proposals: 0
+search_batch_size: 32
+screen_probes: 48
+window_search_seconds: 0
+window_search_points: 50000000
+verification_seconds: 10
+verification_points: 100000000
+max_window_attempts: 65536
+numerical_policy:
+  max_precision_bits: 256
+  max_subdivisions_per_item: 4096
+  max_arrangement_events_per_item: 1048576
+  qfnra_rlimit_per_item: 4194304
+window_selection:
+  valid_pool_multiplier: 4
+  uniform_max_proposals_per_side: 65536
+  uniform_pilot_proposals: 4096
+  guided_fallback: true
+  guide_max_regions: 2048
+  guide_max_pairs: 2048
+  guide_max_proposals_per_side: 131072
+  coverage_cell_side: 128
+  overlap_weight: 0.05
+  swap_attempts_per_selected: 2
+  greedy_evaluations_per_selected: 32
+  selection_mode: soft
+  control_per_side: 128
+  control_max_proposals_per_side: 65536
+  record_proposal_trace: false
+ambiguity:
+  enabled: false
+  maximum_total_references: 8
+  artifact_policy: immutable_external_versioned
+quality_certificate: outputs/lite-v02-research/quality-certification.json
+geometry_mixture: fast-v1
+observation_sampling:
+  mode: mixed
+  natural: 0.3
+  uniform: 0.5
+  extreme: 0.2
+  pool_multiplier: 8
+  max_proposals_per_side: 65536
+  control_per_side: 128

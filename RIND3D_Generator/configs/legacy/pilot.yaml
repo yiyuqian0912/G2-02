@@ -1,0 +1,63 @@
+format_version: 2
+source_precision: float64
+response_storage: RINDPack-v1
+seed: 20261029
+resolution: 1024
+production_windows: 4096
+min_source_separation: 0.03125
+include_true_source: true
+candidate_domain: world_free
+families:
+- - slabs
+- - csg
+- - smooth_blobs
+- - random_field
+- - csg
+  - slabs
+- - csg
+  - smooth_blobs
+- - slabs
+  - random_field
+- - smooth_blobs
+  - random_field
+placement_version: scrambled-sobol-discrete-sides-v2
+candidate_pool: 4096
+screen_probes: 48
+independent_probes: 32
+max_window_attempts: 65536
+window_search_seconds: 2.0
+window_search_points: 50000000
+scene_setup_seconds: 30
+sampling_seconds: 30
+sampling_points: 50000000
+generation_seconds: 300
+generation_points: 2000000000
+workers: 2
+queue_size: 4
+leaf_side: 8
+numerical_policy:
+  max_precision_bits: 256
+  max_subdivisions_per_item: 4096
+  max_arrangement_events_per_item: 1048576
+  qfnra_rlimit_per_item: 4194304
+max_candidates: 64
+global_proposals: 1024
+search_batch_size: 32
+verification_seconds: 10.0
+verification_points: 50000000
+pilot_source_attempts: 3
+window_sides:
+- 32
+- 64
+- 128
+- 256
+pilot_side_counts:
+  32: 8
+  64: 8
+  128: 8
+  256: 8
+production_side_counts:
+  32: 1024
+  64: 1024
+  128: 1024
+  256: 1024

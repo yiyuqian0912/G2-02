@@ -1,0 +1,62 @@
+#version 460
+#extension GL_EXT_ray_query : require
+layout(local_size_x=128) in;
+layout(binding=0) uniform accelerationStructureEXT scene;
+layout(std430,binding=1) readonly buffer Rays { float data[]; };
+layout(std430,binding=2) writeonly buffer Hits { uint results[]; };
+layout(std430,binding=3) readonly buffer Vertices { float vertices[]; };
+layout(std430,binding=4) readonly buffer GeometryIDs { int geometry_ids[]; };
+layout(push_constant) uniform Parameters { uvec4 meta; vec4 driver; vec4 lower; vec4 upper; vec4 limits; } params;
+vec3 vertex(uint index) { return vec3(vertices[3*index],vertices[3*index+1],vertices[3*index+2]); }
+float stable_length(vec3 value) { float m=max(max(abs(value.x),abs(value.y)),abs(value.z)); return m==0?0:m*length(value/m); }
+void main() {
+    uint i=gl_GlobalInvocationID.x;
+    if(i>=params.meta.x) return;
+    uint mode=params.meta.y;
+    vec3 origin,direction;float tmin,tmax;
+    if(mode<2) {
+        uint b=8*i;origin=vec3(data[b],data[b+1],data[b+2]);tmin=data[b+3];
+        direction=vec3(data[b+4],data[b+5],data[b+6]);tmax=data[b+7];
+    } else {
+        vec3 receiver=vec3(data[3*i],data[3*i+1],data[3*i+2]);float distance;
+        if(mode==2) {
+            origin=params.driver.xyz;vec3 delta=receiver-origin;distance=stable_length(delta);
+            direction=distance==0?vec3(1,0,0):delta/distance;
+        } else {
+            receiver=clamp(receiver,params.lower.xyz,params.upper.xyz);origin=receiver;direction=-params.driver.xyz;distance=uintBitsToFloat(0x7f800000);
+            for(int k=0;k<3;k++) if(direction[k]!=0) distance=min(distance,((direction[k]>0?params.upper[k]:params.lower[k])-receiver[k])/direction[k]);
+            distance=max(0,distance);
+        }
+        float scale=max(max(max(abs(origin.x),abs(origin.y)),abs(origin.z)),max(max(max(abs(receiver.x),abs(receiver.y)),abs(receiver.z)),distance));
+        float eps=params.limits.z*1.1920928955078125e-7*scale;
+        if(distance<=2*eps) { results[i]=1;return; }
+        tmin=eps;tmax=distance-eps;
+    }
+    rayQueryEXT query;
+    uint flags=gl_RayFlagsOpaqueEXT;
+    if(mode!=0) flags|=gl_RayFlagsTerminateOnFirstHitEXT;
+    rayQueryInitializeEXT(query,scene,flags,0xff,origin,tmin,direction,tmax);
+    while(rayQueryProceedEXT(query)) {}
+    bool hit=rayQueryGetIntersectionTypeEXT(query,true)!=gl_RayQueryCommittedIntersectionNoneEXT;
+    if(mode!=0) { results[i]=uint(mode>=2?!hit:hit);return; }
+    vec4 t_normal=vec4(uintBitsToFloat(0x7f800000),0,0,0);int id=-1;
+    if(hit) {
+            uint p=rayQueryGetIntersectionPrimitiveIndexEXT(query,true);
+            vec3 normal=vec3(0);
+            if((params.meta.z&1)!=0) {
+                vec3 a=vertex(3*p), b=vertex(3*p+1), c=vertex(3*p+2);
+                vec3 e1=b-a,e2=c-a; e1/=max(max(abs(e1.x),abs(e1.y)),abs(e1.z)); e2/=max(max(abs(e2.x),abs(e2.y)),abs(e2.z));
+                normal=cross(e1,e2);
+                float magnitude=max(max(abs(normal.x),abs(normal.y)),abs(normal.z));
+                normal=magnitude>0?normalize(normal/magnitude):vec3(0);
+            }
+            t_normal=vec4(rayQueryGetIntersectionTEXT(query,true),normal);id=geometry_ids[p];
+    }
+    if((params.meta.z&1)==0) {
+        uint base=3*i;results[base]=floatBitsToUint(t_normal.x);
+        results[base+1]=uint(hit);results[base+2]=uint(id);return;
+    }
+    uvec4 words=floatBitsToUint(t_normal);uint base=8*i;
+    for(uint k=0;k<4;k++) results[base+k]=words[k];
+    results[base+4]=uint(hit);results[base+5]=uint(id);results[base+6]=results[base+7]=0;
+}

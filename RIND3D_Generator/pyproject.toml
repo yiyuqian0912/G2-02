@@ -1,0 +1,38 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=3"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "rind3d"
+version = "0.3.0"
+description = "Offline, certified 3D RIND observations with compact spatial random access"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = ["numpy>=2.2,<3", "zstandard>=0.23", "scipy>=1.13", "pyarrow>=20,<26", "PyYAML>=6", "rind-dataset", "rind3d-reader>=0.1,<0.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=9", "psutil>=6", "pybind11>=3,<4"]
+benchmark = ["zarr>=3.1,<4"]
+train = ["torch>=2.4"]
+
+[project.scripts]
+rind3d = "rind3d.cli:main"
+
+[tool.uv.sources]
+rind3d-reader = {path = "reader"}
+rind-dataset = {path = "vendor/canonical_geometry", editable = true}
+torch = [{index = "pytorch-cpu", marker = "sys_platform == 'linux'"}]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.scikit-build]
+wheel.packages = ["src/rind3d"]
+build-dir = "build/{wheel_tag}"
+build.tool-args = ["-j2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

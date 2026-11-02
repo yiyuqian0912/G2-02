@@ -1,0 +1,22 @@
+{
+  "version": "certified-polyhedral-shadows-v1",
+  "seed": 20261031,
+  "small_resolutions": [32, 64, 128],
+  "full_resolution": 1024,
+  "workers": 2,
+  "queue_size": 4,
+  "leaf_side": 8,
+  "small_C_generation_seconds": 60,
+  "small_B_and_C_python_generation_seconds": 30,
+  "small_A_generation_seconds": 5,
+  "full_generation_seconds": 60,
+  "canonical_query_limit": 24,
+  "production_ready": false,
+  "lite_target": {
+    "production_windows": 256,
+    "side_counts": {"64": 85, "128": 85, "256": 86},
+    "max_candidates": 8,
+    "include_true_source": true,
+    "requires_existing_full_equivalence_and_independent_recheck": true
+  }
+}

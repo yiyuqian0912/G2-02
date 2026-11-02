@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rind-dataset"
+version = "0.1.0"
+description = "Continuous structure-driver-response scene core"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "numpy>=2.2,<3",
+  "zarr>=3.1,<4",
+  "numcodecs>=0.16,<1",
+  "pyarrow>=20,<26",
+  "python-flint>=0.9,<1",
+  "z3-solver>=5.1,<6",
+]
+
+[project.optional-dependencies]
+inspect = ["streamlit>=1.50,<2", "plotly>=6,<8"]
+dev = ["pytest>=9,<10", "pybind11>=3,<4", "sympy>=1.14,<2"]
+
+[project.scripts]
+rind = "rind.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rind"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

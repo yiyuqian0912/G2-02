@@ -1,0 +1,7 @@
+{
+  "optional_clearance_watchdog_seconds": 0.5,
+  "timeout_result": "DIAGNOSTIC_UNAVAILABLE",
+  "scope": "post-acceptance optional clearance descriptor only",
+  "scientific_backend_policy_unchanged": true,
+  "reason": "Unbounded optional clearance diagnostics stalled on ellipsoid-containing geometry; no sampler or validator setting changed."
+}

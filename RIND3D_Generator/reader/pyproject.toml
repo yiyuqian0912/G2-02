@@ -1,0 +1,18 @@
+[build-system]
+requires = []
+build-backend = "build_backend"
+backend-path = ["."]
+
+[project]
+name = "rind3d-reader"
+version = "0.1.0"
+description = "Reader-only SDK for RIND3D catalogs and immutable releases"
+requires-python = ">=3.12,<3.14"
+dependencies = ["numpy>=2.2,<3", "zstandard>=0.23"]
+
+[project.optional-dependencies]
+train = ["torch>=2.4"]
+legacy = ["pyarrow>=20,<26"]
+
+[project.scripts]
+rind3d-reader = "rind3d_reader.cli:main"

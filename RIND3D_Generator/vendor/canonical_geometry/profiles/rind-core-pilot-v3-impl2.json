@@ -1,0 +1,25 @@
+{
+  "profile_id": "rind-core-pilot-v3-impl2",
+  "parent_profile_id": "rind-core-pilot-v3",
+  "master_seed": 20260921,
+  "rng_engine": "NumPy-PCG64",
+  "stream_preimage": "rind-stream-v3",
+  "dimensions": [2, 3],
+  "slots_per_dimension": 128,
+  "max_attempts": 4,
+  "scene_variants_per_geometry": 1,
+  "physics_codec": "binary_v1",
+  "object_count_inclusive": [0, 16],
+  "driver_count_inclusive": [1, 4],
+  "driver_proposal_limit": 1000000,
+  "driver_clearance_hex": "0x1.0000000000000p-26",
+  "family_probabilities_hex": {
+    "B": "0x1.0000000000000p-1",
+    "C": "0x1.0000000000000p-2",
+    "D": "0x1.0000000000000p-2"
+  },
+  "implementation_contract": "dataset/design/04_generation_validation.md",
+  "enabled_run_dimensions": [3],
+  "hull_generator": "CGAL-6.2.1-exact-convex-hull-3-canonical-fan-v1",
+  "ellipsoid_scope": "top-level-union-only"
+}

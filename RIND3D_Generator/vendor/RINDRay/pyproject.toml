@@ -1,0 +1,27 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.4"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "rindray"
+version = "0.1.0"
+description = "Reproducible batched ray visibility and additive response queries"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+rindray = "rindray.__main__:main"
+
+[tool.scikit-build]
+wheel.packages = ["python/rindray"]
+build-dir = "build/{wheel_tag}"
+build.tool-args = ["-j2"]
+editable.rebuild = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

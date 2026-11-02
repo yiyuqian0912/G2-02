@@ -42,3 +42,18 @@ phase2_visualization_*_recovered/
 # Removed duplicate development/export trees must not return as source
 **/phase2_slot_update/
 **/server_bundle/
+
+# RIND3D local data, native build products, credentials and research runs
+*.tar.zst
+*.whl
+*.so
+*.rindb
+*.rindc
+*.rindi
+*.private.*
+.build/
+RIND3D_Generator/outputs/
+RIND3D_Generator/experiments/lite_quality/fixtures/
+Phase3_Single_Source_3D/data/
+Phase3_Single_Source_3D/checkpoints/
+Phase3_Single_Source_3D/results/

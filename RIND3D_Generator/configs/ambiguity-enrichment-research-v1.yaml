@@ -1,0 +1,14 @@
+format: rind3d-ambiguity-enrichment-research-v1
+method: hybrid
+probe_strategy: transition
+screen_probes: 32
+window_budget_seconds: 0.2
+max_candidates: 8
+minimum_source_separation: 0.03125
+candidate_domain: world_outside_window
+seed: 20261101
+maximum_windows_per_invocation: 64
+physical_brick_cache: 256
+source_model_cache: 32
+scientific_certificate: outputs/lite-v01-production/scientific-certification.json
+artifact_policy: immutable_external_private

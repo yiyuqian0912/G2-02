@@ -1,0 +1,73 @@
+{
+  "profile_id": "rind-expanded-v3-impl1",
+  "parent_profile_id": "rind-expanded-v3",
+  "semantics_id": "regular-closed-omega-1",
+  "master_seed": 20260921,
+  "rng_engine": "NumPy-PCG64",
+  "stream_preimage": "rind-stream-v3",
+  "stream_coordinates": ["domain", "master_seed", "profile_id", "dimension", "slot", "attempt", "variant", "object_index", "stream_name", "feature_index"],
+  "dimensions": [2, 3],
+  "slots_per_dimension": 128,
+  "max_attempts": 4,
+  "structural_retry": {
+    "conditioning_event": "structure_valid_and_allowed_driver_exists",
+    "retryable_invalid_reasons": [
+      "SINGULAR_TRANSFORM",
+      "DEGENERATE_RING",
+      "SELF_INTERSECTING_RING",
+      "INVALID_RING_NESTING",
+      "INVALID_HALFSPACE_SOLID",
+      "INVALID_MESH_TOPOLOGY",
+      "MESH_SELF_INTERSECTION",
+      "INVALID_SHELL_NESTING",
+      "NO_ALLOWED_DRIVER_PROVED"
+    ],
+    "unresolved_is_retryable": false
+  },
+  "scene_variants_per_geometry": 1,
+  "physics_codec": "binary_v1",
+  "object_count_inclusive": [0, 16],
+  "driver_count_inclusive": [1, 4],
+  "driver_proposal_limit": 1000000,
+  "driver_clearance_hex": "0x1.0000000000000p-26",
+  "family_probabilities_hex": {
+    "A": "0x1.999999999999ap-3",
+    "B": "0x1.6666666666666p-2",
+    "C": "0x1.999999999999ap-3",
+    "D": "0x1.3333333333333p-3",
+    "E": "0x1.999999999999ap-4"
+  },
+  "family_A_2d": {
+    "codec": "radial_fourier_2d_v1",
+    "harmonics": 16,
+    "sigma_uniform_hex": ["0x1.999999999999ap-5", "0x1.0000000000000p-2"],
+    "ell_uniform_hex": ["0x1.999999999999ap-3", "0x1.0000000000000p+0"],
+    "coefficient_law": "independent centered normals with stddev sigma*exp(-0.5*(j*ell)^2), j=1..16",
+    "center_and_affine_law": "same dimension-2 center, scale, aspect-ratio and orientation draws as rind-core-pilot-v3-impl1"
+  },
+  "family_A_3d": {
+    "codec": "radial_fourier_sphere_v1",
+    "features": 32,
+    "sigma_uniform_hex": ["0x1.999999999999ap-5", "0x1.0000000000000p-2"],
+    "frequency_magnitude_loguniform_hex": ["0x1.0000000000000p+0", "0x1.0000000000000p+3"],
+    "frequency_direction": "normalize three independent standard-normal draws; store resulting binary64 vector",
+    "coefficient_law": "a_j,b_j independent centered normals with stddev sigma/sqrt(32)",
+    "center_and_affine_law": "same dimension-3 center, log-axis and Haar-rotation draws as rind-core-pilot-v3-impl2"
+  },
+  "family_E": {
+    "codec": "cosine_field_v1",
+    "features": 32,
+    "frequency_magnitude_loguniform_hex": ["0x1.921fb54442d18p+2", "0x1.921fb54442d18p+5"],
+    "frequency_direction": "normalize d independent standard-normal draws; store resulting binary64 vector",
+    "phase_uniform_hex": ["0x0.0p+0", "0x1.921fb54442d18p+2"],
+    "amplitude_law": "independent centered normals with stddev 1/sqrt(32)",
+    "threshold_uniform_hex": ["-0x1.0000000000000p-1", "0x1.0000000000000p-1"],
+    "threshold_independent_of_occupancy": true,
+    "support": "ambient field clipped only by the scene domain and explicit CSG"
+  },
+  "family_BCD": "same validated dimension-specific pilot laws, including D recipes restricted to algebraic leaves",
+  "top_level_composition": "ordered explicit union of sampled objects; A and E leaves do not enter D cutout recipes",
+  "acceptance_condition": "structure_valid_and_allowed_driver_exists",
+  "numeric_policy_id": "rind-numeric-3-impl1",
+  "status": "frozen-design-only-not-enabled-for-READY"
+}

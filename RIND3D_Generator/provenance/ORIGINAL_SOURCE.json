@@ -1,0 +1,1208 @@
+{
+  "dataset_name": "RIND3D",
+  "public_release": "v0.1",
+  "internal_production_profile": "Lite-Core-1K",
+  "historical_production_identifier": "RIND3D-Lite-Core-1K-v0.1",
+  "original_source_revision": "No Git revision present in original RIND3D checkout; exact source hashes below.",
+  "original_scientific_build_identity": "b038ba8842f5ea5e059f42173dbbb840cdef4544e52f02dab3cec82f0d8e19a2",
+  "original_archive_sha256": "1f5a2ff2bd9ac4a479a074b33e0d06f160706e4369b199144ee117693913ee1e",
+  "original_archive_bytes": 633273091,
+  "reader_wheel_sha256": "2b1bab822db553b21a78c9e536e02bae1830280f0562978150307d8830f27891",
+  "public_release_id": "2f848bd747bc43d35d3551e7a47b53e298d2025502bf1c37b217c768047e3ada",
+  "copied_source": {
+    "RIND3D/src/rind3d/__init__.py": {
+      "sha256": "5cb4c940e12dc1efd9054c89c7803421e9f2b933aa24c3d53a5bbeaeac0985c0",
+      "bytes": 308
+    },
+    "RIND3D/src/rind3d/__main__.py": {
+      "sha256": "79ee6f134c5c5193377cf9b189cbdcc3e2095e49ba9cec310114441c15a917c4",
+      "bytes": 47
+    },
+    "RIND3D/src/rind3d/benchmark.py": {
+      "sha256": "b5cc159754475e97bc3e43af51d5c2ef13367280d47c22b6299f455f2f949263",
+      "bytes": 8593
+    },
+    "RIND3D/src/rind3d/campaign.py": {
+      "sha256": "86b8856d94decf9a2811080e6934446868bf3a6f78e1cb2e1cac3ba96a500149",
+      "bytes": 25798
+    },
+    "RIND3D/src/rind3d/campaign_cli.py": {
+      "sha256": "ba5384e9d34c4824f08f9a188679c33ae4e52af3dc5eadb452c67ac3d9b76bf5",
+      "bytes": 2799
+    },
+    "RIND3D/src/rind3d/campaign_contract.py": {
+      "sha256": "1babc00464b717ddcc652461c7b6f2fb500bf1a5ca5920738c719da25c546e48",
+      "bytes": 3331
+    },
+    "RIND3D/src/rind3d/campaign_scene.py": {
+      "sha256": "6d3a5c2d7deb3e511e681546d2f2a78af73053412af6d10aa1e9b85f56bd707e",
+      "bytes": 11862
+    },
+    "RIND3D/src/rind3d/campaign_verify.py": {
+      "sha256": "49614ec00e68896eef8b79ddcc50969d7c3373dd37dffd02ec0950c682e70e4d",
+      "bytes": 7891
+    },
+    "RIND3D/src/rind3d/candidates.py": {
+      "sha256": "7ec5bc405a6a1322b1bca88a3b8c4d4c7194b6b854b58ba0987dc19328644737",
+      "bytes": 1896
+    },
+    "RIND3D/src/rind3d/cli.py": {
+      "sha256": "8280161afa78ff11c0994403535c6e821ee124cc20f90a77a314f3e2346dfd12",
+      "bytes": 12528
+    },
+    "RIND3D/src/rind3d/core_checks.py": {
+      "sha256": "0c5983b3ececafb7ec54493fb57a1a0e0c573cacbc97da436b369a50828bdedd",
+      "bytes": 1212
+    },
+    "RIND3D/src/rind3d/core_research.py": {
+      "sha256": "90eb8c3322e0a2dc1b81340b41194901f90531a166f230d0cc3f852da90b7c61",
+      "bytes": 30016
+    },
+    "RIND3D/src/rind3d/counts.py": {
+      "sha256": "e49c814bde2536e1b6b5e044b3407de9401ca54bf3077f9b20cfa47d64c519db",
+      "bytes": 6317
+    },
+    "RIND3D/src/rind3d/data.py": {
+      "sha256": "2715c569e123deb484ce491387e606070a3ce779a02d2c5654cd166cca4e856b",
+      "bytes": 19023
+    },
+    "RIND3D/src/rind3d/enrichment_cli.py": {
+      "sha256": "e27d762fa6cf66fea873e92bf42874d9aa5f590cc10ef663dac4c867422733f5",
+      "bytes": 3298
+    },
+    "RIND3D/src/rind3d/enrichment_research.py": {
+      "sha256": "301a33acfa4756c303a21ca1f294e1956e6b5b6115272b8508f9df7c02fc52f5",
+      "bytes": 13803
+    },
+    "RIND3D/src/rind3d/fast_geometry.py": {
+      "sha256": "01338c7bb3c308a6964c922eb821aec5fa8148a00f40bbc0ee0f56c79fb796da",
+      "bytes": 1726
+    },
+    "RIND3D/src/rind3d/field_acceleration.py": {
+      "sha256": "0888cc8cf5c58a091a27eaec63b764416b279bdaaa99094f8f3bfcbcbb743197",
+      "bytes": 15463
+    },
+    "RIND3D/src/rind3d/geometry.py": {
+      "sha256": "4e7cff63b96a16ff556a8948bb23e22a0812bf513f0669014dc834751e18bab0",
+      "bytes": 11727
+    },
+    "RIND3D/src/rind3d/information.py": {
+      "sha256": "216cce267338808a5f8a1650c56444a2b01db2a1786501b8c7411169023d2aed",
+      "bytes": 12455
+    },
+    "RIND3D/src/rind3d/inverse_certificate.py": {
+      "sha256": "b96557e21b8ec847a787617a5e2b0e31a2efac744d3b20f68505d2fd4c6d0846",
+      "bytes": 6694
+    },
+    "RIND3D/src/rind3d/inverse_research.py": {
+      "sha256": "26d5fa20dfa992b9afebdf48300671b2a55cb0e67e0e39db001339e27905029b",
+      "bytes": 8431
+    },
+    "RIND3D/src/rind3d/legacy/__init__.py": {
+      "sha256": "048a449eeb1963f236f02f1f2e26c8c0bcd4e462dea418f4e3b69b3e66398d32",
+      "bytes": 77
+    },
+    "RIND3D/src/rind3d/legacy/config.py": {
+      "sha256": "cb98358db7d8828d27c4d886551950a406cfc98db63cca6fd3661a93a67e8b1d",
+      "bytes": 1580
+    },
+    "RIND3D/src/rind3d/legacy/search.py": {
+      "sha256": "15027c6b491ce8a5e7df06422ab8a28f1f80e5b1e16c7c62b3434e98b4d0cfe9",
+      "bytes": 16096
+    },
+    "RIND3D/src/rind3d/legacy/validation.py": {
+      "sha256": "47edbc574a2b6ea5c75a32cf4443f9df98b620d3d9c07a694e4ebe03b9fbeffa",
+      "bytes": 441
+    },
+    "RIND3D/src/rind3d/legacy/window_contract.py": {
+      "sha256": "86e7e14f4e12f9e080a1d3e9a01301c717e21d73adf71cf1e2805bbe3c2346c2",
+      "bytes": 2056
+    },
+    "RIND3D/src/rind3d/legacy/windows.py": {
+      "sha256": "d42fd360fe36972594db7290a035e20ff8267d6670c3b3159ef8e389a0c49008",
+      "bytes": 6043
+    },
+    "RIND3D/src/rind3d/lite_acceptance.py": {
+      "sha256": "a65d04b3995030e8dac80d7b799f340b7fc207010a301ed3991b4d9dbd02eb1a",
+      "bytes": 9068
+    },
+    "RIND3D/src/rind3d/lite_certification.py": {
+      "sha256": "d2a178ae79f06af4fd2f5492ac47d1f941d9cc5a33c5af78b239ba578a1d8ce8",
+      "bytes": 10257
+    },
+    "RIND3D/src/rind3d/lite_generators.py": {
+      "sha256": "bdf031f72db4c96f6b8f0dcf53da7b6803f87bef4282d780cfbdf15eedbce34f",
+      "bytes": 6210
+    },
+    "RIND3D/src/rind3d/lite_pipeline.py": {
+      "sha256": "fb9c28b96e43ec29c9d6b09db66825fd246dfeaf89b430408ecf3b714a615927",
+      "bytes": 22958
+    },
+    "RIND3D/src/rind3d/lite_publication.py": {
+      "sha256": "3725d9ab325b981d7faa0dba387766b865b15d7c179a58c437eb0207521f48e2",
+      "bytes": 11393
+    },
+    "RIND3D/src/rind3d/lite_search.py": {
+      "sha256": "0bb8bbae3b759bde12e257c1b678a5f94a5c6bd75e26a3dad40a22dd83bc31c7",
+      "bytes": 7057
+    },
+    "RIND3D/src/rind3d/observation_research.py": {
+      "sha256": "1bc5bce039d9de4871708b605427b3d3014fdf1e80ea823581e366baa2b8fa02",
+      "bytes": 6165
+    },
+    "RIND3D/src/rind3d/origin_domains.py": {
+      "sha256": "8443f6e39abcb86571371ee21046fe9524e3ab69eb70a0812253211cd20d62eb",
+      "bytes": 3460
+    },
+    "RIND3D/src/rind3d/pack.py": {
+      "sha256": "e34c8b2967381d654d4a777cf9c1a6a98cce271bada7d235ac51a69ba5410ec0",
+      "bytes": 9513
+    },
+    "RIND3D/src/rind3d/physical_evidence.py": {
+      "sha256": "055bc82cc10536590d2feeb067eb49be3014b18d6c90d023b3833ce5edf695ae",
+      "bytes": 5802
+    },
+    "RIND3D/src/rind3d/pilot.py": {
+      "sha256": "e12ce3960390da40eaa8eb5c7e4d5ff6f2cc514767db7fb10a4b869d93bf076f",
+      "bytes": 10302
+    },
+    "RIND3D/src/rind3d/pipeline.py": {
+      "sha256": "2d1b17a4e89206c00b53178888e66b984851d413196ab7201456b000023f5a25",
+      "bytes": 30039
+    },
+    "RIND3D/src/rind3d/profiles.py": {
+      "sha256": "a44b40b4607c02b81d4f6c5b0d1b472647272c340905cdffa3805e018fe81102",
+      "bytes": 1287
+    },
+    "RIND3D/src/rind3d/projection_research.py": {
+      "sha256": "882f0ac05856a2f5012d2ff7ec887870ad13111142dfc541f3e8d7ce97550f2c",
+      "bytes": 6032
+    },
+    "RIND3D/src/rind3d/quality_certification.py": {
+      "sha256": "c09898897a2abda4b29fa70fb29bad1f6baffd64a5a67ee23e65b822eefd1168",
+      "bytes": 1696
+    },
+    "RIND3D/src/rind3d/release_export.py": {
+      "sha256": "0cd70c097c8a582696b6a6756ff30ee1711f2ac1b2991d43da7c5df5bdfeff53",
+      "bytes": 9897
+    },
+    "RIND3D/src/rind3d/rendering/__init__.py": {
+      "sha256": "81bc95039a8846dbd972a6587ff6ab22691391bd0cd845ae865d971bb1bf19dd",
+      "bytes": 84
+    },
+    "RIND3D/src/rind3d/rendering/backends.py": {
+      "sha256": "54b2219a4f67102756020887b2aa0181173943078a27ce1c550b07eab57e7c0a",
+      "bytes": 5602
+    },
+    "RIND3D/src/rind3d/rendering/context.py": {
+      "sha256": "c5a0e7b34cfebe07747bce483d84612dc955f32a2c8deb212e4e36c777a65fa5",
+      "bytes": 9797
+    },
+    "RIND3D/src/rind3d/rendering/cuda_backend.py": {
+      "sha256": "e011663734c56383244ef061da096db719bb1b91cfbdee44bf1e84219c3afbc1",
+      "bytes": 6894
+    },
+    "RIND3D/src/rind3d/rendering/cuda_certified.cu": {
+      "sha256": "d89600a1053a4ab0eab2546a95a1df60f691cda068a56c56b031f2201cb7f6c9",
+      "bytes": 3801
+    },
+    "RIND3D/src/rind3d/rendering/cuda_runtime.py": {
+      "sha256": "830a244e32f7169395f411773d01137e28087c7c3a4f84348c48a0019bd9e46a",
+      "bytes": 9155
+    },
+    "RIND3D/src/rind3d/rendering/polyhedra.py": {
+      "sha256": "a2220a3ff0f395093bb85101c9b561b121ff5a27b1e21a2a2d20ddd43ed04186",
+      "bytes": 4408
+    },
+    "RIND3D/src/rind3d/rendering/stream.py": {
+      "sha256": "d24a4c3b1c30016f0372a76364754410dde44c1bfadaa65d9e1909590fdfe971",
+      "bytes": 6472
+    },
+    "RIND3D/src/rind3d/search.py": {
+      "sha256": "53346bc6ad53dcf0c9066d02c4d1ecb9057262833b2050d46573c37f0c658488",
+      "bytes": 15999
+    },
+    "RIND3D/src/rind3d/selection_cli.py": {
+      "sha256": "7e81be2304b39e46e21204d64d58a54bc02e510af4a161cbec9b8c4c73dae798",
+      "bytes": 2883
+    },
+    "RIND3D/src/rind3d/source_eligibility.py": {
+      "sha256": "0049fbe0ed475b6e307b5ce845d3f46957bb7655413dd0d5bc702b1a0d948974",
+      "bytes": 3386
+    },
+    "RIND3D/src/rind3d/stored_guidance.py": {
+      "sha256": "b10aa9bca7edb59fadd210320c5ef00dd6f54df5fa5e24deecab65c39f81f583",
+      "bytes": 9868
+    },
+    "RIND3D/src/rind3d/stored_windows.py": {
+      "sha256": "4116f289c1f9cebe2e7586e1bdbfaa3f5c06f935e7cc86ad8425973fffddb8e0",
+      "bytes": 13028
+    },
+    "RIND3D/src/rind3d/stratified_windows.py": {
+      "sha256": "73e4118d42c07e62a207961c0a637d3ac2f2aba8d183cbdff00977dd9fcf9317",
+      "bytes": 7783
+    },
+    "RIND3D/src/rind3d/stream.py": {
+      "sha256": "27d12aad3969216cf5161aaaf42f9bb8aa9b779ff906a2e084541bc2b0dd7a72",
+      "bytes": 6419
+    },
+    "RIND3D/src/rind3d/window_contract.py": {
+      "sha256": "062ec01f786db25bbc96c3d7843430edbb93b24eed00f4a761941830c86a36e2",
+      "bytes": 2369
+    },
+    "RIND3D/src/rind3d/window_diversity.py": {
+      "sha256": "0a7e56fea91d3c132ce5b70375485dafa375f668b22659e38433f4f0427a6650",
+      "bytes": 5352
+    },
+    "RIND3D/src/rind3d/windows.py": {
+      "sha256": "128ab790c442fe267749990c7a76626e0bde1199289faa5cc6708d96b2da5bd2",
+      "bytes": 5832
+    },
+    "RIND3D/src/rind3d/zarr_store.py": {
+      "sha256": "d653d2a7077133af65854b4b30500a6129f8154388811391d2de368751ee5b97",
+      "bytes": 4609
+    },
+    "RIND3D/native/convex.cpp": {
+      "sha256": "35536b51838dbab3ffe30426e1b8f176911ebc7b5796aaeb37032f3625786b58",
+      "bytes": 29460
+    },
+    "RIND3D/native/filter.cpp": {
+      "sha256": "77b718b340d048662bab79c3ecd95ec3069e2b29a1f489b2c7db452a962cee1d",
+      "bytes": 4110
+    },
+    "RIND3D/native/filter.hpp": {
+      "sha256": "3a287171722f811a68d89448063586b575c7e175b2d95b485957d009f7debbad",
+      "bytes": 538
+    },
+    "RIND3D/native/functional.cpp": {
+      "sha256": "bf7198a258e9ce1bf111b7d427badd83a1e27653048404b28672dad0ac9059af",
+      "bytes": 7459
+    },
+    "RIND3D/native/functional.hpp": {
+      "sha256": "9219e47f4d629f057b9fd05fb2bd753814e6c1512a34e65d5c0cb65514edf525",
+      "bytes": 1107
+    },
+    "RIND3D/native/module.cpp": {
+      "sha256": "34dd3a648c1e8b9a158dd9b5253814463394122466cd2ffed60759c9bace12e0",
+      "bytes": 5506
+    },
+    "RIND3D/native/pack.cpp": {
+      "sha256": "6251c0d1668c667935d6cdcde9492580950db6745cdd27ecfe96367df237059a",
+      "bytes": 8579
+    },
+    "RIND3D/native/pack.hpp": {
+      "sha256": "2bc47dce000b28e0118d693abc80376040ff7532ac083ee1096c46b20c7aa183",
+      "bytes": 884
+    },
+    "RIND3D/native/research.cpp": {
+      "sha256": "364d4d516717f86c02e80ef766a508d679f699a5d8a0b7fe6dead56f0cc28db2",
+      "bytes": 12827
+    },
+    "RIND3D/native/research_nonlocal.hpp": {
+      "sha256": "56fb9d10bd241842ead4b29207f45c3f3c3f0e6921d2b783200c569b9475cb76",
+      "bytes": 5825
+    },
+    "RIND3D/native/research_projection.hpp": {
+      "sha256": "3f413f1d44abbc75e4da939dd8f1e1adc3c3d0efc87d6b483e3864f849960f6f",
+      "bytes": 10630
+    },
+    "RIND3D/reader/build_backend.py": {
+      "sha256": "b2f86a8671fbc2350ffb4ac29f8c4f43ec5c68450412abfd7ab62927c3535f62",
+      "bytes": 2431
+    },
+    "RIND3D/reader/pyproject.toml": {
+      "sha256": "60d7cf7551b39cbf33b256313dc073dbc825d97808e72ef8e52d8af8dc0fabac",
+      "bytes": 444
+    },
+    "RIND3D/reader/src/rind3d_reader/__init__.py": {
+      "sha256": "afb60ca7f04b73749e491d0027cfba0e405630c743c161c5f61c1b201ec3fc86",
+      "bytes": 228
+    },
+    "RIND3D/reader/src/rind3d_reader/catalog.py": {
+      "sha256": "35cd0a5236015dde8e7fd373ccfbc15210cd5ec4ebc08a530195b60d83f4caaf",
+      "bytes": 4942
+    },
+    "RIND3D/reader/src/rind3d_reader/cli.py": {
+      "sha256": "86c5035f70703a761dff8b339928f27c21a0e06e2bc487b7d51eb3d06e19f4e6",
+      "bytes": 1758
+    },
+    "RIND3D/reader/src/rind3d_reader/counts.py": {
+      "sha256": "10139f25c4e65a179ca6af81e680cffe59983f30c8e767976128e9f59962b7fd",
+      "bytes": 4329
+    },
+    "RIND3D/reader/src/rind3d_reader/data.py": {
+      "sha256": "6b50eae3dbcbbe0f963677996a8ba8144ab5e0fdc78d422b0377c6ea5d16e2f6",
+      "bytes": 11292
+    },
+    "RIND3D/reader/src/rind3d_reader/durable.py": {
+      "sha256": "a0a940524efd0af65418af4345853fb6beb204d571319c9f2e128d01fe878fb2",
+      "bytes": 1777
+    },
+    "RIND3D/reader/src/rind3d_reader/pack.py": {
+      "sha256": "de2fc6daf3db4375f0a1ce51587de8400b9480b7fe284b55661e5c714c7d54ff",
+      "bytes": 8016
+    },
+    "RIND3D/reader/src/rind3d_reader/releases.py": {
+      "sha256": "5eb29122ef0bb5641069b92e60709a611f1f5cd1d1786356dccc76af279dd1f4",
+      "bytes": 10663
+    },
+    "RIND3D/configs/ambiguity-enrichment-research-v1.yaml": {
+      "sha256": "2b24eeb025cff13716b0dc2fbb17c19014a8939ffb9a14d8cc43368237f9cbf2",
+      "bytes": 452
+    },
+    "RIND3D/configs/legacy/pilot-extended.yaml": {
+      "sha256": "98f9e29703db9d9ec5ce1bdcea4d33228322913bd9736d64ca3d3a98a62013bb",
+      "bytes": 1206
+    },
+    "RIND3D/configs/legacy/pilot.yaml": {
+      "sha256": "7bd0e38960ec9c0789c97e9e5adfc723176c2dc9525f1694e448b4e09a8f4f34",
+      "bytes": 1205
+    },
+    "RIND3D/configs/lite-core-1k-diagnostic.yaml": {
+      "sha256": "65c8c7deb03b9c1b094e13deecd481f19c23984f1d49c525cb9b59ada74f241b",
+      "bytes": 2429
+    },
+    "RIND3D/configs/lite-core-1k-reference-a8.yaml": {
+      "sha256": "04a85e225729d3265cd38106ebe7a018697f30cd97e25b6411785d757a02d57f",
+      "bytes": 2429
+    },
+    "RIND3D/configs/lite-core-1k-v01.yaml": {
+      "sha256": "fba7a64972c5bece038ae32db99b117610bb856ba3b3cf22e1197175a11c7176",
+      "bytes": 2429
+    },
+    "RIND3D/configs/lite-core-fast-natural-research-v1.yaml": {
+      "sha256": "448674cd15025e69c22cd7eed7af8fc3b18e5089e32a6e443344c095c67e659d",
+      "bytes": 2244
+    },
+    "RIND3D/configs/lite-core-fast-research-v1.yaml": {
+      "sha256": "edea68c15a3d083cba4da12ce559086c19bbaa6283d176055f0a336648d59d07",
+      "bytes": 2242
+    },
+    "RIND3D/configs/lite-core-mixed-research-v1.yaml": {
+      "sha256": "aeed1f95e8d87f9217dbba8da322ef488b968072d8956f9139413cf31ac71812",
+      "bytes": 2284
+    },
+    "RIND3D/configs/lite-core-research-v1.yaml": {
+      "sha256": "af32cd391c1fc141055a5184a6fb26ebf0ef1c254b3c7c180822b2b1480bbc2b",
+      "bytes": 2286
+    },
+    "RIND3D/configs/lite-v0.1.yaml": {
+      "sha256": "ab82ffc23aed51fddcc3043acb48fd1a259deecaffab20a679b5f2b9b0d22d42",
+      "bytes": 1922
+    },
+    "RIND3D/configs/pilot-extended.yaml": {
+      "sha256": "e9cdee3f7201f7bc1615682caf3b8d581c8cdbea1a8478fdbf04ee0cc5aad2e4",
+      "bytes": 1827
+    },
+    "RIND3D/configs/pilot.yaml": {
+      "sha256": "93a034f8b78b2dfe62d55f35c9e9996b16f2ee331100282404c9ee7b5cf1c291",
+      "bytes": 1826
+    },
+    "RIND3D/tests/test_boundary_guided.py": {
+      "sha256": "5c229540d6e33fa5d630dd3c12152833be24cee57e8547fce98be1e94160cc72",
+      "bytes": 9877
+    },
+    "RIND3D/tests/test_campaign_protocol.py": {
+      "sha256": "e311d92f1b9c47c369695403a201142f54dba34ba0d735e29656a1bb9914c854",
+      "bytes": 3457
+    },
+    "RIND3D/tests/test_campaign_verifier.py": {
+      "sha256": "2f7a1ef4fee8137137a712a5b35557a54df72968c2d9868eadeceb36cdc74e48",
+      "bytes": 2372
+    },
+    "RIND3D/tests/test_core_research.py": {
+      "sha256": "65da8e565ccedb2417a5895ffd3e799dbd67a7d5b020df0e7155a92fdfc149b4",
+      "bytes": 5177
+    },
+    "RIND3D/tests/test_cpu_cuda_experiment.py": {
+      "sha256": "e9bc5042463662be25cadc14defcfcc1b458ca13fc2710375bdb275680820c0f",
+      "bytes": 10689
+    },
+    "RIND3D/tests/test_data.py": {
+      "sha256": "8abd8fa0f9697620d57d46f2bf2f1e1d5bdb53ef5e24b47406e32175008ca6a0",
+      "bytes": 11955
+    },
+    "RIND3D/tests/test_enrichment_cli.py": {
+      "sha256": "172c08f66cde8ca4c5ecfa729d5ca19985eb75398da995f71ec914290fac1e4c",
+      "bytes": 1759
+    },
+    "RIND3D/tests/test_enrichment_research.py": {
+      "sha256": "026a1b6870d9d19cd090e2891704a2956571492f9a42bbf3f319282c6ee69ec0",
+      "bytes": 1451
+    },
+    "RIND3D/tests/test_exact_counts.py": {
+      "sha256": "c55a7ad19568151eef8097b1517c5ef9e0209ca3a58be762d4b4bddae99f22fa",
+      "bytes": 3184
+    },
+    "RIND3D/tests/test_field_acceleration.py": {
+      "sha256": "7367cf9c8c48501235fac65daa08932da0635032c42d2ea25ef2318d6bbad92e",
+      "bytes": 6798
+    },
+    "RIND3D/tests/test_full_origin_selector.py": {
+      "sha256": "1f1ff0b8254593c8d48cde92a230365b670fc785f22ac9173f8ebf876b6c664e",
+      "bytes": 7117
+    },
+    "RIND3D/tests/test_gates.py": {
+      "sha256": "9796a37bb30edaa45fcb9e8f608ec0065cbddcaef5c765eb2a8282d7b0c73156",
+      "bytes": 5220
+    },
+    "RIND3D/tests/test_geometry.py": {
+      "sha256": "e083b9b07a24e58cfab732de24860c106e44b9376d34d586b7fdb21c7fea4f42",
+      "bytes": 3098
+    },
+    "RIND3D/tests/test_information_index.py": {
+      "sha256": "be87aa2e9ad5b213a94bd0e7f0084e70c39b22fe0b7983f547a17ab8e8354de0",
+      "bytes": 5352
+    },
+    "RIND3D/tests/test_inverse_certificate.py": {
+      "sha256": "69a49f282acfbae29b08928dac444cef78db9d4a725e0fb4b14402f55e775686",
+      "bytes": 1586
+    },
+    "RIND3D/tests/test_inverse_research.py": {
+      "sha256": "055a5829b275e85ab7be16fadfa4a17969cce76cb65b1eecb018649702c78f9e",
+      "bytes": 5988
+    },
+    "RIND3D/tests/test_lite_production.py": {
+      "sha256": "ab300a27ded4c262929e9610ad95aa8da98294c4bb698ae9c7ab8deb7374cd4b",
+      "bytes": 12459
+    },
+    "RIND3D/tests/test_lite_ready_artifacts.py": {
+      "sha256": "f914cac1738a9bd58427cb23c51c6b4c536aa8bdb43fe0422e2e93c4d5e298ce",
+      "bytes": 4141
+    },
+    "RIND3D/tests/test_optional_clearance_diagnostic.py": {
+      "sha256": "a01d2dd4433cf1350623ecce05e8452c540c1af98b3ce3e030eeac1f81dce155",
+      "bytes": 1900
+    },
+    "RIND3D/tests/test_origin_distribution_analysis.py": {
+      "sha256": "e6cc5a3ef89b7b7d8b992ec314459ca44662a3e39f3b8d1ffa3b3fdf2e73b25f",
+      "bytes": 4624
+    },
+    "RIND3D/tests/test_pack.py": {
+      "sha256": "4c58875e8b6302206f96a7c490e64086df0e72882f71eb26c2fba523d5821463",
+      "bytes": 4101
+    },
+    "RIND3D/tests/test_projection_research.py": {
+      "sha256": "d5adf04d832b81477c42838cd64bb06619f738db828f0273c1b3d82ac682f1c4",
+      "bytes": 4797
+    },
+    "RIND3D/tests/test_proposal_diagnostic.py": {
+      "sha256": "e28f8efde935f04f5d875fdc02e6e6531c2234bd2e54fe4128d95629bcf22c74",
+      "bytes": 7424
+    },
+    "RIND3D/tests/test_public_release.py": {
+      "sha256": "51c8c47f56f850533a24d61ef480161520bcfa4b9d38bf760ecf6a9d9ad08219",
+      "bytes": 2004
+    },
+    "RIND3D/tests/test_release_catalog.py": {
+      "sha256": "a0d0cee98d3d3482ffc1ed161c1f4b9519e60dd898821248ea369c55185f9f15",
+      "bytes": 3539
+    },
+    "RIND3D/tests/test_search.py": {
+      "sha256": "f4847545721bc89f63160ce1b162a9f256ca039c00331d7bdfdadccddb8486d3",
+      "bytes": 1740
+    },
+    "RIND3D/tests/test_selection_audit.py": {
+      "sha256": "c9464a80449c9e8a133e7c8657bf75a2ad52304176152c89f7df6bd574666575",
+      "bytes": 1660
+    },
+    "RIND3D/tests/test_shadow_experiment.py": {
+      "sha256": "a9727895cbafa9a827fcf8c66563a078dc67a6cc30c47cdcc280e47f20a1f0ec",
+      "bytes": 5674
+    },
+    "RIND3D/tests/test_source_eligibility.py": {
+      "sha256": "a5c898afe4a2591e447faaab6331bc050e7abc86d2c78ed4ca4fe2d903387f07",
+      "bytes": 1915
+    },
+    "RIND3D/tests/test_stored_windows.py": {
+      "sha256": "3460f42479b9cec4818dcac9a85096eda74506f57af527c04dbd2da3b969e18b",
+      "bytes": 6952
+    },
+    "RIND3D/tests/test_stratified_windows.py": {
+      "sha256": "c45b873195c547320ae4c30436134de0d33896e14306e374f8eb14304f7da8a1",
+      "bytes": 2421
+    },
+    "RIND3D/tests/test_stream.py": {
+      "sha256": "1c0a89d432edfc9560e6e5f437e3217015c49bbb99a7d4b3ce19e6643ffba4d7",
+      "bytes": 2376
+    },
+    "RIND3D/tests/test_transition_observations.py": {
+      "sha256": "913721735e6a27ac6830460ad5d9ce344f7cc447e68a9e22b960c0f74582018d",
+      "bytes": 1266
+    },
+    "RIND3D/tests/test_variable_candidates.py": {
+      "sha256": "1335b417d768aaf6bbc13547a5ede0855351a98b99bb5c945caeb06b1104684a",
+      "bytes": 8051
+    },
+    "RIND3D/tests/test_window_contract.py": {
+      "sha256": "44f1f1969516f4e54ae85d2832496b4357f2f8bb245d68385947859eb0558fbe",
+      "bytes": 4172
+    },
+    "RIND3D/tests/test_windows.py": {
+      "sha256": "50e4193cd68226501ee89b6d9803262e9880c9e185d402b3081ac66cee72919c",
+      "bytes": 2545
+    },
+    "RIND3D/tests/test_zarr.py": {
+      "sha256": "8db367909c244743520dc64bf9c74996ebd8e15274736389539d045dd22dee92",
+      "bytes": 1251
+    },
+    "RIND3D/examples/load_dataset.py": {
+      "sha256": "85061282ab9e506da9e1ead183e27b0c7ca778c4fa63341d784fa94d8337cc60",
+      "bytes": 781
+    },
+    "RIND3D/examples/public_reader/basic.py": {
+      "sha256": "2d80ce633714a631ed3956f1344e49b1da88883319518888ee5719c999485830",
+      "bytes": 552
+    },
+    "RIND3D/examples/public_reader/torch_batches.py": {
+      "sha256": "2dd36a7685e8bf3eabf3674cc5b4f966fdf0aeb0ea02a537d950725124571c09",
+      "bytes": 542
+    },
+    "RIND3D/examples/public_reader/visualize.py": {
+      "sha256": "e0dfc71b9fe94a414b082cee1bca96bb745f59fe3746c75ad07283ff4c3c99e9",
+      "bytes": 1287
+    },
+    "RIND3D/CMakeLists.txt": {
+      "sha256": "2577e8b2c746a5302ba44e40fa1b592f302212f551476474291c9fb464961150",
+      "bytes": 1653
+    },
+    "RIND3D/pyproject.toml": {
+      "sha256": "6eac5c10d13c6b67982cdd71ac9cceaeeb8d74bfbca9b63fe19bdec5fb88416f",
+      "bytes": 1079
+    },
+    "RIND3D/experiments/cpu_cuda/CMakeLists.txt": {
+      "sha256": "0aa40e5d7ee66cd339de2ced047877501939718a15b6268423656c6812027f6b",
+      "bytes": 537
+    },
+    "RIND3D/experiments/cpu_cuda/__init__.py": {
+      "sha256": "663f03acee878e9cdaa3c45099d3a4731566cfce326384b55f4efe2458635257",
+      "bytes": 75
+    },
+    "RIND3D/experiments/cpu_cuda/benchmark.py": {
+      "sha256": "8463b377f7749bf8fdac3b9f090455c1d8793440d002e39e9cb8045f5269f31c",
+      "bytes": 14375
+    },
+    "RIND3D/experiments/cpu_cuda/canonical_audit.py": {
+      "sha256": "4f7a9e4a1b82d841ff1f901654d16d6072e89feacf29dff3f3324aae6d160290",
+      "bytes": 3846
+    },
+    "RIND3D/experiments/cpu_cuda/certified.cu": {
+      "sha256": "d89600a1053a4ab0eab2546a95a1df60f691cda068a56c56b031f2201cb7f6c9",
+      "bytes": 3801
+    },
+    "RIND3D/experiments/cpu_cuda/cpu.py": {
+      "sha256": "77cd290a817592a5ef4fc216886b6d34abdcc4d79f4e2caa4480663cd82a7909",
+      "bytes": 6597
+    },
+    "RIND3D/experiments/cpu_cuda/cuda_runtime.py": {
+      "sha256": "62fb8af624b9b090b44f6465a8ad5acdb14babeb18f3489fe906940fa60e0b8e",
+      "bytes": 8434
+    },
+    "RIND3D/experiments/cpu_cuda/difficult_fields.py": {
+      "sha256": "7cb187ab23925737aae5a681232b137991cb5008b5579c0f775d6d1bd1722185",
+      "bytes": 2562
+    },
+    "RIND3D/experiments/cpu_cuda/evaluate.py": {
+      "sha256": "087636020d02a6ce95c5ef29849e166f4bec70378c0406aa63742b09584474e0",
+      "bytes": 9346
+    },
+    "RIND3D/experiments/cpu_cuda/evidence.py": {
+      "sha256": "98e60bd01d9c33751093d59988a6d42f89311aa6d49786342eac07c57890bd99",
+      "bytes": 9619
+    },
+    "RIND3D/experiments/cpu_cuda/fair_io.py": {
+      "sha256": "1e949f0fcd4bff931602f16d20bcedb67da6776c1f664d7340063c3506140381",
+      "bytes": 2298
+    },
+    "RIND3D/experiments/cpu_cuda/fallback_repro.py": {
+      "sha256": "63d188e67023bcf062a88997e7902bda83e595b74c22d1da8b760436e5dce918",
+      "bytes": 1886
+    },
+    "RIND3D/experiments/cpu_cuda/fallback_study.py": {
+      "sha256": "7ea11bd73fc643e727661bb2c28911bac89b9bc4a3707132c4c60b7bb915428a",
+      "bytes": 5709
+    },
+    "RIND3D/experiments/cpu_cuda/final_checks.py": {
+      "sha256": "e1c7f742ed4ffb5931e85a3d8f009635f0bbce9e2bf571066dedfea3df4e4876",
+      "bytes": 1246
+    },
+    "RIND3D/experiments/cpu_cuda/gpu.py": {
+      "sha256": "a89e31b19fbe7b57a42c91d64042c8edfbbba7a2f762d218f509de26a99f9a59",
+      "bytes": 9888
+    },
+    "RIND3D/experiments/cpu_cuda/lite_end_to_end.py": {
+      "sha256": "6439ce6b8cd616cce66c9399efdd457fe3839c63977f84e80cf68c3b36faa67f",
+      "bytes": 7605
+    },
+    "RIND3D/experiments/cpu_cuda/lite_profile.py": {
+      "sha256": "01af945e37716ba30ca6125a443bc533415c2bb7893c1ce0ede134c1e405aa87",
+      "bytes": 4491
+    },
+    "RIND3D/experiments/cpu_cuda/native.cpp": {
+      "sha256": "05bc5fc4898f42b3800abe1513c511dff2d493eda22db04ee5d4026aa0c7ce8f",
+      "bytes": 9324
+    },
+    "RIND3D/experiments/cpu_cuda/post_run.py": {
+      "sha256": "dd1df832543bead18862fa14ecb60267bb880c4af4e93745ac97a5ea681ffc05",
+      "bytes": 1563
+    },
+    "RIND3D/experiments/cpu_cuda/preservation.py": {
+      "sha256": "3a16f27e72584d43081712405c54bbe59d6d0806d2fa2b4e8c5dcd25c5f6ee44",
+      "bytes": 3164
+    },
+    "RIND3D/experiments/cpu_cuda/report.py": {
+      "sha256": "73526a60efcb24fde4ce4913fff5f23f7724d062f00a4011fbb320429ee153e6",
+      "bytes": 33919
+    },
+    "RIND3D/experiments/cpu_cuda/reuse_ablation.py": {
+      "sha256": "792f33e70e60e93764eddd192b2ab932c6f9b8812f42f68ddc7e885a49386046",
+      "bytes": 2665
+    },
+    "RIND3D/experiments/cpu_cuda/run.py": {
+      "sha256": "44bc379967036e4e94e5e7cdfddd00eac33682c2da77ae5f8e6246767c0e44ec",
+      "bytes": 3350
+    },
+    "RIND3D/experiments/shadow_volumes/CMakeLists.txt": {
+      "sha256": "a37b8f82b57b0c77337f63ade72c80254908f95d5552ade984fd84ae9b8e26c2",
+      "bytes": 548
+    },
+    "RIND3D/experiments/shadow_volumes/__init__.py": {
+      "sha256": "42324081dd2d3c2761281ce614fbac0f048e0611507d86fea723d81ede118c7c",
+      "bytes": 86
+    },
+    "RIND3D/experiments/shadow_volumes/audit.py": {
+      "sha256": "0551302cb1ac62d701c1fc3fe4804b2ad00bb28300e9f7135b25feb28e515e08",
+      "bytes": 1724
+    },
+    "RIND3D/experiments/shadow_volumes/audit_sources.py": {
+      "sha256": "1f0050573b09585b087b7c0e20e15de640df4409d2001b51c7205cb9e19c2c24",
+      "bytes": 2229
+    },
+    "RIND3D/experiments/shadow_volumes/benchmark.py": {
+      "sha256": "115829d3a07f2c7a41235eec36f8edcad1e8315c3f692dac025865fdcd42255a",
+      "bytes": 8987
+    },
+    "RIND3D/experiments/shadow_volumes/cases.py": {
+      "sha256": "8b696f201ebf8088a7c9d1ea2469f644116ea6676e52c630a426a24187f47a57",
+      "bytes": 3203
+    },
+    "RIND3D/experiments/shadow_volumes/difficult.py": {
+      "sha256": "dcd668e0681507b580019a65cc13e957c7b91af3301a784fed7b6fc6d75f4267",
+      "bytes": 2174
+    },
+    "RIND3D/experiments/shadow_volumes/evaluate.py": {
+      "sha256": "14130edfd2006f0b00c57d283dbe4c1036fe0b8504b5b9fe68f142015c3d81a4",
+      "bytes": 6729
+    },
+    "RIND3D/experiments/shadow_volumes/lite_demo.py": {
+      "sha256": "961673db74ec169c28504bc0dd94e10aa59a3349196e25cfacb9f405399740ce",
+      "bytes": 5596
+    },
+    "RIND3D/experiments/shadow_volumes/native.cpp": {
+      "sha256": "8cd790f8df329cddd302f7e3854d57f9fb7daefe80f193c42125371b78bc1a83",
+      "bytes": 7653
+    },
+    "RIND3D/experiments/shadow_volumes/plot.py": {
+      "sha256": "4e72febc78f6947ea5a185cff5f4f3b5d3212f065656887466094ff1a4f828b4",
+      "bytes": 3250
+    },
+    "RIND3D/experiments/shadow_volumes/preservation.py": {
+      "sha256": "d74628a522753c6d69313f020ed37a3b058d691123ff56a984b9ef4ad9d479d0",
+      "bytes": 1992
+    },
+    "RIND3D/experiments/shadow_volumes/renderer.py": {
+      "sha256": "357c58c37eb116c717d6fdc8a72ac878873f2f8140ebc8da6d445faab03dd1ed",
+      "bytes": 9897
+    },
+    "RIND3D/experiments/shadow_volumes/report.py": {
+      "sha256": "280032acf4d698e6eb0451cba570c169344decbb060663f885c52acd1a11a65e",
+      "bytes": 17454
+    },
+    "RIND3D/experiments/shadow_volumes/reuse_geometry_control.py": {
+      "sha256": "4c07fb97ec28b4903b326f3c0b59cc551fc45f439c9a5b3fc6b3ef6fbf28959d",
+      "bytes": 1296
+    },
+    "RIND3D/experiments/shadow_volumes/run_controlled.py": {
+      "sha256": "59b2ccf160296a7a6cf4387956681ae161e15cc70974f3ed22377268470bab25",
+      "bytes": 2051
+    },
+    "RIND3D/experiments/shadow_volumes/statistics.py": {
+      "sha256": "307bd07b286a63e46c1bf8555c65a5a29347bc0d5dc7f342b7d236ea3a123f61",
+      "bytes": 2903
+    },
+    "RIND3D/experiments/shadow_volumes/summarize.py": {
+      "sha256": "4a53ce43a3f599d5b93b4a9194b6d14325b71f6036390500c5b62d5f60e20da2",
+      "bytes": 5232
+    },
+    "RIND3D/experiments/lite_quality/ambiguity.py": {
+      "sha256": "f0a9483b767e21ff8020952b1de583f1c00f8d54f91a95fb42124a5bcfc44410",
+      "bytes": 3311
+    },
+    "RIND3D/experiments/lite_quality/audit.py": {
+      "sha256": "87596e6ea029f86adeaf979207003760acc90b1a60f8d29b00784eb8151e59bb",
+      "bytes": 6842
+    },
+    "RIND3D/experiments/lite_quality/campaign.py": {
+      "sha256": "7a56d52d69f125970acb966ee35dff3c797814aa4f11c64e5473503229855bad",
+      "bytes": 1500
+    },
+    "RIND3D/experiments/lite_quality/certify.py": {
+      "sha256": "1606e5c8856ff88a3c92889a97cff4d37bcc138941ae9033e60833ab23befa55",
+      "bytes": 4909
+    },
+    "RIND3D/experiments/lite_quality/certify_ambiguity.py": {
+      "sha256": "759a21b7f3cbe1fceb2103be0385a5e50142097f7e0f68468954874ae97a7051",
+      "bytes": 2296
+    },
+    "RIND3D/experiments/lite_quality/count_benchmark.py": {
+      "sha256": "1b92eb99dccf56461d90aba45f22a652ee8f7f1f3d5d9a9e5754b600fd0a45ff",
+      "bytes": 2470
+    },
+    "RIND3D/experiments/lite_quality/export_enrichment.py": {
+      "sha256": "7cfe8100f5959902f13c2c0fd88315dab6aa868c3b734261da4d215b902163da",
+      "bytes": 1356
+    },
+    "RIND3D/experiments/lite_quality/figures.py": {
+      "sha256": "76604b506440c13445a064a41390e23cb88aa1a0703c6f8e2bd14dbe6b2cb46d",
+      "bytes": 7944
+    },
+    "RIND3D/experiments/lite_quality/inverse.py": {
+      "sha256": "0145169faa3214db5e5c6b65db7759ad8d44024dbe0cb26cfc69264beff4a823",
+      "bytes": 5474
+    },
+    "RIND3D/experiments/lite_quality/nearby.py": {
+      "sha256": "dc960a3631a2e06ab5e5500c2eb0005bbcb5fc14b35774bd853f26fa9fb9faed",
+      "bytes": 2589
+    },
+    "RIND3D/experiments/lite_quality/nonlocal_audit.py": {
+      "sha256": "8da0d44a7cec6e5ce82aeab303e0ab85fb510029f98d73344fe789ff40cfc993",
+      "bytes": 7940
+    },
+    "RIND3D/experiments/lite_quality/pilot_audit.py": {
+      "sha256": "6be7932f29a2e49089bb8475ab460ce0e03de2c69e2b145aa010f77d9af1838a",
+      "bytes": 4020
+    },
+    "RIND3D/experiments/lite_quality/preservation.py": {
+      "sha256": "d1cbd9a4dd955534f288e246029470af050cae7f4b57f015b841e140afbe5c95",
+      "bytes": 2209
+    },
+    "RIND3D/experiments/lite_quality/probe_gpu.py": {
+      "sha256": "b7bdb1da42a54c42a2063844a798019512c6406513d185a4aabdc416e19ba82d",
+      "bytes": 4620
+    },
+    "RIND3D/experiments/lite_quality/recovery.py": {
+      "sha256": "8be4c009ac7805e7ae1870bc7d5bb63acc1ac9d0d801a57c2669deb083630187",
+      "bytes": 2178
+    },
+    "RIND3D/experiments/lite_quality/report.py": {
+      "sha256": "85655a3cec7ee3d2f4510612fa59cb4238133bbd210c9a98dd00ff7124a41cbf",
+      "bytes": 33372
+    },
+    "RIND3D/experiments/lite_quality/results.py": {
+      "sha256": "faafc6e1248e1d44bf42d7b936189d3860182887a773c838b931f9ae7de55422",
+      "bytes": 12767
+    },
+    "RIND3D/experiments/lite_quality/sampling.py": {
+      "sha256": "4b9b45d22a1730e17755268ba06b4fbf4d52f9fe3c03a68f44b7b9145d11d5fd",
+      "bytes": 3308
+    },
+    "RIND3D/experiments/lite_quality/search_compare.py": {
+      "sha256": "709bae424e3b1f7266658376a8ec5c865f01255e812ac633862fcce383c59426",
+      "bytes": 6085
+    },
+    "RIND3D/experiments/lite_quality/selection_quality.py": {
+      "sha256": "d005c94658512b00e39e7d5a4bb17ce5c6e7dd16c1d50307249d1cf6e9b0c821",
+      "bytes": 2332
+    },
+    "RIND3D/experiments/lite_quality/verification.py": {
+      "sha256": "6cbac3c799e3b7de7f1927cdc208306f197eeea4f32d9d73d972fc676455f186",
+      "bytes": 3905
+    },
+    "RIND3D/experiments/lite_quality/wheel_check.py": {
+      "sha256": "d9135dfaa1728b756c944ab781535d0376b2452c3d1b1831ef46ad4d34f61770",
+      "bytes": 6191
+    },
+    "canonical_geometry/src/rind/__init__.py": {
+      "sha256": "c3be702eaac83c15610b7253ec8e96b7a2414147a4858b8d7c8e480d3d3974a1",
+      "bytes": 110
+    },
+    "canonical_geometry/src/rind/benchmark.py": {
+      "sha256": "206f89eaecde36f2d49c2c5e3f6c93b7424a2f740a27a50348f566339389520f",
+      "bytes": 3981
+    },
+    "canonical_geometry/src/rind/cli.py": {
+      "sha256": "b1e75ade3cfd5206c368d54676fc5c3c5e64e3520a5601e451f8f202ade33ac6",
+      "bytes": 12430
+    },
+    "canonical_geometry/src/rind/contracts.py": {
+      "sha256": "c74649dbc5e42bde5d47c12a1b0020f170f98f122b5df9ed601aabeb27c0ae8f",
+      "bytes": 17789
+    },
+    "canonical_geometry/src/rind/decay.py": {
+      "sha256": "e70740d3acfee24c713f98453f9c1f703eb31f2fa9275dfe443aeb20b5c68883",
+      "bytes": 11213
+    },
+    "canonical_geometry/src/rind/diagnostics.py": {
+      "sha256": "78f6af2ef90439a6ef83fccf1bfbc91d695d22e1098487dd6ac95cd1797f0893",
+      "bytes": 5570
+    },
+    "canonical_geometry/src/rind/ellipsoid3d.py": {
+      "sha256": "cf73562e8cb61db6d6380092b37e6a553cfd3e237747e836c38db4b8e28367e9",
+      "bytes": 12134
+    },
+    "canonical_geometry/src/rind/expanded_geometry.py": {
+      "sha256": "6505404557012e9110a3f228a0355a3ae0e37804534f182581f22d08a60c310b",
+      "bytes": 21971
+    },
+    "canonical_geometry/src/rind/generation.py": {
+      "sha256": "941c9f367d378ad025433c18cef6c1b89396d8646e9e756c5639674f06c1d08b",
+      "bytes": 15009
+    },
+    "canonical_geometry/src/rind/generation3d.py": {
+      "sha256": "3bf1d0e87215f3b736b14a0630838bc9b5c67edfaf9b3184274cef75a89cb05d",
+      "bytes": 12812
+    },
+    "canonical_geometry/src/rind/generation_decay.py": {
+      "sha256": "17b5300b0f7fb8195613c29493276c8b48a1969bbca2fd7949967ef9e3f92713",
+      "bytes": 3367
+    },
+    "canonical_geometry/src/rind/generation_expanded.py": {
+      "sha256": "966c2e24f5598e0f25ce38130eb37ddc2b376bea857237b4a81b203ac838b8a1",
+      "bytes": 21076
+    },
+    "canonical_geometry/src/rind/geometry.py": {
+      "sha256": "60469d6ab2233a17ded0a675323953051a9f1102b3db952979d88ea851390f59",
+      "bytes": 27156
+    },
+    "canonical_geometry/src/rind/hybrid3d.py": {
+      "sha256": "132dfb4e534d50e1e65c7ecbeed37cecd3d308aff056c140081b3155c15a8863",
+      "bytes": 6409
+    },
+    "canonical_geometry/src/rind/identity.py": {
+      "sha256": "f340a82681ddb989c71adb569bdb2b5dbca09d3a1b00ddd2428522fe4c6b2d2a",
+      "bytes": 6284
+    },
+    "canonical_geometry/src/rind/inspector.py": {
+      "sha256": "085fdb7f30b6f6a94810911db0e07dc2c6324451aebd02ea9c3b464ecca73b03",
+      "bytes": 11748
+    },
+    "canonical_geometry/src/rind/inspector3d.py": {
+      "sha256": "cceced8dc032f4104d0123cbe0ce1c8a58caf07ae05e642bdc30a8def9cf14fb",
+      "bytes": 10689
+    },
+    "canonical_geometry/src/rind/journal.py": {
+      "sha256": "88b58f79fae038ed41bc03d58c1e35d24f8b4202ea38e530c039bc3f2541bdf2",
+      "bytes": 7387
+    },
+    "canonical_geometry/src/rind/oracle.py": {
+      "sha256": "c491ed89f8cff451ffa617a0b9f18e8999c98830aaa5fbcf13205e64b3ab31fd",
+      "bytes": 4977
+    },
+    "canonical_geometry/src/rind/publication.py": {
+      "sha256": "1c311f84dd78a094515de8f8ed16075428957f76e9d094c0df0e34c0fc0b220f",
+      "bytes": 42727
+    },
+    "canonical_geometry/src/rind/publication3d.py": {
+      "sha256": "be7fbc592843a094731916ab0b777fc2f6b11c7c27a5eb306d0833cd24be0646",
+      "bytes": 31621
+    },
+    "canonical_geometry/src/rind/publication_decay.py": {
+      "sha256": "3621e178494a0a89701dbeb4eec5debbdfe56c580ef6ed18f8ea69fb3f1efc15",
+      "bytes": 23477
+    },
+    "canonical_geometry/src/rind/reports.py": {
+      "sha256": "3d13aad0a802387b54e5f5526558cae56e0f6ee3ac84f67de47b515bb7e815f4",
+      "bytes": 4508
+    },
+    "canonical_geometry/src/rind/storage.py": {
+      "sha256": "07c18323a267d657c827501a82d7f0379f854210fd4b03c6290f0ba153041fe2",
+      "bytes": 33057
+    },
+    "canonical_geometry/src/rind/transcendental.py": {
+      "sha256": "f3ea9324ad328f87da5cd255d955fc286e40bb7b78615834ecb9f1ff268c90bd",
+      "bytes": 28113
+    },
+    "canonical_geometry/native/capability_probe.cpp": {
+      "sha256": "bdd9716586c45e0a2369b9deb520fdc51f77e843586582cc7227f53bd0b0a71d",
+      "bytes": 2836
+    },
+    "canonical_geometry/native/capability_probe_3d.cpp": {
+      "sha256": "502129cdd92addccca04e3089f6d6b2c39bc15755d293cbeb102e7cba3e297ab",
+      "bytes": 3078
+    },
+    "canonical_geometry/native/exact2d.cpp": {
+      "sha256": "f4645ebbcd3e041382577f29da89caf46a493d8f5e6b9fbcfdc60dcf72547a4b",
+      "bytes": 21732
+    },
+    "canonical_geometry/native/exact3d.cpp": {
+      "sha256": "d600ce769dca16d66bb205a8b7e76c927825598e02698268dd339b170176cced",
+      "bytes": 31148
+    },
+    "canonical_geometry/native/identity_reference.cpp": {
+      "sha256": "cb87978ff23e1e8c07cc17e918dc039b50dec0b8c93ca012d62ead2bfee91114",
+      "bytes": 5708
+    },
+    "canonical_geometry/scripts/build_native.sh": {
+      "sha256": "f35fd9dc2c6947ab15be9e3007692119b865f82c15d0626dafc9fe381f615d43",
+      "bytes": 1836
+    },
+    "canonical_geometry/scripts/complete_3d_decay.sh": {
+      "sha256": "0d70b44a15cbfe133e7108fbc4b9777c5f34eddadc27e65d330dd31d707854b4",
+      "bytes": 1098
+    },
+    "canonical_geometry/scripts/complete_3d_pilot.sh": {
+      "sha256": "7142681df05704ed177c2bba598ff4b581f7e19ad7e7852ece2fa31f8021ca66",
+      "bytes": 1635
+    },
+    "canonical_geometry/scripts/fetch_cgal.sh": {
+      "sha256": "3cfec6bb02f1cf1377eeb6699a3cfc7c3209e1f3e269eb5ebe67708bc5ad2669",
+      "bytes": 850
+    },
+    "canonical_geometry/pyproject.toml": {
+      "sha256": "bc0d76cc92fa352cefab8075dabc8204ae9e8c974982a4eb3072800113292397",
+      "bytes": 673
+    },
+    "canonical_geometry/native/CMakeLists.txt": {
+      "sha256": "f47c8abbc5df5ed76666233551b7c8518e22d5adfd18e32f554c60846fe63c09",
+      "bytes": 1514
+    },
+    "RINDRay/cpp/bindings.cpp": {
+      "sha256": "4ae0319838d9f152bbe4237cd5355bcd5a6b4f472eae0410358a7486e8ece360",
+      "bytes": 5507
+    },
+    "RINDRay/cpp/core.cpp": {
+      "sha256": "731ea4b9dfdfceb4031df90ed974e3552408b3928407db1909f37968e24b1578",
+      "bytes": 33190
+    },
+    "RINDRay/cpp/query.comp": {
+      "sha256": "67b8e33e61e90487dc1b33bbfc66d7321969e586b52211109f49ae1ee1641407",
+      "bytes": 3530
+    },
+    "RINDRay/cpp/vulkan.cpp": {
+      "sha256": "3161331a548e557c549db463bed4724740a04173ed47ce623a812a5849e0eb11",
+      "bytes": 35425
+    },
+    "RINDRay/cpp/vulkan.hpp": {
+      "sha256": "fa1910a765ad463b6ac22eeaebd43c003d58fca5aba000c5d1a03640c7a25f4b",
+      "bytes": 1442
+    },
+    "RINDRay/include/rindray/rindray.hpp": {
+      "sha256": "b64a287d05c0cbd7581dac3699201b07418304a8399c3b1e085da26be1b4e733",
+      "bytes": 3837
+    },
+    "RINDRay/python/rindray/__init__.py": {
+      "sha256": "e84cfdc6acc997d425229be51481b63a8a19ded08b8761c5add1597e50df1121",
+      "bytes": 1743
+    },
+    "RINDRay/python/rindray/__main__.py": {
+      "sha256": "6376bda2230609b8b67b5c9bfbb28e306dc138c26039c9415c4dfe88af3e5dc5",
+      "bytes": 6003
+    },
+    "RINDRay/python/rindray/benchmark.py": {
+      "sha256": "a0f1d5f6a3f6416f225d96edfd0960dbe9803d6c19b40d12635a6aec2a41cfeb",
+      "bytes": 14667
+    },
+    "RINDRay/python/rindray/dataset.py": {
+      "sha256": "4851b27d34d2752e1c9343775b9d5cecf6d434e50cc5e4adb4bb9a622b6c2d14",
+      "bytes": 17161
+    },
+    "RINDRay/python/rindray/drivers.py": {
+      "sha256": "a720aac188c6e6b771ce854441d0afa6f5844a330ef694d4a794d5127f45bed9",
+      "bytes": 9896
+    },
+    "RINDRay/python/rindray/grids.py": {
+      "sha256": "37014302d0ee8d7e0ab170758a263b90bc0adb8b28c5ec9e931eaa8d68f24a2c",
+      "bytes": 12623
+    },
+    "RINDRay/python/rindray/sampling.py": {
+      "sha256": "ea7d3f17239b32e090b2b47e73e7a999a319d9aa47455d25d9c3be42149fe218",
+      "bytes": 10043
+    },
+    "RINDRay/python/rindray/scene.py": {
+      "sha256": "11e385783e7272902b3e0d3a0de369f9076aa2227df20247f873bdacab95dbb3",
+      "bytes": 25218
+    },
+    "RINDRay/python/rindray/streaming.py": {
+      "sha256": "44cf5993d472de69f3fc4235f466ca3a48e9e2a13c2eb4710ade2ad699aa46c1",
+      "bytes": 6507
+    },
+    "RINDRay/python/rindray/tuning.py": {
+      "sha256": "fdd803a9275962202033ca7c9617e82c32cc2844c5df4079367f7e8703e39211",
+      "bytes": 15170
+    },
+    "RINDRay/pyproject.toml": {
+      "sha256": "7dbeda7eeaa4eb9cd840412414aee3c141ef63866302b63edfe14c18649b2578",
+      "bytes": 632
+    },
+    "RINDRay/CMakeLists.txt": {
+      "sha256": "0e012a291517ecc3df5618c661782aa9fb0ce8e3e14363cf473cdca7c3b00ffa",
+      "bytes": 4301
+    },
+    "RIND3D/docs/lite-v01-contract.md": {
+      "sha256": "babce667f5274d237b42eac0415f078b1087519af478952aa3f9083a3c9e0f7d",
+      "bytes": 8508
+    },
+    "RIND3D/docs/cpu-cuda-certification.md": {
+      "sha256": "8bf3bea0fc54daa50deaa35c313d6306d01d209aec96a3211ec9a1481f6fb171",
+      "bytes": 9711
+    },
+    "RIND3D/docs/shadow-volume-design.md": {
+      "sha256": "6d572f38d1a1da476c01e939ce49fd15ff9c04785faef1fcd8271996d06081b1",
+      "bytes": 4978
+    },
+    "RIND3D/docs/functional-field-correctness.md": {
+      "sha256": "179e73885f1462cf35d8cdc9ed6637dfb91f40cb24b52c267f2c67a41c416250",
+      "bytes": 5415
+    },
+    "RIND3D/docs/lite-quality-inverse-design.md": {
+      "sha256": "4659ab7c5d712229d61f01af84b679b2ec366242e8d890d06f487cd071d8e1e9",
+      "bytes": 9859
+    },
+    "RINDRay/cmake/embed_spirv.cmake": {
+      "sha256": "b60cb0f14530c2a958bae5616d70d5018034c6518a217fc0b2b9dbfdfbf616f4",
+      "bytes": 289
+    },
+    "RIND3D/scripts/analyze_boundary_ab.py": {
+      "sha256": "33499d558d6795a14d997d80f60dff700190cac9fc492de0b8e4488fc27b1270",
+      "bytes": 14878
+    },
+    "RIND3D/scripts/analyze_origin_distribution.py": {
+      "sha256": "6acf4466779ec5dc0855de7045f1df35dc8fa046ee0898fa66c86ceaafeff93c",
+      "bytes": 28403
+    },
+    "RIND3D/scripts/audit_stored_selection.py": {
+      "sha256": "1da64c7fb24bc756c22ac722467f2220f9387eab14584c31455c1ccd6ae38c8f",
+      "bytes": 11410
+    },
+    "RIND3D/scripts/boundary_experiment_support.py": {
+      "sha256": "84e1578daa821f70d9cb66dc8848f474144750ccd35927fa8bc9ad8b6c9bd7e7",
+      "bytes": 7145
+    },
+    "RIND3D/scripts/bounded_origin_feature_audit.py": {
+      "sha256": "1b43dcb1c68dbbceca502f086569105979d4bbd0ad0eb7db52a860a44714303c",
+      "bytes": 6531
+    },
+    "RIND3D/scripts/diagnose_window_proposals.py": {
+      "sha256": "c1c02812fc3362583628daa69fbfa0b130be6de2de06cfa414e6b47318a682fb",
+      "bytes": 17010
+    },
+    "RIND3D/scripts/experimental_boundary_guided.py": {
+      "sha256": "ae6a7189c0bb31d6704fb7307cc786cf4c252277faff14768515e6df987fd013",
+      "bytes": 15638
+    },
+    "RIND3D/scripts/full_origin_selector.py": {
+      "sha256": "1f34f86aace6552b78748c18d61de19f580e4ce687308eecbf6607d7db4da624",
+      "bytes": 7017
+    },
+    "RIND3D/scripts/origin_audit_meter.py": {
+      "sha256": "42867c5a3d6db9a28134a782e4addcc0f61b98f723f2df2b41ffa2e00770d119",
+      "bytes": 3050
+    },
+    "RIND3D/scripts/origin_distribution_features.py": {
+      "sha256": "b5ffcc2de97fd09bc5c30f49968efca84c764077f616574d6658c767cfcb34eb",
+      "bytes": 9578
+    },
+    "RIND3D/scripts/origin_multiscale_analysis.py": {
+      "sha256": "cf9c022cb64d45711106ce0ade68d8ed97e4495156b17e4aa1b6ee5061a24a95",
+      "bytes": 2805
+    },
+    "RIND3D/scripts/run_stored_selection_pilot.py": {
+      "sha256": "23c519ec812d11684622a826c959a7729a9f447452479dbde102ef15d83cea52",
+      "bytes": 10891
+    },
+    "RIND3D/scripts/stored_selection_baselines.py": {
+      "sha256": "dcc00a29451c4e5fa638bfe62c3b71b52d2236208c63e0318d9eeff108526e55",
+      "bytes": 9166
+    },
+    "RIND3D/scripts/summarize_window_diagnostic.py": {
+      "sha256": "3feadacaea22f282df66e6e1928a03b6554303cda1cefa81e4a65c46f16cc522",
+      "bytes": 14655
+    },
+    "RIND3D/configs/experimental-feature-diagnostics.json": {
+      "sha256": "8d2c16bd9c05dc753b96c99c061a0d2453eb7216a596011ccac93c9c564b5e13",
+      "bytes": 346
+    },
+    "RIND3D/configs/experimental-shadow-volumes.json": {
+      "sha256": "3730fbdad4521517abb2b136f0b22a000ca35c89eeb59ce76f62f57e2e540896",
+      "bytes": 639
+    },
+    "RIND3D/configs/experimental-boundary-guided.json": {
+      "sha256": "a6dddecfc56f910d3b2a4d051d3e4309146817b65a5ecd4421f3c4858f8134d6",
+      "bytes": 684
+    },
+    "RIND3D/configs/experimental-origin-distribution.json": {
+      "sha256": "c8004c4e45f3ba26987ba6620b4ff8ce52b1bccd86499516896db0702d1a6549",
+      "bytes": 1032
+    },
+    "dataset/profiles/rind-core-pilot-v3-impl1.json": {
+      "sha256": "de46873cc0cdceb545ca78169acc4b100252a9d648ecd297e5b294dadceebb29",
+      "bytes": 735
+    },
+    "dataset/profiles/rind-core-pilot-v3-impl2.json": {
+      "sha256": "41be3019cdd232edbf43e7851b6bf787c42aa45ac67c4f93438a62ac8445201f",
+      "bytes": 851
+    },
+    "dataset/profiles/rind-decay-v3-impl1.json": {
+      "sha256": "e1679bc4914640f4aa1990deaa9eb7591f7d27bed3a9a16ef419bedbfed9efdf",
+      "bytes": 954
+    },
+    "dataset/profiles/rind-expanded-v3-impl1.json": {
+      "sha256": "01fd5eae9b6eb26f6ebb980bcd2bc162b717ce7b735a40ba00ce106a723d8d3c",
+      "bytes": 3403
+    },
+    "dataset/profiles/rind-numeric-3-impl1.json": {
+      "sha256": "4e59b96197fd024943ddbca6f1a72259b7f202d7b4303619237ab535f9a9643f",
+      "bytes": 745
+    },
+    "RIND3D/docs/public/DATASET_CARD.md": {
+      "sha256": "5631feaec4473963dc78086d68c902467818a97731b62f95fd63574071a16fa3",
+      "bytes": 5327
+    },
+    "RIND3D/docs/public/FORMAT.md": {
+      "sha256": "223f644becb5462e9c5297d62ed392d9b9bd66f24d9109b368778679256e0056",
+      "bytes": 5771
+    },
+    "RIND3D/docs/public/PRODUCTION.md": {
+      "sha256": "2af04ab959d31c42da03ba773f86455dbd45304bec42a8041f1c7ca6a6ebbd48",
+      "bytes": 5904
+    },
+    "RIND3D/docs/public/README.md": {
+      "sha256": "61fb9266db0aa9d530004c9e5473606f66dce5b3b7874fadf27e776154837df6",
+      "bytes": 7226
+    },
+    "RIND3D/docs/public/RELEASES.md": {
+      "sha256": "f87142a415e9647ba2315e10c88f874bce02179dcae8b9f5effffc50f354d0ee",
+      "bytes": 3711
+    },
+    "RIND3D/docs/public/REPORT.md": {
+      "sha256": "118850e7ae39779f82e3db67d371999b6c6344de3e30b4ea7b5c62d9fd782dbc",
+      "bytes": 10528
+    }
+  },
+  "relocation_changes": [
+    "CMake local vendor default",
+    "uv local dependency paths",
+    "new portable build/validation wrappers and documentation",
+    "Public documentation templates use permanent RIND3D branding; original scientific identifiers and archive contents unchanged.",
+    "New reader package summary/description use RIND3D branding; original frozen wheel and its hash unchanged."
+  ],
+  "certification_scope": "Historical identifiers certify the completed frozen data only. The relocated build needs its own fixture certification; no old authority is copied.",
+  "relocated_paths": {
+    "RIND3D/docs/lite-v01-contract.md": "docs/scientific/lite-v01-contract.md",
+    "RIND3D/docs/cpu-cuda-certification.md": "docs/scientific/cpu-cuda-certification.md",
+    "RIND3D/docs/shadow-volume-design.md": "docs/scientific/shadow-volume-design.md",
+    "RIND3D/docs/functional-field-correctness.md": "docs/scientific/functional-field-correctness.md",
+    "RIND3D/docs/lite-quality-inverse-design.md": "docs/scientific/lite-quality-inverse-design.md"
+  },
+  "adapted_files_sha256": {
+    "CMakeLists.txt": "b8b5f46becbdf3aba2f3db6bd09cd4a597e746f1bad7634f8ceb6b4acf720d5d",
+    "pyproject.toml": "0a40b0254f15274f388b44ede87b31ed1cde2adc34d81b32d922346392d9390d",
+    "reader/build_backend.py": "32caaefc76b0c1873dbd3788991d5201d3c71f32cfb193c527fa1f35602607cb",
+    "reader/pyproject.toml": "0513e464b6bf970b56731b68b6c9d4963c9a483bfef7759213d3e4cb3734ac30",
+    "docs/public/README.md": "e0bef3556d0aa66dc7029650f786351be7aeef129d4e610afd17ee0acb4acdfc",
+    "docs/public/DATASET_CARD.md": "67401d4deda980d716297b567152194c818505987bed3fa0550552e49c382583",
+    "docs/public/FORMAT.md": "fd16587722b4b8c3625657535c8fb08696b9b0277d8c99ba2de12f15f39a7d03",
+    "docs/public/PRODUCTION.md": "7d74d0196c7b42ee38c744f79a05ed20f5c1785fcb741db3ae64a9eeb72b102d",
+    "docs/public/RELEASES.md": "f13e19d3141f4d466246fc5249fb0ae1676056c8b87c2f30717b285224948d3c"
+  }
+}
