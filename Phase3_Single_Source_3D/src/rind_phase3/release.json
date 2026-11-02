@@ -1,0 +1,13 @@
+{
+  "dataset_name": "RIND3D",
+  "release_version": "0.1",
+  "archive_name": "RIND3D-v0.1.tar.zst",
+  "archive_bytes": 633273091,
+  "archive_sha256": "1f5a2ff2bd9ac4a479a074b33e0d06f160706e4369b199144ee117693913ee1e",
+  "release_id": "2f848bd747bc43d35d3551e7a47b53e298d2025502bf1c37b217c768047e3ada",
+  "historical_internal_name": "RIND3D-Lite-Core-1K-v0.1",
+  "drive_file_id": "1PmMp39En-uc4QTgACd_EpS4mTZ3wO7yx",
+  "share_url": "https://drive.google.com/file/d/1PmMp39En-uc4QTgACd_EpS4mTZ3wO7yx/view?usp=drivesdk",
+  "license": "PENDING",
+  "citation": "PENDING"
+}

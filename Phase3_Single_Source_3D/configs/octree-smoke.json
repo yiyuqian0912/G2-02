@@ -1,0 +1,12 @@
+{
+  "purpose": "bounded diagnostic, not a finalized teacher or production training recommendation",
+  "k_per_cell": 4,
+  "observation_probes": 64,
+  "max_candidates": 64,
+  "max_pairs": 4096,
+  "max_refinements": 1,
+  "minimum_source_cell_side": 64,
+  "source_domain": "open unit world, FREE with original clearance, outside observation",
+  "cost_normalization": "fraction of sampled FREE receivers disagreeing",
+  "teacher_probability_target": null
+}
