@@ -57,3 +57,4 @@ RIND3D_Generator/experiments/lite_quality/fixtures/
 Phase3_Single_Source_3D/data/
 Phase3_Single_Source_3D/checkpoints/
 Phase3_Single_Source_3D/results/
+Phase3_Single_Source_3D/.rind3d-viewer.local.json

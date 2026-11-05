@@ -13,6 +13,7 @@ dependencies = ["rind3d-reader>=0.1,<0.2", "numpy>=2.2,<3"]
 physics = ["rind3d==0.3.0"]
 train = ["torch>=2.4"]
 dev = ["pytest>=9", "pybind11>=3", "psutil>=6"]
+viewer = ["scipy>=1.13"]
 
 [project.scripts]
 rind3d-download = "rind_phase3.download:main"
@@ -32,7 +33,7 @@ explicit = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-rind_phase3 = ["release.json"]
+rind_phase3 = ["release.json", "web/*.html", "web/*.css", "web/*.js", "web/vendor/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

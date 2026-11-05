@@ -420,6 +420,9 @@ train = [
     { name = "torch", version = "2.15.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
 ]
+viewer = [
+    { name = "scipy" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -429,10 +432,11 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9" },
     { name = "rind3d", marker = "extra == 'physics'", editable = "../RIND3D_Generator" },
     { name = "rind3d-reader", directory = "../RIND3D_Generator/reader" },
+    { name = "scipy", marker = "extra == 'viewer'", specifier = ">=1.13" },
     { name = "torch", marker = "sys_platform == 'linux' and extra == 'train'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch", marker = "sys_platform != 'linux' and extra == 'train'", specifier = ">=2.4" },
 ]
-provides-extras = ["physics", "train", "dev"]
+provides-extras = ["physics", "train", "dev", "viewer"]
 
 [[package]]
 name = "rind3d"

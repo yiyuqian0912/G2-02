@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RIND3D · 场景探索器</title>
+  <meta name="description" content="RIND3D 本地三维场景、真实源、全局响应体积与精确光照切片查看器">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 5L57 19v27L32 60 7 46V19z' fill='%23111f30' stroke='%23efbc67' stroke-width='4'/%3E%3Cpath d='M7 19l25 14 25-14M32 33v27' fill='none' stroke='%23efbc67' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/style.css">
+  <script type="importmap">{"imports":{"three":"/assets/vendor/three.module.js"}}</script>
+</head>
+<body>
+  <header class="app-header">
+    <button class="library-toggle icon-button" id="library-toggle" aria-label="展开场景库">☰</button>
+    <div class="brand"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3 35 11.5v17L20 37 5 28.5v-17Z M5 11.5 20 20l15-8.5 M20 20v17"/></svg><div><strong>RIND<span>3D</span></strong><small>SCENE EXPLORER</small></div></div>
+    <span class="header-divider"></span><span class="header-caption">场景探索器</span>
+    <div class="dataset-summary"><span><b id="scene-total">—</b> 场景</span><span><b id="window-total">—</b> 观测窗</span><span class="resolution">1024³</span></div>
+    <button id="help-button" class="quiet-button" aria-label="查看操作说明">操作说明 <span class="shortcut">?</span></button>
+    <span class="local-badge"><i></i> 本地 · 只读</span>
+  </header>
+
+  <div class="workspace">
+    <aside class="library" aria-label="场景库">
+      <div class="library-heading"><h2>场景库</h2><span id="filter-count" class="muted">—</span></div>
+      <label class="search-box"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg><input id="scene-search" type="search" placeholder="搜索场景编号或 ID" aria-label="搜索场景"></label>
+      <div class="filter-row"><select id="family-filter" aria-label="几何族"><option value="">全部几何族</option></select><select id="split-filter" aria-label="数据划分"><option value="">全部划分</option><option value="train">Train</option><option value="val">Val</option><option value="test">Test</option></select></div>
+      <div class="scene-list" id="scene-list" role="list" aria-label="筛选后的场景"></div>
+      <button class="load-more" id="load-more" hidden>显示更多场景</button>
+      <div class="library-footer"><span class="tiny-dot"></span> RIND3D v0.1<span>单光源 · 二值可见性</span></div>
+    </aside>
+
+    <main class="main-view">
+      <section class="viewport-panel" aria-label="交互式三维场景">
+        <div class="viewport-title"><div><span class="eyebrow" id="scene-number">RIND3D / SCENE</span><h1 id="scene-title">正在连接数据集…</h1><div class="scene-subtitle" id="scene-subtitle">读取已认证场景</div><div class="response-summary"><span id="response-summary">全局响应预览</span><span class="dot-separator">·</span><i class="source-dot"></i><span id="source-legend">真实源未提供</span></div></div><span class="split-badge" id="active-split">—</span></div>
+        <div class="viewport" id="viewport"><div class="viewport-loading" id="viewport-loading"><span class="spinner"></span><span>正在载入场景</span></div><div id="webgl-error" class="webgl-error" hidden>无法创建 WebGL 视图。请使用支持 WebGL 2 的浏览器；下方精确切片仍可使用。</div></div>
+        <div class="viewport-toolbar"><div class="segmented"><button id="global-view" class="active">全局空间</button><button id="focus-view">聚焦窗口</button></div><div class="camera-actions"><button id="view-xy" title="沿 Z 轴看 XY 平面">XY</button><button id="view-xz" title="沿 Y 轴看 XZ 平面">XZ</button><button id="view-yz" title="沿 X 轴看 YZ 平面">YZ</button><span></span><button id="reset-view" title="重置视角 · R">重置</button><button id="screenshot" title="保存当前三维视图">截图 ↗</button><button id="fullscreen" title="全屏查看">⛶</button></div></div>
+        <div class="viewport-bottom"><span><i class="gesture-icon">↔</i> 拖动旋转 <span class="dot-separator">·</span> 滚轮缩放 <span class="dot-separator">·</span> 右键平移</span><span id="geometry-summary">—</span></div>
+        <div class="axis-compass" aria-hidden="true"><span class="axis-x">X</span><span class="axis-y">Y</span><span class="axis-z">Z ↑</span></div>
+      </section>
+
+      <section class="slice-section" aria-label="三向精确光照切片">
+        <div class="section-heading"><div><h2>光照切片 <span class="truth-badge">存储真值</span></h2><p>点击切片联动定位；悬停查看体素坐标。</p></div><div class="segmented small"><button id="scope-global" class="active">全局 1024²</button><button id="scope-window">当前窗口</button></div></div>
+        <div class="slice-grid">
+          <article class="slice-card" data-axis="z"><div class="slice-head"><h3><span class="axis-dot z"></span>XY <small>Z = <b id="slice-label-z">512</b></small></h3><button class="slice-open" data-open="z" title="打开原始切片 PNG">↗</button></div><div class="slice-image"><canvas id="slice-z" width="1024" height="1024" aria-label="XY 光照切片"></canvas><span class="slice-empty" id="empty-z" hidden>该切面在窗口外<br>点击“切片居中”</span><span class="slice-busy" id="busy-z" hidden>读取中…</span></div><div class="slice-footer" id="slice-info-z">—</div></article>
+          <article class="slice-card" data-axis="y"><div class="slice-head"><h3><span class="axis-dot y"></span>XZ <small>Y = <b id="slice-label-y">512</b></small></h3><button class="slice-open" data-open="y" title="打开原始切片 PNG">↗</button></div><div class="slice-image"><canvas id="slice-y" width="1024" height="1024" aria-label="XZ 光照切片"></canvas><span class="slice-empty" id="empty-y" hidden>该切面在窗口外<br>点击“切片居中”</span><span class="slice-busy" id="busy-y" hidden>读取中…</span></div><div class="slice-footer" id="slice-info-y">—</div></article>
+          <article class="slice-card" data-axis="x"><div class="slice-head"><h3><span class="axis-dot x"></span>YZ <small>X = <b id="slice-label-x">512</b></small></h3><button class="slice-open" data-open="x" title="打开原始切片 PNG">↗</button></div><div class="slice-image"><canvas id="slice-x" width="1024" height="1024" aria-label="YZ 光照切片"></canvas><span class="slice-empty" id="empty-x" hidden>该切面在窗口外<br>点击“切片居中”</span><span class="slice-busy" id="busy-x" hidden>读取中…</span></div><div class="slice-footer" id="slice-info-x">—</div></article>
+        </div>
+        <div class="color-legend"><span><i class="lit"></i> 受光自由体素</span><span><i class="shadow"></i> 阴影自由体素</span><span><i class="solid"></i> 实体障碍物</span><span><i class="window"></i> 观测窗口</span></div>
+      </section>
+    </main>
+
+    <aside class="inspector" aria-label="查看器控制">
+      <section class="inspector-section"><div class="inspector-heading"><h2>全局响应体积</h2><span class="truth-badge">来自存储场</span></div><label class="checkbox-row"><input type="checkbox" id="show-volume" checked><span>显示三维响应体积</span></label><div class="volume-select-row"><select id="volume-mode" aria-label="体积显示内容"><option value="0">阴影体积</option><option value="1">受光体积</option><option value="2">受光 + 阴影</option><option value="3">明暗边界表面</option></select><select id="volume-quality" aria-label="体积预览分辨率"><option value="64">64³ · 流畅</option><option value="128" selected>128³ · 标准</option><option value="256">256³ · 精细</option></select></div><label class="slider-label"><span>体积浓度</span><output id="volume-density-label">1.8</output><input id="volume-density" type="range" min="5" max="80" value="18" aria-label="体积浓度"></label><label class="checkbox-row"><input type="checkbox" id="volume-crop"><span>体积只显示窗口内</span></label><p class="section-note volume-status" id="volume-status">准备读取全局响应…</p><p class="section-note">体积是 1024³ 原始场的抽样预览；薄小结构请用精确切片核对。</p></section>
+      <section class="inspector-section source-section"><div class="inspector-heading"><h2>真实驱动源</h2><span id="source-badge" class="source-badge">读取中</span></div><div id="source-coordinates" class="source-coordinates" hidden><span class="axis-x">X</span><code id="source-x">—</code><span class="axis-y">Y</span><code id="source-y">—</code><span class="axis-z">Z</span><code id="source-z">—</code></div><p id="source-status" class="section-note">检查本地原始源记录…</p><div class="source-actions"><label class="checkbox-row"><input type="checkbox" id="show-source" checked disabled><span>显示源标记</span></label><button id="locate-source" class="text-button" disabled>定位源 ↗</button></div></section>
+      <section class="inspector-section"><div class="inspector-heading"><h2>观测窗口</h2><span id="window-counter" class="muted">— / 256</span></div><div class="window-select-row"><select id="window-size" aria-label="窗口边长"><option value="">全部尺寸</option><option value="64">64³</option><option value="128">128³</option><option value="256">256³</option></select><select id="window-select" aria-label="选择观测窗口"></select></div><div class="window-navigation"><button id="previous-window">← 上一个</button><button id="next-window">下一个 →</button></div><div class="window-details"><span>原点 XYZ</span><code id="window-origin">—</code><span>窗口尺寸</span><b id="window-side">—</b></div><div class="balance-card"><div><span>受光 / 自由体素</span><strong id="lit-ratio">—<small>%</small></strong></div><div class="balance-track"><span id="balance-lit"></span></div><div class="balance-labels"><span><i class="lit"></i> 受光 <b id="lit-count">—</b></span><span><i class="shadow"></i> 阴影 <b id="shadow-count">—</b></span></div><p id="window-validity">正在读取精确体素计数…</p></div><label class="checkbox-row"><input type="checkbox" id="follow-window" checked><span>切片随窗口居中</span></label><label class="checkbox-row"><input type="checkbox" id="all-windows"><span>显示全部窗口边框</span></label></section>
+
+      <section class="inspector-section"><div class="inspector-heading"><h2>三维切片平面</h2><button class="text-button" id="center-slices">切片居中</button></div><p class="section-note">勾选轴显示平面，拖动滑块移动。</p><div class="axis-controls">
+        <div class="axis-control"><label class="axis-name axis-x"><input type="checkbox" id="show-x">X</label><input id="range-x" type="range" min="0" max="1023" value="512" aria-label="X 切片位置"><input id="number-x" type="number" min="0" max="1023" value="512" aria-label="X 体素坐标"></div>
+        <div class="axis-control"><label class="axis-name axis-y"><input type="checkbox" id="show-y">Y</label><input id="range-y" type="range" min="0" max="1023" value="512" aria-label="Y 切片位置"><input id="number-y" type="number" min="0" max="1023" value="512" aria-label="Y 体素坐标"></div>
+        <div class="axis-control"><label class="axis-name axis-z"><input type="checkbox" id="show-z">Z</label><input id="range-z" type="range" min="0" max="1023" value="512" aria-label="Z 切片位置"><input id="number-z" type="number" min="0" max="1023" value="512" aria-label="Z 体素坐标"></div>
+      </div><label class="slider-label"><span>平面不透明度</span><output id="plane-opacity-label">90%</output><input id="plane-opacity" type="range" min="10" max="100" value="90" aria-label="平面不透明度"></label></section>
+
+      <section class="inspector-section"><div class="inspector-heading"><h2>几何显示</h2><span class="muted" id="obstacle-count">—</span></div><label class="slider-label"><span>障碍物不透明度</span><output id="obstacle-opacity-label">55%</output><input id="obstacle-opacity" type="range" min="5" max="100" value="55" aria-label="障碍物不透明度"></label><label class="checkbox-row"><input type="checkbox" id="show-edges" checked><span>轮廓边线</span></label><label class="checkbox-row"><input type="checkbox" id="clip-window"><span>几何裁剪到当前窗口</span></label><label class="checkbox-row"><input type="checkbox" id="auto-rotate"><span>自动旋转</span></label></section>
+
+      <section class="inspector-section global-statistics"><h2>全局场景</h2><dl><div><dt>受光 / 自由体素</dt><dd id="global-lit">—</dd></div><div><dt>实体体积占比</dt><dd id="global-solid">—</dd></div><div><dt>连续几何组件</dt><dd id="global-components">—</dd></div><div><dt>源位置</dt><dd class="muted" id="source-summary">读取中</dd></div></dl><p class="section-note">表面照明与体积浓度只改变显示。精确明暗以存储的 1024³ 二值场为准。</p></section>
+    </aside>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <dialog id="help-dialog"><button id="close-help" class="dialog-close" aria-label="关闭说明">×</button><span class="eyebrow">RIND3D EXPLORER</span><h2>从全局关系，看到局部观测。</h2><p>左侧选择场景，中间旋转观察几何与全局响应体积；右侧选择体积模式与观测窗，下面三个截面读取已保存的精确二值场。</p><div class="help-grid"><span>旋转</span><b>鼠标左键拖动</b><span>缩放</span><b>滚轮 / 双指缩放</b><span>平移</span><b>鼠标右键拖动</b><span>窗口切换</span><b>← / →</b><span>恢复全局</span><b>G</b><span>聚焦窗口</span><b>F</b><span>重置视角</span><b>R</b></div><p>体积使用原始场的最近邻抽样，64³/128³/256³ 是显示分辨率，不能据此判定薄结构或等价源。单击任意二维切片可联动定位。明暗比例统计整个三维窗口；显示浓度不是光源强度。</p><p>公开包不含源坐标。配置本地原始生产目录后，可显示与场景和科学文件哈希匹配的真实源；不会猜测位置，也不会更改公开数据或学生输入。</p><p class="muted">本地只读 · 无需 CUDA · 私有源显示仅限本机<br>Three.js r170 · <a href="/assets/vendor/THREE-LICENSE.txt" target="_blank" rel="noreferrer">第三方许可证</a></p></dialog>
+  <script type="module" src="/assets/app.js"></script>
+</body>
+</html>

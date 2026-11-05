@@ -36,6 +36,17 @@ The default student sample has exactly six fields: scene ID, window ID, integer 
 
 All scenes have complete 1024³ response/solid fields and 256 unique informative windows: 85/85/86 at sides 64/128/256, with arbitrary integer origins. Both lit and shadowed FREE voxels occur in every window and truth lies outside. The nine certified convex-union families and mixed natural/uniform/extreme observation policy are preserved. Geometry-group splits contain 776/116/108 train/validation/test scenes. Source references stay private; one reference never proves uniqueness.
 
+## Interactive scene viewer
+
+```bash
+uv sync --extra viewer
+./scripts/browser.sh
+```
+
+Open **http://127.0.0.1:8765**. The local read-only viewer covers all 1,000 scenes and their 256 windows. Rotate/pan/zoom the geometry and **global 3D response volume**; switch between shadow, lit, combined and boundary displays. Volume previews use 64³/128³/256³ exact stored-voxel samples from the complete 1024³ fields. Three full-resolution slices and full-window counts remain exact. Filter scenes by family or split, select windows, or focus the camera on a local window. Clicking a 2D slice links the other slice coordinates.
+
+The viewer uses the public reader, NumPy, SciPy and vendored Three.js. It needs **no CUDA, native geometry build, teacher oracle, or CDN at runtime**. `RIND3D_DATA_ROOT` selects another installed dataset; `./scripts/browser.sh --port 8766` changes the port. With explicitly configured local original production records (`--private-root`), it can also show the **matched true source**, its XYZ coordinates and a camera locator. This local inspection feature requires loopback binding and does not change the public reader or reveal private labels in the dataset. Geometry meshes, volume sampling and surface shading are display aids; exact binary truth remains in the original fields. See [viewer controls and limits](docs/VIEWER.md).
+
 ## Enable exact teacher physics
 
 ```bash

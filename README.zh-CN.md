@@ -25,6 +25,15 @@ uv run python examples/pytorch_dataloader.py --workers 2
 
 读取数据不需要 GPU 或生成器编译。Phase3 使用独立环境，避免与二维项目的 NumPy 和原生依赖冲突。公开包采用 `full-field-training-v1` 策略，含全场连续几何及完整响应/实体场；因此不能把整个包当成隐藏全场的盲测集。默认学生接口只返回场景/窗口 ID、位置、边长、局部响应和局部实体掩码，不返回全场几何、源位置、参考解或证据点。教师通过显式接口获取完整几何。
 
+安装数据后，在 `Phase3_Single_Source_3D` 内启动[交互式场景查看器](Phase3_Single_Source_3D/docs/VIEWER.md)：
+
+```bash
+uv sync --extra viewer
+./scripts/browser.sh
+```
+
+打开 **http://127.0.0.1:8765**，即可浏览全部场景、旋转查看全局三维受光/阴影体积、选择观测窗口，以及移动 XYZ 精确切片。三维预览可选 64³/128³/256³ 显示精度，原始 1024³ 数据保持不变。工具无需 CUDA 或原生几何编译，可离线运行。真实驱动源标记需显式配置、校验匹配的本地原始生产记录；公开下载包仍隐藏源坐标。
+
 数据集的永久名称是 **RIND3D**；历史清单内的 `Lite-Core-1K` 仅是内部生产配置和溯源标识，不改写科学哈希。当前数据保留九类认证几何、混合明暗采样，每场景 256 窗，边长 64/128/256 各 85/85/86 窗；按几何分组的训练/验证/测试场景数为 776/116/108。每窗的一份私有参考解不代表源唯一。许可证和引用署名待定。详细说明见[数据与坐标](Phase3_Single_Source_3D/docs/DATASET.md)、[物理接口](Phase3_Single_Source_3D/docs/PHYSICAL_ORACLE.md)及[自适应教师设计](Phase3_Single_Source_3D/docs/ADAPTIVE_TEACHER.md)。
 
 构建、完整回归、新克隆安装、真实数据物理对照和已知限制的实测记录见[三维集成验收与交接](docs/RIND3D_INTEGRATION.md)。

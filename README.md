@@ -29,6 +29,15 @@ uv run python examples/pytorch_dataloader.py --workers 2
 
 Reading requires no GPU or generator build. Use the separate Phase 3 environment: its NumPy/native physics dependencies differ from the 2D stack. The public training archive includes canonical geometry and complete response/solid fields; the default Phase 3 student adapter exposes only window identity, origin/size, local response and local mask. Hidden sources and private references are excluded from the archive. This is the `full-field-training-v1` policy, rather than a blind hidden-field benchmark.
 
+After installing the dataset, launch the [interactive RIND3D viewer](Phase3_Single_Source_3D/docs/VIEWER.md) from `Phase3_Single_Source_3D`:
+
+```bash
+uv sync --extra viewer
+./scripts/browser.sh
+```
+
+Open **http://127.0.0.1:8765** to explore all scenes, global 3D lit/shadow volumes, observation windows and exact XYZ slices. Volume previews have adjustable 64³/128³/256³ display resolution; the stored 1024³ fields stay unchanged. The tool requires no CUDA or native geometry build and works offline. True-source markers require explicitly configured, matching local original production records; public downloads keep those coordinates hidden.
+
 The dataset's permanent name is **RIND3D**. Historical `Lite-Core-1K` identifiers remain internal scientific provenance. All nine certified geometry families, mixed lit/shadow sampling, 85/85/86 size quotas at 64/128/256 and stable 776/116/108 geometry-group splits are preserved. One private reference does not imply a unique source. License and citation metadata remain pending. See [coordinates and data](Phase3_Single_Source_3D/docs/DATASET.md), [PhysicalOracle](Phase3_Single_Source_3D/docs/PHYSICAL_ORACLE.md), [teacher design](Phase3_Single_Source_3D/docs/ADAPTIVE_TEACHER.md) and [integration acceptance](docs/RIND3D_INTEGRATION.md).
 
 ## Start
@@ -55,7 +64,7 @@ See [the expansion guide](Phase2_Multi_Source/docs/MASKS_EXPANDED.zh-CN.md) for 
 |---|---|
 | `Phase1_Single_Source_Single_Intensity/` | Single-contribution physics, models, training, evaluation and visualization |
 | `Phase2_Multi_Source/` | Multi-source data, residual labels, slot decomposition, training and evaluation |
-| `Phase3_Single_Source_3D/` | RIND3D data adapter, certified physical queries and exploratory single-source octree teacher |
+| `Phase3_Single_Source_3D/` | RIND3D data adapter, interactive scene viewer, certified physical queries and exploratory single-source octree teacher |
 | `RIND3D_Generator/` | Self-contained canonical geometry, CPU/CUDA rendering, independent verification and resumable generation |
 | `tools/` | Repository checks and reproducible server packages |
 | `docs/` | Cross-phase status, compact results and maintenance notes |
