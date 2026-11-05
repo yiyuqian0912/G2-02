@@ -48,6 +48,7 @@ def main():
         else:
             run([args.python, "-m", "unittest", "dataset_update.test_dataset_union", "-q"], phase, current)
             run([args.python, "-m", "unittest", "discover", "-s", "research/implicit_slots", "-p", "test_*.py", "-q"], phase, current)
+            run([args.python, "-m", "unittest", "research.active_observation.test_observation_env", "-q"], phase, current)
     print("Repository checks passed.", flush=True)
 
 

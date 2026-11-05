@@ -1,82 +1,86 @@
 # RIND / G2-02
 
-[English](README.md) · [项目进展与结果](docs/PROJECT_STATUS.zh-CN.md) · [Phase1](Phase1_Single_Source_Single_Intensity/README.zh-CN.md) · [Phase2](Phase2_Multi_Source/README.zh-CN.md)
+[完整研究链路报告](docs/RIND_RESEARCH_CHAIN.zh-CN.md) · [实验状态](docs/PROJECT_STATUS.zh-CN.md) · [English](README.md)
 
-目标是在学生不知道全场障碍物几何的情况下，根据局部响应推断驱动源位置，并研究如何用多个视窗逐步缩小不确定性。物理模型是无距离衰减的正强度、二值可见性线性叠加。
+目标是在学生不知道全场障碍物几何的情况下，从局部响应反演驱动源位置，并通过同场景多视窗观测逐步减少不确定性。物理模型为正强度、二值可见性、无距离衰减的线性叠加。
 
-当前主线分为两部分：Phase1学习单贡献的全场位置概率；Phase2先学习把原始多源响应解耦成若干有效贡献层，再复用Phase1定位。当前服务器已完成2万窗口的解耦训练；10万窗口扩展流程已交付，完整多源定位与多视窗闭环仍需验证。
+## 当前主线
+
+1. **Phase1定位**：单贡献响应与窗口位置 → 全场源位置概率。已有正式测试结果。
+2. **Phase2分层**：原始多源响应与窗口位置 → 有效层数、无序二值贡献掩码。当前v6在学生内部自主减去单层贡献，只监督最终层数和掩码；新实验尚无最终测试结论。
+3. **后续闭环**：学生分层 → Phase1逐层定位 → 多视窗融合与主动选窗。环境已有原型，完整多源定位收益仍需验证。
+
+当前关注层数预测准确率与单层IoU≥0.90通过率，两项等权。完整响应是守恒约束，不是v6重建loss。教师剥离顺序、中间残差、强度和真源编号不进入学生前向。有效层数R不等于物理源数K；32为兼容已有复杂标签的执行上限。
+
+方法、证据、负结果、指标口径与研究限制见[完整报告](docs/RIND_RESEARCH_CHAIN.zh-CN.md)。
 
 ## 目录职责
 
-```text
-G2-02/
-├── README.md / README.zh-CN.md           项目入口
-├── setup.sh / requirements.txt          用户目录Python环境和固定训练依赖
-├── run_masks*_tmux.sh                   当前分层解耦训练、扩展与后台管理
-├── run_decomposition*.sh                保留完整位置教师/定位训练入口
-├── run_phase1_100k.sh                   单贡献定位训练入口
-├── Phase1_Single_Source_Single_Intensity/
-│   ├── src/rind_phase1/                 数据、物理教师、能量模型、训练和浏览器
-│   ├── part_e/                         正式评价与自适应对照，仍被主流程引用
-│   ├── student_baseline/               旧模型兼容适配，保留复现依赖
-│   ├── configs/ scripts/ tests/ docs/   配置、命令、回归检查与方法文档
-│   └── research/                       边界统计与几何反例研究
-├── Phase2_Multi_Source/
-│   ├── src/rind_phase2/                 多源数据、可见性、教师与几何邻接
-│   ├── research/implicit_slots/         当前解耦模型、标签、训练和评估
-│   ├── research/layered_residual/       残差教师、旧定位实验与结果浏览
-│   ├── dataset_update/                 数据安装、随机强度派生与几何安全拼接
-│   └── configs/ scripts/ tests/ docs/   运行配置、辅助命令与实验记录
-├── tools/                              检查仓库与构建服务器更新包
-├── docs/                               跨阶段进展、结果摘要和整理记录
-├── Literature_Review/                  组员文献与讨论
-└── G2_02_Initial_Proposal.pdf           原始proposal
-```
+| 路径 | 内容 |
+|---|---|
+| `Phase1_Single_Source_Single_Intensity/` | 单贡献物理教师、模型、训练、评价与位置场浏览器 |
+| `Phase2_Multi_Source/src/rind_phase2/` | 多源数据、几何遮挡、加权响应和候选工具 |
+| `Phase2_Multi_Source/research/implicit_slots/` | 当前分层学生、标签缓存、训练、指标和旧权重对比 |
+| `Phase2_Multi_Source/research/layered_residual/` | 逐层教师、共享候选渲染、历史定位实验与浏览器 |
+| `Phase2_Multi_Source/research/active_observation/` | 新增像素预算、移动/扩窗环境及参考策略 |
+| `Phase2_Multi_Source/dataset_update/` | 安装数据、随机强度派生、重复几何安全拼接 |
+| 各阶段的 `configs/`、`tests/`、`docs/` | 版本化实验、回归测试、方法及运行文档 |
+| `docs/` | 跨阶段研究报告、状态和紧凑证据 |
+| `tools/` | 仓库检查、从正式源码构建服务器包 |
+| `Literature_Review/`、`G2_02_Initial_Proposal.pdf` | 团队文献与原proposal |
 
-各阶段的 `data/`、`outputs/` 与虚拟环境保留在本地，GitHub不包含原始数据、教师缓存、权重和逐窗输出。服务器包也不包含这些文件。
+Phase1的 `part_e/`、`student_baseline/` 仍是运行依赖。历史训练入口和配置用于复现旧权重；当前版本无需复制另一套源码目录。
 
-## 环境与数据
+## 环境
 
-从仓库根目录运行：
+在G2-02根目录运行：
 
 ```bash
 ./setup.sh
 export RIND_PYTHON="$PWD/.venv/bin/python"
 ```
 
-安装脚本在用户目录管理uv/Python 3.12，无需sudo或snap；默认安装CUDA 12.4版PyTorch，CPU环境可用 `RIND_TORCH_BACKEND=cpu ./setup.sh`。已有环境可直接设置 `RIND_PYTHON=/path/to/python`，不必重装。脚本不会覆盖已有的阶段独立虚拟环境。
+安装器在用户目录准备Python 3.12和固定依赖，无需sudo/snap。默认CUDA 12.4；CPU安装可用 `RIND_TORCH_BACKEND=cpu ./setup.sh`。已有环境直接设置 `RIND_PYTHON=/absolute/path/to/python`。
 
-数据需单独安装。多源数据步骤见 [数据更新说明](Phase2_Multi_Source/dataset_update/README.zh-CN.md)；单源数据见 [Phase1服务器说明](Phase1_Single_Source_Single_Intensity/docs/SERVER_100K_MULTISCALE.zh-CN.md)。已有缓存可直接训练/评估；只有准备新窗口时才需要原始数据。
+原始数据需单独安装，见[多源数据说明](Phase2_Multi_Source/dataset_update/README.zh-CN.md)及[Phase1服务器说明](Phase1_Single_Source_Single_Intensity/docs/SERVER_100K_MULTISCALE.zh-CN.md)。已有完整分层缓存和旧v5最佳权重时，v6训练无需原始ZIP或重新渲染位置教师。
 
-## 当前推荐运行流程
+## 当前训练与评价
 
-复现2万窗口解耦训练：
-
-```bash
-./run_masks_tmux.sh start all --gpus auto
-./run_masks_tmux.sh status
-```
-
-在已有 `outputs/masks_only_v1` 缓存和最佳权重基础上扩展到10万窗口：
+以下源目录是服务器上一轮大实验示例；必须包含完整 `mask_records.json`、`mask_cache/` 与v5 `models/seed_0/best.pt`。缺失时明确报错，不回退到小数据集。
 
 ```bash
-./run_masks_expanded_tmux.sh start all --gpus auto
-./run_masks_expanded_tmux.sh status
+unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_TMUX_SESSION
+./run_implicit_masks_tmux.sh start all \
+  --source-root outputs/masks_disentangled_v5_complex245746 \
+  --gpus auto --auto-batch
+./run_implicit_masks_tmux.sh status
 ```
 
-扩展复用旧2万训练窗，仅新增8万；原验证和测试各2千窗保持不变。训练结束自动生成完整指标。配置、恢复命令和输出位置见 [扩展训练说明](Phase2_Multi_Source/docs/MASKS_EXPANDED.zh-CN.md)。后台任务启动后可断开SSH/VPN。
+全部原训练记录及追加复杂窗保留，验证/测试名单不变；真实数量以缓存索引和日志为准。任务在tmux后台运行，可断开SSH/VPN。再次启动复用配置与epoch末的 `last.pt`，不承诺恢复到中断batch。
 
-已完成标签准备时用 `start train`，只生成指标时用 `start evaluate`。默认最多选取所有符合空闲阈值的GPU，也可传 `--gpus 6` 或 `--gpu-ids 0,2,3`。
+```bash
+./run_implicit_masks_tmux.sh logs
+./run_implicit_masks_tmux.sh attach
+./run_implicit_masks_tmux.sh start evaluate --gpus auto --auto-batch
+```
 
-单源定位与旧结果浏览继续从Phase1目录使用原入口；完整定位流程见 [完整训练说明](Phase2_Multi_Source/docs/DECOMPOSITION_TRAINING.zh-CN.md)。新分层模型的可视化接入情况以对应说明为准，旧定位浏览器展示的是已有定位实验。
+最后一条只做正式评价。新输出默认位于 `Phase2_Multi_Source/outputs/<原实验名>_implicit_v6/`：
 
-## 检查与服务器打包
+- `models/seed_0/best.pt`、`last.pt`：最佳模型与恢复断点。
+- `training_summary.json`、`models/seed_0/training.json`：训练记录。
+- `evaluation/seed_0/primary_metrics.json`：两个主要指标及分层结果。
+- `evaluation/seed_0/reference_comparison.zh-CN.md`：相同名单上的旧最终best/新best对比；旧训练未完成时记录pending。
+- `tmux_runs/`：持久日志、执行命令、退出码。
+
+完整协议见 [v6说明](Phase2_Multi_Source/docs/SEQUENTIAL_COUNT_SHAPE.zh-CN.md)。历史v1–v5、数据扩充、诊断、槽数搜索与动态观测入口集中在 [Phase2文档索引](Phase2_Multi_Source/docs/README.zh-CN.md)。旧定位浏览器仍可用于对应旧产物，当前纯分层结果不自动获得完整位置场可视化。
+
+## 检查与服务器包
 
 ```bash
 "$RIND_PYTHON" tools/check_repo.py
 "$RIND_PYTHON" tools/package_update.py
 ```
 
-默认生成 `dist/RIND_Phase2_Update.tar.gz`，始终使用同一文件名；也可用 `--output /path/to/RIND_Phase2_Update.tar.gz`。更新包按白名单从正式目录构建，不再依赖临时更新副本。解压到服务器现有安装的父目录即可覆盖代码，保留已有数据、缓存和模型。
+默认生成 `dist/RIND_Phase2_Update.tar.gz`；解压前缀固定为 `RIND_Phase2_Training_Minimal`。可以用 `--output /path/to/RIND_Phase2_Update.tar.gz` 指定同名目标。源码包不含原始数据、缓存、虚拟环境、权重或逐窗结果。
 
-未完成的研究包括有效层的单源物理可实现性、严格整窗解耦成功率、多源定位端到端验证，以及多视窗信息融合与动态扩窗。分层标签目前是既有BFS规则的有效贡献，不应直接解释成真实源逐个恢复。
+本地的这些实验产物仍保留，由 `.gitignore` 排除。GitHub保存源码、配置、测试、方法与紧凑证据。维护规则见 [仓库整理约定](docs/REPOSITORY_MAINTENANCE.zh-CN.md)。

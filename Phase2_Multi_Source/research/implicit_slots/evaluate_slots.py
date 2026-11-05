@@ -230,11 +230,14 @@ def _bootstrap(rows: list[dict[str, Any]], keys: list[str], repetitions: int,
     result = {}
     for key in keys:
         estimates = np.empty(repetitions, dtype=np.float64)
-        for iteration in range(repetitions):
-            sampled = rng.integers(0, len(scenes), size=len(scenes))
-            estimates[iteration] = np.mean([
-                np.mean([item[key] for item in groups[scenes[index]]]) for index in sampled
-            ])
+        # A scene's mean does not change across bootstrap draws. Compute it
+        # once, then sample scene indices in bounded arrays (same RNG stream).
+        # This avoids millions of Python/np.mean calls for expanded holdouts.
+        values = np.asarray([np.mean([item[key] for item in groups[scene]]) for scene in scenes])
+        for start in range(0, repetitions, 64):
+            stop = min(start + 64, repetitions)
+            sampled = rng.integers(0, len(scenes), size=(stop - start, len(scenes)))
+            estimates[start:stop] = values[sampled].mean(1)
         result[key] = {
             "lower": float(np.quantile(estimates, 0.025)),
             "upper": float(np.quantile(estimates, 0.975)),

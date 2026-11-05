@@ -33,6 +33,17 @@ class _ConvBlock(nn.Module):
         return self.body(value)
 
 
+def slot_activation(output):
+    """Actual inference decision. Legacy checkpoints retain their .5 rule."""
+    return output['active_slots'] if 'active_slots' in output else output['presence_probability'] >= .5
+
+
+def contribution_gate(output):
+    """Legacy soft existence vs v5 binary activation; never change silently."""
+    return (output['active_slots'].float() if 'active_slots' in output
+            else output['presence_probability'].float())
+
+
 def poisson_binomial_logits(presence: torch.Tensor) -> torch.Tensor:
     """Normalized count logits implied by independent Bernoulli slot existence.
 
@@ -49,6 +60,27 @@ def poisson_binomial_logits(presence: torch.Tensor) -> torch.Tensor:
         p = presence[:, slot:slot + 1].float()
         probability = probability * (1 - p) + F.pad(probability[:, :-1], (1, 0)) * p
     return probability.clamp_min(torch.finfo(torch.float32).tiny).log()
+
+
+def stable_count_logits(presence_logits: torch.Tensor) -> torch.Tensor:
+    """Log-space Poisson-binomial DP directly from finite logits.
+
+    Grow only reachable counts: logaddexp(-inf,-inf) would have undefined
+    derivatives. No sigmoid rounding to exactly 0/1 or clipped count tails.
+    """
+    if presence_logits.ndim != 2:
+        raise ValueError('presence_logits must be [B,S]')
+    with torch.autocast(device_type=presence_logits.device.type, enabled=False):
+        logits = presence_logits.float()
+        distribution = logits.new_zeros((len(logits), 1))
+        for slot in range(logits.shape[1]):
+            log_yes = F.logsigmoid(logits[:, slot:slot+1])
+            log_no = F.logsigmoid(-logits[:, slot:slot+1])
+            middle = torch.logaddexp(distribution[:, 1:] + log_no,
+                                     distribution[:, :-1] + log_yes)
+            distribution = torch.cat((distribution[:, :1] + log_no,
+                                      middle, distribution[:, -1:] + log_yes), 1)
+        return distribution
 
 
 class ResponseDecompositionField(nn.Module):
@@ -185,7 +217,9 @@ class ResponseDecompositionField(nn.Module):
             "mask_logits": mask_logits.float(), "mask_probability": masks,
             "presence_logits": presence_logits, "presence_probability": presence,
             "intensity": intensity, "reconstruction": contribution.sum(dim=1),
-            "count_logits": poisson_binomial_logits(presence),
+            "count_logits": (stable_count_logits(presence_logits) if getattr(self, 'stable_count_output', False)
+                             else poisson_binomial_logits(presence)),
+            **({'_count_log_space': True} if getattr(self, 'stable_count_output', False) else {}),
         }
 
     def locate_masks(self, masks: torch.Tensor, obstacle: torch.Tensor, window: torch.Tensor,
@@ -294,7 +328,7 @@ def exact_batched_assignment(cost: torch.Tensor) -> torch.Tensor:
     return result
 
 
-def decomposition_training_loss(
+def _decomposition_single_loss(
     output: dict[str, torch.Tensor], batch: dict[str, torch.Tensor], *,
     mask_weight: float = 1.0, dice_weight: float = 1.0,
     intensity_weight: float = 0.25, presence_weight: float = 1.0,
@@ -302,6 +336,8 @@ def decomposition_training_loss(
     reconstruction_weight: float = 1.0, residual_weight: float = 0.25,
     negative_residual_weight: float = 0.1, count_weight: float = 0.25,
     match_location_weight: float = 0.0,
+    normalized_reconstruction: bool = False, relative_reconstruction_weight: float = 0.0,
+    relative_reconstruction_floor: float = 1e-3, stable_count_loss: bool = False, _assignment=None,
 ) -> dict[str, torch.Tensor]:
     """Complete decomposition supervision, normalized by actual layer counts.
 
@@ -336,9 +372,12 @@ def decomposition_training_loss(
     mask_pair = bce_pair + dice_weight * dice_pair
     teacher_a = batch["teacher_intensity"].float()
     predicted_a = output["intensity"].float()
+    strength_scale = (batch["response"].float().amax((-1, -2)).clamp_min(1e-12)[:, None]
+                      if normalized_reconstruction else torch.ones_like(teacher_a[:, :1]))
+    strength_floor = 1e-12 if normalized_reconstruction else 1e-6
     intensity_pair = F.smooth_l1_loss(
-        torch.log(teacher_a.clamp_min(1e-6))[:, :, None].expand(-1, -1, s),
-        torch.log(predicted_a.clamp_min(1e-6))[:, None, :].expand(-1, s, -1),
+        torch.log((teacher_a / strength_scale).clamp_min(strength_floor))[:, :, None].expand(-1, -1, s),
+        torch.log((predicted_a / strength_scale).clamp_min(strength_floor))[:, None, :].expand(-1, s, -1),
         reduction="none",
     )
     presence_logits = output["presence_logits"].float()
@@ -362,7 +401,7 @@ def decomposition_training_loss(
     dummy_cost = (presence_weight * empty_presence_weight * negative_presence.detach()
                   / empty_count[:, None, None])
     matching_cost = torch.where(real[:, :, None], matching_cost, dummy_cost.expand(-1, s, -1))
-    assignment = exact_batched_assignment(matching_cost)
+    assignment = exact_batched_assignment(matching_cost) if _assignment is None else _assignment
     gather_pair = assignment[:, :, None]
     matched_mask = torch.gather(mask_pair, 2, gather_pair).squeeze(-1)
     matched_dice = torch.gather(dice_pair, 2, gather_pair).squeeze(-1)
@@ -379,6 +418,12 @@ def decomposition_training_loss(
     ).mean()
     reconstruction_error = (output["reconstruction"].float() - batch["response"].float()).abs().flatten(1)
     reconstruction_loss = ((reconstruction_error * free).sum(-1) / free_count).mean()
+    scale = batch["response"].float().amax((-1, -2)).clamp_min(1e-12)
+    reconstruction_per_window = (reconstruction_error * free).sum(-1) / free_count
+    reconstruction_objective = (reconstruction_per_window / scale).mean() if normalized_reconstruction else reconstruction_loss
+    normalized_brightness = ((batch["response"].float().flatten(1) * free).sum(-1) / free_count) / scale
+    relative_objective = ((reconstruction_per_window / scale) /
+                          normalized_brightness.clamp_min(relative_reconstruction_floor)).mean()
     aligned_masks = masks.gather(1, assignment[..., None, None].expand_as(masks))
     aligned_strength = predicted_a.gather(1, assignment)
     aligned_presence = output["presence_probability"].float().gather(1, assignment)
@@ -389,14 +434,25 @@ def decomposition_training_loss(
     residual_error = (predicted_residual - target_residual).abs().flatten(2)
     residual_loss = (((residual_error * free[:, None]).sum(-1) / free_count[:, None]
                       * real).sum(-1) / positive_count).mean()
+    residual_per_window = (((residual_error * free[:, None]).sum(-1) / free_count[:, None]
+                             * real).sum(-1) / positive_count)
     negative_error = F.relu(-predicted_residual).flatten(2)
     negative_loss = (((negative_error * free[:, None]).sum(-1) / free_count[:, None]
                       * real).sum(-1) / positive_count).mean()
-    count_loss = F.cross_entropy(output["count_logits"].float(), teacher_count)
+    negative_per_window = (((negative_error * free[:, None]).sum(-1) / free_count[:, None]
+                             * real).sum(-1) / positive_count)
+    if type(stable_count_loss) is not bool:
+        raise ValueError('stable_count_loss must be boolean')
+    count_logits = (stable_count_logits(presence_logits) if stable_count_loss and not output.get('_count_log_space', False)
+                    else output['count_logits'].float())
+    count_loss = F.cross_entropy(count_logits, teacher_count)
     loss = (mask_weight * mask_loss + intensity_weight * intensity_loss
             + presence_weight * presence_loss + location_weight * location_loss
-            + reconstruction_weight * reconstruction_loss + residual_weight * residual_loss
-            + negative_residual_weight * negative_loss + count_weight * count_loss)
+            + reconstruction_weight * reconstruction_objective
+            + relative_reconstruction_weight * relative_objective
+            + residual_weight * ((residual_per_window / scale).mean() if normalized_reconstruction else residual_loss)
+            + negative_residual_weight * ((negative_per_window / scale).mean() if normalized_reconstruction else negative_loss)
+            + count_weight * count_loss)
     predicted_count = (output["presence_probability"] >= 0.5).sum(-1)
     metrics = {
         "mask": mask_loss, "intensity": intensity_loss, "presence": presence_loss,
@@ -408,4 +464,36 @@ def decomposition_training_loss(
         "matched_presence": (aligned_presence * real).sum() / real.sum().clamp_min(1),
     }
     return {"loss": loss, "assignment": assignment.detach(),
+            "_count_log_probability": count_logits.detach(),
             **{name: value.detach() for name, value in metrics.items()}}
+
+
+def decomposition_training_loss(output, batch, *, auxiliary_weight=0.0, objective=None, **kwargs):
+    """Complete set supervision; auxiliary rounds use FINAL-round matching.
+
+    Defaults preserve legacy training exactly. New relative/normalized losses
+    change objectives, while reported reconstruction/residual metrics remain in
+    original response units. Teacher targets never enter model.forward.
+    """
+    if objective == 'sequential_count_shape_v6':
+        if auxiliary_weight:
+            raise ValueError('sequential v6 has exactly two tasks; no auxiliary loss')
+        from sequential_objective import loss
+        return loss(output,batch,**kwargs)
+    if objective == 'disentangled_v5':
+        from disentangled_objective import disentangled_training_loss
+        return disentangled_training_loss(output,batch,auxiliary_weight=auxiliary_weight,**kwargs)
+    if objective is not None:
+        raise ValueError('unknown decomposition objective')
+    if auxiliary_weight < 0 or kwargs.get("relative_reconstruction_weight", 0) < 0:
+        raise ValueError("loss weights must be nonnegative")
+    if kwargs.get("relative_reconstruction_floor", 1e-3) <= 0:
+        raise ValueError("relative_reconstruction_floor must be positive")
+    result = _decomposition_single_loss(output, batch, **kwargs)
+    rounds = output.get("refinement_outputs", ())
+    if auxiliary_weight and rounds:
+        auxiliary = torch.stack([_decomposition_single_loss(
+            current, batch, _assignment=result["assignment"], **kwargs)["loss"] for current in rounds]).mean()
+        result["loss"] = result["loss"] + auxiliary_weight * auxiliary
+        result["auxiliary_loss"] = auxiliary.detach()
+    return result

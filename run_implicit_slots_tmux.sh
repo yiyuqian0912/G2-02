@@ -7,6 +7,7 @@ SESSION_DEFAULT="${RIND_TMUX_SESSION:-rind_phase2_slots}"
 OUTPUT_ROOT="${RIND_TMUX_OUTPUT_ROOT:-$ROOT/Phase2_Multi_Source/outputs/implicit_contribution_slots_v1}"
 RUNNER="${RIND_TMUX_RUNNER:-$ROOT/run_implicit_slots.sh}"
 TASK="${RIND_TMUX_TASK:-train}"
+JOB_LABEL="${RIND_TMUX_JOB_LABEL:-training}"
 FRONTEND="${RIND_TMUX_FRONTEND:-./run_implicit_slots_tmux.sh}"
 TMUX_ROOT="$OUTPUT_ROOT/tmux_runs"
 LATEST_POINTER="$TMUX_ROOT/latest_run.txt"
@@ -24,7 +25,11 @@ GPU options are passed to run_implicit_slots.sh, for example:
   --gpus 8
   --gpu-ids 2,3
   --max-used-memory-mib 2048
-  --max-utilization 10
+  --max-utilization 20
+  --gpu-policy adaptive
+  --min-free-memory-mib 24576
+  --auto-batch
+  --batch-size 64
 EOF
   exit 2
 }
@@ -73,9 +78,9 @@ worker() {
     printf '%s\n' "$code" > "$run_dir/exit_code.txt"
     printf '%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" > "$run_dir/finished_at.txt"
     if [[ "$code" -eq 0 ]]; then
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] training finished successfully"
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] $JOB_LABEL finished successfully"
     else
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] training failed | exit_code=$code"
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] $JOB_LABEL failed | exit_code=$code"
     fi
     exit "$code"
   ) 2>&1 | tee -a "$log"
@@ -118,7 +123,7 @@ case "$action" in
       echo "Use './run_implicit_slots_tmux.sh status --session $session' or choose another name." >&2
       exit 1
     fi
-    if [[ "${#arguments[@]}" -eq 0 ]]; then
+    if [[ "${#arguments[@]}" -eq 0 && "$JOB_LABEL" != inventory ]]; then
       arguments=(--gpus auto)
     fi
     mkdir -p "$TMUX_ROOT"
@@ -128,15 +133,18 @@ case "$action" in
     printf '%s\n' "$run_dir" > "$LATEST_POINTER"
     printf '%s\n' "$OUTPUT_ROOT" > "$run_dir/results_path.txt"
     worker_environment=(env "RIND_TMUX_OUTPUT_ROOT=$OUTPUT_ROOT" "RIND_TMUX_RUNNER=$RUNNER" "RIND_TMUX_TASK=$TASK")
-    for variable in RIND_PYTHON RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG NUMBA_CACHE_DIR; do
+    for variable in RIND_TMUX_JOB_LABEL RIND_PYTHON RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_SEARCH_CONFIG NUMBA_CACHE_DIR; do
       if [[ -n "${!variable:-}" ]]; then
         worker_environment+=("$variable=${!variable}")
       fi
     done
-    printf -v worker_command '%q ' "${worker_environment[@]}" "$SELF" __worker "$session" "$run_dir" "${arguments[@]}"
+    worker_invocation=("${worker_environment[@]}" "$SELF" __worker "$session" "$run_dir")
+    # Bash 3 + nounset treats an empty array as unset; inventory has no GPU args.
+    if [[ "${#arguments[@]}" -gt 0 ]]; then worker_invocation+=("${arguments[@]}"); fi
+    printf -v worker_command '%q ' "${worker_invocation[@]}"
     printf '%s\n' "$worker_command" > "$run_dir/command.txt"
     tmux new-session -d -s "$session" "$worker_command"
-    echo "Started background training."
+    echo "Started background $JOB_LABEL."
     echo "tmux session: $session"
     echo "log: $run_dir/training.log"
     echo "results: $OUTPUT_ROOT"

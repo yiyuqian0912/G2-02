@@ -416,12 +416,16 @@ def collate_decomposition_records(records: list[dict[str, Any]]) -> dict[str, to
 
 def _batch_groups(records: DecompositionRecords, batch_size: int,
                   rng: np.random.Generator | None, rank: int, world_size: int,
-                  training: bool) -> list[list[int]]:
+                  training: bool, sampling=None) -> list[list[int]]:
     if batch_size < 1 or world_size < 1 or not 0 <= rank < world_size:
         raise ValueError("invalid decomposition batching arguments")
     buckets: dict[tuple[int, int], list[int]] = defaultdict(list)
-    for index, key in enumerate(zip(records.window_sizes, records.candidate_counts)):
-        buckets[(int(key[0]), int(key[1]))].append(index)
+    if sampling and training:
+        from balanced_sampling import draw_by_bucket
+        buckets = draw_by_bucket(records, sampling, rng)
+    else:
+        for index, key in enumerate(zip(records.window_sizes, records.candidate_counts)):
+            buckets[(int(key[0]), int(key[1]))].append(index)
     groups = []
     for indices in buckets.values():
         if rng is not None:
@@ -444,15 +448,15 @@ def _batch_groups(records: DecompositionRecords, batch_size: int,
 
 
 def batch_count(records: DecompositionRecords, batch_size: int, world_size: int = 1,
-                rank: int = 0, training: bool = True) -> int:
-    return len(_batch_groups(records, batch_size, None, rank, world_size, training))
+                rank: int = 0, training: bool = True, sampling=None) -> int:
+    return len(_batch_groups(records, batch_size, None, rank, world_size, training, sampling))
 
 
 def decomposed_batches(records: DecompositionRecords, batch_size: int,
                        rng: np.random.Generator | None = None, prefetch: int = 0,
                        rank: int = 0, world_size: int = 1,
-                       training: bool = True) -> Iterator[dict[str, torch.Tensor]]:
-    groups = _batch_groups(records, batch_size, rng, rank, world_size, training)
+                       training: bool = True, sampling=None) -> Iterator[dict[str, torch.Tensor]]:
+    groups = _batch_groups(records, batch_size, rng, rank, world_size, training, sampling)
     def load(group: list[int]) -> dict[str, torch.Tensor]:
         return collate_decomposition_records([records[index] for index in group])
     if prefetch < 1:

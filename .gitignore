@@ -42,3 +42,17 @@ phase2_visualization_*_recovered/
 # Removed duplicate development/export trees must not return as source
 **/phase2_slot_update/
 **/server_bundle/
+
+# Regenerable diagnostic/editor output
+*.log
+*.pid
+*.tmp
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.ckpt
+*.safetensors
+*.tgz
+*.tar

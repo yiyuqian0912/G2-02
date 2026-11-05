@@ -1,20 +1,23 @@
 # RIND Phase2
 
-[中文说明](README.zh-CN.md) · [Current decomposition training](docs/MASKS_ONLY.zh-CN.md) · [100k-window expansion](docs/MASKS_EXPANDED.zh-CN.md)
+[中文说明](README.zh-CN.md) · [Research chain](../docs/RIND_RESEARCH_CHAIN.zh-CN.md) · [Documentation index](docs/README.zh-CN.md)
 
-The current student reads the original multi-source local response and predicts overlapping effective-contribution masks, positive strengths and slot existence. Supervision uses the existing minimum-positive residual/BFS decomposition. It does not use source identities to decide the labels, and mask-only training does not render candidate positions or instantiate the Phase1 locator.
+The current v6 student reads the original multi-source local response and window coordinates. It predicts the effective contribution count and autonomously extracts binary layers through recurrent subtraction. Only the final count and unordered teacher mask set supervise training; teacher strengths, residual trajectories and ordering are not model inputs.
 
-From the repository root:
+Count accuracy and per-layer hard-mask IoU ≥0.90 accuracy are the two equally weighted tasks. Response conservation is a feasibility constraint rather than a reconstruction loss. Final v6 test performance is not established yet.
+
+From the repository root, reuse the previous completed v5 cache and best checkpoint:
 
 ```bash
-./run_masks_tmux.sh start all --gpus auto
-./run_masks_expanded_tmux.sh start all --gpus auto
+unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_TMUX_SESSION
+./run_implicit_masks_tmux.sh start all \
+  --source-root outputs/masks_disentangled_v5_complex245746 \
+  --gpus auto --auto-batch
+./run_implicit_masks_tmux.sh status
 ```
 
-Use the second command only after the base `masks_only_v1` cache and best model exist. It expands the actual training windows from20k to100k while preserving the original2k validation and2k test windows. The20k run is complete; the expanded workflow is available but its full server result has not yet been established.
+Replace the source path with the actual experiment. All original and appended complex windows are preserved. Cache-only training requires no raw dataset or candidate rendering. The new output is `outputs/<source-name>_implicit_v6/`; old weights are retained for paired evaluation. See the [v6 guide](docs/SEQUENTIAL_COUNT_SHAPE.zh-CN.md).
 
-`research/implicit_slots/` contains the current model, label/cache preparation, trainer and metrics. `src/rind_phase2/` provides physical rendering, geometry and data tools. `dataset_update/` installs the new release and preserves geometry-based split isolation. `research/layered_residual/` keeps prior localization experiments and browsers.
+`research/implicit_slots/` contains current and historical decomposition models, labels, training and evaluation. `research/layered_residual/` retains single-layer physical scoring and previous localization browsers. `src/rind_phase2/` provides data and visibility physics; `dataset_update/` installs and joins releases with geometry-safe splits. Active observation remains a separate research environment.
 
-The full localization pipeline remains available through `run_decomposition*_tmux.sh` at repository root. Old localization browsers require the matching original artifacts; they do not automatically visualize the new mask-only student.
-
-Raw data, weights and generated outputs are not stored in Git. Arithmetic decomposition labels are effective contributions, not a guarantee of unique physical-source recovery. See the project status and phase-specific documents for completed experiments and limitations.
+Effective layers are not physical source identities. Local arithmetic label closure does not prove single-source physical realizability. Historical localization browsers need their matching artifacts; they do not automatically display the current mask-only student. Raw data, caches, checkpoints and detailed outputs remain local and are excluded from Git.

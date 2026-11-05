@@ -1,0 +1,22 @@
+{
+  "template_config": "configs/masks_only.json",
+  "source_candidates": ["outputs/masks_only_100k", "outputs/masks_only_v1"],
+  "output_root": "outputs/slot_architecture_search_v1",
+  "seed": 20261028,
+  "slot_counts": [6, 8, 12, 16, 32],
+  "hidden_widths": [128, 192, 256],
+  "decoder_depths": [2, 4],
+  "attention_heads": 8,
+  "learning_rates": [0.00005, 0.0001],
+  "max_trials": 18,
+  "pilot_records": {"train": 8000, "validation": 1500},
+  "pilot_global_batch_size": 128,
+  "epoch_budgets": [5, 15, 40],
+  "reduction_factor": 3,
+  "score_weights": {"count_accuracy": 0.5, "mask_iou": 0.35, "reconstruction_quality": 0.15},
+  "score_tolerance": 0.005,
+  "autobatch": {"enabled": true, "batch_sizes": [16, 32, 64, 128], "steps": 2, "memory_fraction": 0.8},
+  "final_training": {"epochs": 100, "patience": 15, "seeds": [0]},
+  "success_thresholds": {"mask_iou": 0.9, "relative_strength": 0.1, "relative_reconstruction": 0.05},
+  "bootstrap_repetitions": 1000
+}

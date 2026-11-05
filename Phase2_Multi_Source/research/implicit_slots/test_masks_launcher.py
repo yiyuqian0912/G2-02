@@ -94,6 +94,28 @@ class MasksLauncherTests(unittest.TestCase):
             self.assertIn(f"RIND_MASKS_CONFIG={config.resolve()}", command)
             self.assertIn("RIND_TMUX_TASK=all", command)
 
+    def test_search_tmux_forwards_search_config_and_resume_task(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config, output = root / "search config.json", root / "search output"
+            config.write_text(json.dumps({"output_root": str(output)}))
+            binary = root / "bin"
+            binary.mkdir()
+            fake = binary / "tmux"
+            fake.write_text('#!/usr/bin/env bash\nif [[ "$1" == has-session ]]; then exit 1; fi\nexit 0\n')
+            fake.chmod(0o755)
+            env = {**os.environ, "PATH": str(binary) + os.pathsep + os.environ["PATH"],
+                   "RIND_PYTHON": sys.executable, "RIND_SEARCH_CONFIG": str(config)}
+            env.pop("RIND_TMUX_SESSION", None)
+            result = subprocess.run(["bash", str(PACKAGE / "run_slot_search_tmux.sh"), "start", "all", "--gpus", "6"],
+                                    env=env, text=True, capture_output=True, check=True)
+            self.assertIn("rind_slot_search", result.stdout)
+            run = Path((output / "tmux_runs/latest_run.txt").read_text().strip())
+            command = shlex.split((run / "command.txt").read_text())
+            self.assertIn(f"RIND_SEARCH_CONFIG={config.resolve()}", command)
+            self.assertIn(f"RIND_TMUX_RUNNER={PACKAGE / 'run_slot_search.sh'}", command)
+            self.assertIn("RIND_TMUX_TASK=all", command)
+
 
 if __name__ == "__main__":
     unittest.main()
