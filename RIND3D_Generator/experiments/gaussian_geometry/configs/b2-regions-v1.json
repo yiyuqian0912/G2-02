@@ -1,0 +1,15 @@
+{
+  "experiment": "B2 whole-receiver-region certification v1",
+  "frozen_cases": [0, 7, 14, 21],
+  "staged_resolutions": [8, 32, 64, 128],
+  "strategies": ["A_scalar", "B_old_regions", "C_ray_volume", "D_fused_shadow", "E_combined", "F_proof_reuse"],
+  "cover_depth": 6,
+  "cover_nodes": 32769,
+  "cover_seconds": 15.0,
+  "shadow_boxes": 256,
+  "parameter_nodes": 31,
+  "parameter_depth": 6,
+  "fast_exp_default": false,
+  "production": false,
+  "allow_1024_complete_fields": false
+}
