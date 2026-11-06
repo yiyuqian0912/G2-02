@@ -15,7 +15,10 @@ def sha(path):
 
 def write_json(path,value):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
-    tmp=path.with_suffix('.tmp');tmp.write_text(json.dumps(value,indent=2,allow_nan=False)+'\n');tmp.replace(path)
+    tmp=path.with_suffix('.tmp')
+    with tmp.open('w',encoding='utf-8') as stream:
+        json.dump(value,stream,indent=2,allow_nan=False);stream.write('\n')
+    tmp.replace(path)
 
 
 def resolve(path):

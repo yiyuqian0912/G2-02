@@ -10,6 +10,7 @@ from .core import TileEnv,Window,ActorCritic,advantages,potential,belief_metrics
 from .locator import FrozenLocator,Belief,policy_inputs
 from .frontier import make_env,make_policy,policy_names,boundary_actions
 from .scene_schedule import make_schedule,coverage
+from .runtime import RunLock,rank_zero_action,resume_checkpoint,merge_training_limits,training_limits
 from .prepare import prepare,resolve,sha,write_json,geometry_hash
 from rind_phase1.data import Phase1Dataset,PROJECT_ROOT
 
@@ -64,6 +65,11 @@ def load_config(args,base=None):
     if type(c['bootstrap_repetitions']) is not int or c['bootstrap_repetitions']<1:raise ValueError('positive bootstrap repetitions required')
     if c['fusion_discount']<=0 or c['fusion_discount']>1:raise ValueError('fusion discount in (0,1]')
     if not 0<c['gae_lambda']<=1 or not 0<c['clip_ratio']<1:raise ValueError('invalid PPO settings')
+    for name,allow_zero in (('learning_rate',False),('grad_clip',False),('target_kl',False),
+                             ('fusion_discount',False),('value_weight',True),('action_entropy_bonus',True)):
+        value=c[name]
+        if type(value) not in (int,float) or not math.isfinite(value) or value<0 or (value==0 and not allow_zero):
+            raise ValueError('invalid finite numeric setting: '+name)
     return c
 
 
@@ -278,15 +284,22 @@ def train(policy,protocol,c,locator,output,rank,world):
     wrapped=DistributedDataParallel(policy,device_ids=[locator.device.index] if locator.device.type=='cuda' else None) if world>1 else policy
     optimizer=torch.optim.Adam(policy.parameters(),lr=c['learning_rate'],eps=1e-5)
     start=0;best=-float('inf');history=[];last=output/'last.pt';fingerprint=sha(output/'protocol.json');saved=None
-    if last.is_file():
-        saved=torch.load(last,map_location='cpu',weights_only=True)
+    checkpoint=resume_checkpoint(output)
+    if checkpoint is not None:
+        saved=torch.load(checkpoint,map_location='cpu',weights_only=True)
         if saved['protocol_sha256']!=fingerprint:raise ValueError('RL checkpoint/protocol mismatch')
         policy.load_state_dict(saved['policy']);optimizer.load_state_dict(saved['optimizer'])
         start=saved['update'];best=saved['best'] if saved['best'] is not None else -float('inf');history=saved['history']
-        c['updates']=max(c['updates'],saved.get('config',{}).get('updates',0))
-        c['minimum_scene_visits']=max(c.get('minimum_scene_visits',0),saved.get('config',{}).get('minimum_scene_visits',0))
-        log(f'RL resume after update={start}; partial simulator episodes restart')
-    elif rank==0:atomic_save(output/'initial.pt',dict(policy=policy.state_dict(),config=c,protocol_sha256=fingerprint))
+        log(f'RL resume from {checkpoint.name} after update={start}; partial simulator episodes restart')
+    elif (output/'initial.pt').is_file():
+        initial=torch.load(output/'initial.pt',map_location='cpu',weights_only=True)
+        if initial['protocol_sha256']!=fingerprint:raise ValueError('initial policy/protocol mismatch')
+        policy.load_state_dict(initial['policy'])
+    else:
+        rank_zero_action(lambda:atomic_save(output/'initial.pt',dict(
+            policy=policy.state_dict(),config=c,protocol_sha256=fingerprint)),rank,world)
+    merge_training_limits(c,output,fingerprint,saved.get('config') if saved else None)
+    rank_zero_action(lambda:write_json(output/'training_schedule.json',training_limits(c,fingerprint)),rank,world)
     if world>1:dist.barrier()
     torch.manual_seed(c['seed']+rank+1009*start)
     rng=np.random.default_rng(np.random.SeedSequence([c['seed'],rank,start,7]))
@@ -346,7 +359,7 @@ def train(policy,protocol,c,locator,output,rank,world):
                 states=[None]*world if rank==0 else None
                 dist.gather_object(schedule.state_dict(),states,dst=0)
             else:states=[schedule.state_dict()]
-        if rank==0:
+        def save_update():
             state=dict(schema='rind-active-rl-policy-v1',policy=policy.state_dict(),optimizer=optimizer.state_dict(),
                 locator_snapshot_sha256=protocol['snapshot_sha256'],update=update,best=best if math.isfinite(best) else None,
                 history=history,config=c,protocol_sha256=fingerprint,scene_schedule_states=states)
@@ -368,7 +381,7 @@ def train(policy,protocol,c,locator,output,rank,world):
                     f'completed={progress["completed_unique_scenes"]:,}/{progress["training_scenes"]:,} '
                     f'reached {progress["required_visits"]} visits={progress["scenes_reaching_target"]:,}/{progress["training_scenes"]:,} '
                     f'min visits={progress["minimum_completed_visits"]}; minimum updates={c["updates"]}, complete={finished}')
-        if world>1:dist.barrier()
+        rank_zero_action(save_update,rank,world)
         if finished:break
 
 
@@ -499,7 +512,7 @@ def main():
     parser.add_argument('--num-envs',type=int);parser.add_argument('--rollout-steps',type=int)
     parser.add_argument('--set',action='append',default=[])
     args=parser.parse_args()
-    if not re.fullmatch(r'[A-Za-z0-9_.-]+',args.run_name):parser.error('invalid run name')
+    if args.run_name in ('.','..') or not re.fullmatch(r'[A-Za-z0-9_.-]+',args.run_name):parser.error('invalid run name')
     output=PROJECT_ROOT/'outputs/active_rl'/args.run_name
     if args.config is None and (output/'protocol.json').exists():
         base=json.loads((output/'protocol.json').read_text())['config']
@@ -507,20 +520,24 @@ def main():
     else:
         args.config=args.config or 'configs/active_rl.json';c=load_config(args)
     rank=int(os.environ.get('RANK',0));world=int(os.environ.get('WORLD_SIZE',1));local=int(os.environ.get('LOCAL_RANK',0))
-    if args.command=='prepare':prepare(c,output);return
+    if args.command=='prepare':
+        if world!=1:parser.error('prepare must run in a single process')
+        with RunLock(output,'prepare'):prepare(c,output)
+        return
     device=torch.device(f'cuda:{local}' if args.device=='cuda' else 'cpu')
     if device.type=='cuda':
         if not torch.cuda.is_available():raise RuntimeError('CUDA unavailable; choose --device cpu explicitly')
         torch.cuda.set_device(device);torch.backends.cuda.matmul.allow_tf32=True;torch.backends.cudnn.benchmark=True
     torch.set_num_threads(max(1,c['threads']//world));torch.manual_seed(c['seed'])
     if world>1:dist.init_process_group('nccl' if device.type=='cuda' else 'gloo')
+    lock=RunLock(output,args.command)
     try:
-        if rank==0:prepare(c,output)
-        if world>1:dist.barrier()
+        rank_zero_action(lock.acquire,rank,world)
+        rank_zero_action(lambda:prepare(c,output),rank,world)
         protocol=json.loads((output/'protocol.json').read_text())
-        if (output/'last.pt').is_file():
-            last_settings=torch.load(output/'last.pt',map_location='cpu',weights_only=True).get('config',{})
-            for key in ('updates','minimum_scene_visits'):c[key]=max(c.get(key,0),last_settings.get(key,0))
+        checkpoint=resume_checkpoint(output)
+        settings=torch.load(checkpoint,map_location='cpu',weights_only=True).get('config',{}) if checkpoint else None
+        merge_training_limits(c,output,sha(output/'protocol.json'),settings)
         dataset=Phase1Dataset(protocol['data_root'])
         if sha(Path(protocol['data_root'])/'manifest.json')!=protocol['data_manifest_sha256']:raise ValueError('data changed after preparation')
         locator=FrozenLocator(dataset,output/'phase1_frozen.pt',device,tile=c['tile_size'],spacing=c['spacing'],
@@ -530,11 +547,14 @@ def main():
         if args.command in ('train','all'):train(policy,protocol,c,locator,output,rank,world)
         if args.command in ('evaluate','all'):
             metadata=[None]
-            if rank==0:
+            def freeze_policy():
+                if not (output/'best.pt').is_file():
+                    raise FileNotFoundError('best.pt missing; finish the requested training/scene coverage before evaluation')
                 raw=(output/'best.pt').read_bytes();fingerprint=hashlib.sha256(raw).hexdigest()
                 snapshot=output/'evaluation/policy_snapshots'/(fingerprint+'.pt');snapshot.parent.mkdir(parents=True,exist_ok=True)
                 if not snapshot.exists():snapshot.write_bytes(raw)
                 metadata[0]=dict(snapshot=str(snapshot),sha256=fingerprint)
+            rank_zero_action(freeze_policy,rank,world)
             if world>1:dist.broadcast_object_list(metadata,src=0)
             checkpoint=metadata[0]
             if sha(checkpoint['snapshot'])!=checkpoint['sha256']:raise ValueError('evaluation policy snapshot changed')
@@ -550,22 +570,27 @@ def main():
             initial.load_state_dict(torch.load(output/'initial.pt',map_location='cpu',weights_only=True)['policy']);initial.eval()
             if c.get('environment')=='frontier':
                 validation_rows=evaluate_frontier_rows(policy,protocol,c,locator,rank,world,split='validation',full_validation=True)
-                if rank==0:
+                def save_validation():
                     write_json(output/'evaluation/validation_final.json',dict(
                         scenes=len(validation_rows),selection_probe_scenes=min(c['validation_probe_scenes'],len(validation_rows)),
                         policy_checkpoint=checkpoint,selected_using_test=False,
                         mean={k:float(np.mean([r[k] for r in validation_rows])) for k in ('score','mass16','mass32','map_distance','core90_area','core90_covers_truth')},
                         recall32=float(np.mean([r['map_distance']<=32 for r in validation_rows])),episodes=validation_rows))
+                rank_zero_action(save_validation,rank,world)
             rows=evaluate_rows(policy,protocol,c,locator,rank,world,split='test',baselines=True,initial=initial)
-            if rank==0:
+            def save_evaluation():
                 for scene in protocol['scene_splits']['test'][:c['plot_scenes']]:
                     for kind,p in [(name,policy if name=='ppo' else None) for name in policy_names(c) if name!='initial_policy']:
                         seed=int(np.random.SeedSequence([c['seed'],scene,c['budget'],19]).generate_state(1)[0])
                         trace=episode(p,kind,scene,c['budget'],protocol,c,locator,seed,trace=True)
                         save_trace(trace,protocol,c,locator,output)
                 result=summarize(rows,c,output,protocol,checkpoint);log(f'RL evaluation saved: {output/"evaluation/report.zh-CN.md"}')
+            rank_zero_action(save_evaluation,rank,world)
     finally:
-        if world>1 and dist.is_initialized():dist.destroy_process_group()
+        try:
+            if world>1 and dist.is_initialized():dist.destroy_process_group()
+        finally:
+            if rank==0:lock.release()
 
 
 if __name__=='__main__':main()

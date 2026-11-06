@@ -46,7 +46,9 @@ coverage_complete              是否已完成覆盖目标
   --run-name single_source_rl_frontier16_minimum_full --gpus auto
 ```
 
-想让每个训练场景至少完成两条轨迹，可额外指定`--set minimum_scene_visits=2`；恢复保留已完成次数。增加的访问目标和更新次数存入断点，下次不重复参数也不会回退。完整测试结果仅在主进程汇总，避免每张卡持有全部逐场景结果的副本。
+想让每个训练场景至少完成两条轨迹，可额外指定`--set minimum_scene_visits=2`；恢复保留已完成次数。增加的访问目标和更新次数同时存入断点和`training_schedule.json`，下次不重复参数也不会回退。恢复优先使用`last.pt`；若它缺失，使用已有`best.pt`，只恢复到该断点保存的进度。两者都没有时才重新开始，不覆盖已有的`initial.pt`。
+
+同一实验目录使用进程锁，防止两个训练/评估任务并发写入；进程退出后锁自动释放，无需删除锁文件。多卡准备、保存和汇总阶段的主进程异常会同步给其他进程。完整测试结果仅在主进程汇总，并流式写入JSON，避免每张卡持有全部结果或创建大型JSON字符串副本；逐场景记录本身仍需内存。
 
 本地已用旧小定位器和小预算跑通`all`训练分片的2,500个真实场景，覆盖达到2,500/2,500后结束；另已验证双进程训练及恢复为单进程后累计到每场景两次。这些是流程验证，不是服务器80,000场景的训练效果或H20性能结果。
 
@@ -154,7 +156,7 @@ coverage_complete              是否已完成覆盖目标
   --run-name single_source_rl_frontier16_minimum_v2 --gpus auto
 ```
 
-参数改变需要新run-name；只有总updates允许在同一轮中增加。不要用v1旧run-name运行新配置。
+参数改变需要新run-name；总`updates`和`minimum_scene_visits`可在同一轮中增加。不要用v1旧run-name运行新配置。
 
 固定起始像素的独立实验可在首次启动时额外传：
 
@@ -183,6 +185,7 @@ Phase1_Single_Source_Single_Intensity/outputs/active_rl/
 
 - `protocol.json`：场景、起点、数据及冻结权重身份、验证选优子集。
 - `training.json`：奖励、验证分数、动作KL、全局交互数、吞吐、rank0显存峰值与定位缓存命中。
+- `training_schedule.json`：该实验已要求的最低更新次数和场景访问目标；续训不会静默降低目标。
 - `best.pt`、`last.pt`、`initial.pt`：选路权重；`phase1_frozen.pt`是已有定位器的快照。
 - `evaluation/validation_final.json`：最佳选路器在完整验证集上的结果。
 - `evaluation/metrics.json`：三预算五策略汇总，按独立几何组的配对bootstrap区间。
@@ -201,5 +204,7 @@ Phase1_Single_Source_Single_Intensity/outputs/active_rl/
 最小值只保留一个全场log-min向量，每增加一块为O(N)更新；不会每步重新堆叠所有历史场。全亮/全暗避免模型调用但照常计费；定位预测有GPU上的有界LRU缓存。局部位图的全场packed缓存仍仅对模拟器私有，Actor看不到。
 
 已经覆盖的检查包括：边缘连通、精确预算、禁止重复、融合顺序、真实零值不恢复、空交集报错、中性块不截峰、真值隔离、串行与并行评价一致、PPO反传，以及真实本地数据的小规模完整流程。正式100k模型的训练收益、最小值是否优于乘积、H20吞吐仍需服务器实验；不作保证。
+
+2026-11-06再次审核：27项RL专项测试通过，另完成Phase1回归检查；真实本地16个训练场景、4个验证场景、4个测试场景跑通训练、全覆盖、五策略评价和逐步可视化。双进程测试覆盖主进程错误同步，以及双进程转单进程续训并提高到每场景两次。另专门验证删除`last.pt`后的`best.pt`恢复、访问目标不回退和重复写入拒绝。这些运行使用本地CPU及旧小定位器，仅证明已测试路径可运行，不代替H20或完整100k实验。
 
 最小值与旧乘积的对照应保持相同16块环境和预算。可在另一个run-name下使用同一配置并覆盖`--set 'fusion_method="product"' --set fusion_discount=0.5`。随机/紧凑/边界基线的固定路径有助于区分融合变化和选路变化。

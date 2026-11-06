@@ -11,7 +11,7 @@ while [[ $# -gt 0 ]];do
   if [[ "$1" == --run-name ]];then [[ $# -ge 2 ]] || { echo "Missing --run-name";exit 2; };run_name="$2";arguments+=(--run-name "$2");shift 2
   else arguments+=("$1");shift;fi
 done
-[[ "$run_name" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo 'Invalid run name';exit 2; }
+[[ "$run_name" != . && "$run_name" != .. && "$run_name" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo 'Invalid run name';exit 2; }
 export RIND_TMUX_SESSION="rind_rl_$run_name"
 export RIND_TMUX_OUTPUT_ROOT="$ROOT/Phase1_Single_Source_Single_Intensity/outputs/active_rl/$run_name"
 export RIND_TMUX_RUNNER="$ROOT/run_single_source_rl.sh"

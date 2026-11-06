@@ -107,6 +107,21 @@ class SceneCoverageTests(unittest.TestCase):
             self.assertGreater(last['update'],old_update)
             self.assertGreaterEqual(best['history'][-1]['training_scene_coverage']['minimum_completed_visits'],2)
             self.assertGreaterEqual(min(last['scene_schedule_states'][0]['visits']),2)
+            # A deleted last checkpoint must never silently start a fresh policy.
+            # The durable visit target also survives fallback to an older best.
+            initial=(output/'initial.pt').read_bytes()
+            (output/'last.pt').unlink()
+            resumed=make_policy(config)
+            config['minimum_scene_visits']=1
+            train(resumed,protocol,config,loc,output,0,1)
+            self.assertEqual(config['minimum_scene_visits'],2)
+            for key,value in resumed.state_dict().items():
+                torch.testing.assert_close(value,best['policy'][key],rtol=0,atol=0)
+            self.assertEqual((output/'initial.pt').read_bytes(),initial)
+            config['updates']=best['update']+1
+            train(resumed,protocol,config,loc,output,0,1)
+            self.assertTrue((output/'last.pt').is_file())
+            self.assertEqual((output/'initial.pt').read_bytes(),initial)
 
 
 if __name__=='__main__':unittest.main()
