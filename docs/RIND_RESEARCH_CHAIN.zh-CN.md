@@ -511,3 +511,6 @@ unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_TMUX_SESSION
 2026-11-05回收的服务器v1使用冻结Phase1 epoch18，在128个独立测试几何上比较三档预算与四个策略。262,144像素预算下，PPO/随机/优先扩窗的Recall@32为41.41%/42.19%/44.53%，M32为20.42%/21.20%/21.41%。配对区间尚未支持PPO优于基线。128个场景均用两次扩窗耗尽最大预算；敏感性探测显示策略对内容利用不足。观测增加和信息融合有效，不等于RL选路已经有效。[完整审核与限制](../Phase1_Single_Source_Single_Intensity/docs/results/rl_single_source_v1_review.zh-CN.md)。
 
 2026-11-06实现独立v2：每次从全部已观测区域的四邻接边缘新增一个16×16块，复用冻结Phase1；对有效块原始概率逐点取min，最后统一归一化。原始min单独保存，避免归一化递推产生顺序偏差；明确零值不恢复、空交集报错、恒定块收费但暂作中性证据。选路器改为空间动作图，默认10,000/1,000/1,000场景并排除上轮已审阅测试身份。它仍是待检验的共识融合与选路方法，不是精确后验或已证实改进。新增逐步HTML页面展示局部响应、单块原始场、累计融合场及路径。[实现和运行](../Phase1_Single_Source_Single_Intensity/docs/FRONTIER16_MINIMUM_RL.zh-CN.md)。
+
+
+全量入口补充：`active_rl_frontier16_minimum_full.json`使用冻结定位器各split的全部场景；100k单源包预期80,000训练、10,000验证和9,872个未审阅测试场景。训练按scene_id保存完成次数，最低更新数与全覆盖目标同时满足才结束；best仅从达到目标后的权重中选取。另一个100k多源包不混入单源RL。本地全量流程验证不等于服务器80k训练已经完成。

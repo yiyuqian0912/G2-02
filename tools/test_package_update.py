@@ -18,6 +18,8 @@ class PackageTests(unittest.TestCase):
                 names = set(tar.getnames())
                 for name in ("run_single_source_rl.sh","run_single_source_rl_tmux.sh",
                              "Phase1_Single_Source_Single_Intensity/configs/active_rl_frontier16_minimum.json",
+                             "Phase1_Single_Source_Single_Intensity/configs/active_rl_frontier16_minimum_full.json",
+                             "Phase1_Single_Source_Single_Intensity/src/rind_phase1/active_rl/scene_schedule.py",
                              "Phase1_Single_Source_Single_Intensity/src/rind_phase1/active_rl/frontier.py",
                              "Phase1_Single_Source_Single_Intensity/src/rind_phase1/active_rl/trajectory_view.py",
                              "Phase1_Single_Source_Single_Intensity/docs/FRONTIER16_MINIMUM_RL.zh-CN.md",

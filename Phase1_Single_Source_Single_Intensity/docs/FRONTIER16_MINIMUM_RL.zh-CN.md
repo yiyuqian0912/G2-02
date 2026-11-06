@@ -2,6 +2,56 @@
 
 2026-11-06。本版是独立选路实验：复用并冻结已有Phase1单源定位器，每次只新增一个16×16小窗，再训练PPO选择下一个小窗。没有重训Phase1，也没有给学生输入全场障碍物或未来响应。
 
+## 全量训练配置（新增推荐入口）
+
+`configs/active_rl_frontier16_minimum_full.json`将三个scene_counts设置为`all`。它从冻结Phase1权重继承的独立划分中取全部可用场景，不把验证/测试并入训练。100k单源发布包预期为：
+
+- 训练80,000个场景，验证10,000个场景；
+- 测试10,000减去上轮已审阅的128个场景及同几何组，预期9,872；最终以启动日志和protocol的实际数字为准；
+- 定期选优仍只用预先固定的128个验证场景；最佳策略最后评价完整验证集和测试集。
+
+```bash
+./run_single_source_rl_tmux.sh start all \
+  --run-name single_source_rl_frontier16_minimum_full \
+  --config configs/active_rl_frontier16_minimum_full.json \
+  --gpus auto
+
+./run_single_source_rl_tmux.sh status \
+  --run-name single_source_rl_frontier16_minimum_full
+```
+
+使用原100k定位器及原始单源数据的默认路径。仅全量训练、暂不启动最终评价时将`start all`换成`start train`；之后可`start evaluate`。tmux断网后继续运行。旧1万场景配置和输出保留，新全量实验使用上面的独立名称。
+
+`minimum_scene_visits=1`要求每个训练场景至少完成一条观测轨迹。轨迹可以耗尽预算或由策略主动停止；这不表示穷举每场景所有16×16块，更不表示每个场景都可准确定位。场景先打乱排队，优先调度尚未达到目标的场景，不用重复轨迹冒充新增独立场景。
+
+`updates=500`在全量模式中是**最低更新次数，不是上限**。训练同时满足“更新不少于500”和“全部训练场景达到访问目标”才结束；若500次后还没覆盖完，会继续训练并显示真实进度。`best.pt`只从达到全覆盖目标后的权重中选择；此前持续保存`last.pt`用于恢复。
+
+日志和`training.json.training_scene_coverage`明确保存：
+
+```text
+training_scenes                 全部训练场景数
+started_unique_scenes           已开始观测的独立场景数
+completed_unique_scenes         至少完成一条轨迹的独立场景数
+scenes_reaching_target          已达到目标访问次数的场景数
+minimum_completed_visits        全部场景中最少的完成次数
+coverage_complete              是否已完成覆盖目标
+```
+
+未完成轨迹不会计为完成，恢复时重新开始；完成次数不会因重新启动清零。自动选到的GPU数量变化时，覆盖记录按scene_id重新分配。覆盖完成前的定期验证分数仅供监控；这些权重不冒充全量最佳模型。
+
+全量续训：
+
+```bash
+./run_single_source_rl_tmux.sh start train \
+  --run-name single_source_rl_frontier16_minimum_full --gpus auto
+```
+
+想让每个训练场景至少完成两条轨迹，可额外指定`--set minimum_scene_visits=2`；恢复保留已完成次数。增加的访问目标和更新次数存入断点，下次不重复参数也不会回退。完整测试结果仅在主进程汇总，避免每张卡持有全部逐场景结果的副本。
+
+本地已用旧小定位器和小预算跑通`all`训练分片的2,500个真实场景，覆盖达到2,500/2,500后结束；另已验证双进程训练及恢复为单进程后累计到每场景两次。这些是流程验证，不是服务器80,000场景的训练效果或H20性能结果。
+
+注意：此处“全量”是100k**单源**发布包。另一个100k多源扩展包用于Phase2，不能直接将其多源总响应当作当前单源RL输入。单源定位权重继续复用，不重新渲染位置教师。
+
 ## 观测顺序
 
 1. 从一个起点所属的16×16网格块开始，首次花费256像素预算。
@@ -51,7 +101,7 @@
 
 这里的M来自**最小值融合后的场**。真源仅用于训练奖励、离线评价和可视化标注；Actor与Critic都不接收真源。位置熵不进入奖励；PPO动作熵用于探索。
 
-## 默认规模与预算
+## 先前1万场景配置与预算
 
 配置：`configs/active_rl_frontier16_minimum.json`。
 
@@ -71,6 +121,8 @@
 `compact`优先选择离起点最近的边缘块；`boundary`使用相邻已观测块的响应混合程度与差异，信息不足时采用紧凑扩展。两者都不预读未来响应，也不读取真实几何。
 
 ## 服务器命令：tmux后台训练
+
+本节保留先前1万场景命令；全量请使用文档开头的`_full`配置与实验名。
 
 在`RIND_Phase2_Training_Minimal`根目录运行（沿用已有.venv）：
 

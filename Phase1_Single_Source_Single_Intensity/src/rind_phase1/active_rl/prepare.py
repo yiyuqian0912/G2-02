@@ -28,12 +28,22 @@ def geometry_hash(dataset,scene):
     return hashlib.sha256(b''.join(sorted(bytes([int(t)])+np.asarray(p,dtype='<f8').tobytes() for t,p in zip(types,params)))).hexdigest()
 
 
+def select_scenes(available, requested, rng):
+    if requested != 'all' and (type(requested) is not int or requested < 1):
+        raise ValueError('scene count must be a positive integer or all')
+    count=len(available) if requested=='all' else requested
+    if not count or count>len(available):
+        raise ValueError(f'requires {requested}, available scene count is {len(available)}')
+    return [int(s) for s in rng.choice(available,count,replace=False)]
+
+
 def prepare(config,output):
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
     target=output/'protocol.json'
     if target.is_file():
         result=json.loads(target.read_text())
-        if {k:v for k,v in result['config'].items() if k!='updates'}!={k:v for k,v in config.items() if k!='updates'}:raise ValueError('existing RL output uses another config; use a new --run-name')
+        schedule_keys={'updates','minimum_scene_visits'}
+        if {k:v for k,v in result['config'].items() if k not in schedule_keys}!={k:v for k,v in config.items() if k not in schedule_keys}:raise ValueError('existing RL output uses another config; use a new --run-name')
         if sha(output/'phase1_frozen.pt')!=result['snapshot_sha256']:raise ValueError('frozen Phase1 weights changed')
         return result
     run=resolve(config['phase1_run']);source=run/config.get('variant','response')/'seed_0/best.pt'
@@ -44,6 +54,7 @@ def prepare(config,output):
     if hashlib.sha256(json.dumps(dataset.manifest,sort_keys=True).encode()).hexdigest()!=origin['dataset_manifest_sha256']:raise ValueError('locator/data manifest mismatch')
     saved=torch.load(source,map_location='cpu',weights_only=True)
     splits=saved['scene_splits'];ownership={};ids={};geometry_groups={}
+    print('RL available source splits: '+str({k:len(v) for k,v in splits.items()})+'; requested: '+str(config['scene_counts']),flush=True)
     excluded=set(config.get('exclude_test_scene_ids',[]));excluded_geometry=set()
     if any(type(s) is not int or s<0 for s in excluded):raise ValueError('invalid excluded test identity')
     for scene in excluded:
@@ -63,9 +74,9 @@ def prepare(config,output):
             if j and j%5000==0:print(f'RL geometry audit {split}: {j}/{len(rows)}',flush=True)
         available=[s for s in rows if split!='test' or (s not in excluded and geometry_groups[str(s)] not in excluded_geometry)]
         want=config['scene_counts'][split]
-        if want>len(available):raise ValueError(f'{split} requires {want}, available locator split has {len(available)} after exclusions')
         rng=np.random.default_rng(np.random.SeedSequence([config['seed'],('train','validation','test').index(split)]))
-        ids[split]=[int(x) for x in rng.choice(available,want,replace=False)]
+        try:ids[split]=select_scenes(available,want,rng)
+        except ValueError as error:raise ValueError(f'{split}: {error} after exclusions') from error
     world=dataset.manifest['global_size'];tile=config['tile_size'];initial=config['initial_size']
     if world%tile or world%config['spacing'] or initial>world or max(config['evaluation_budgets']+[config['budget']])>world**2:
         raise ValueError('budget/grid outside dataset world')
@@ -90,6 +101,8 @@ def prepare(config,output):
         appended_geometry_audit='not independently verified; audit covers the Phase1 data manifest and supplied scene splits',
         actor_inputs=['observed_response','coverage','belief','window','budget','action_geometry'],
         excluded_test_scene_ids=sorted(excluded),
+        source_scene_counts={k:len(v) for k,v in splits.items()},
+        selected_scene_counts={k:len(v) for k,v in ids.items()},
         validation_selection_scenes=ids['validation'][:config.get('validation_probe_scenes',len(ids['validation']))],
         truth_usage='training reward and evaluation only; never policy inputs',
         inference_fusion=('normalized pointwise minimum over informative unique tiles; constant-response tiles neutral; not a posterior'

@@ -9,6 +9,7 @@ from torch.nn.parallel import DistributedDataParallel
 from .core import TileEnv,Window,ActorCritic,advantages,potential,belief_metrics
 from .locator import FrozenLocator,Belief,policy_inputs
 from .frontier import make_env,make_policy,policy_names,boundary_actions
+from .scene_schedule import make_schedule,coverage
 from .prepare import prepare,resolve,sha,write_json,geometry_hash
 from rind_phase1.data import Phase1Dataset,PROJECT_ROOT
 
@@ -22,6 +23,7 @@ def atomic_save(path,value):
 
 def load_config(args,base=None):
     c=copy.deepcopy(base) if base is not None else json.loads(resolve(args.config).read_text())
+    c.setdefault('minimum_scene_visits',0)
     for item in args.set:
         key,sep,value=item.partition('=')
         if not sep or key not in c:raise ValueError('expected known KEY=JSON: '+item)
@@ -29,6 +31,9 @@ def load_config(args,base=None):
     if args.phase1_run:c['phase1_run']=args.phase1_run
     if args.data_root:c['data_root']=args.data_root
     if args.scene_counts:c['scene_counts']=dict(zip(('train','validation','test'),args.scene_counts))
+    if getattr(args,'all_scenes',False):
+        c['scene_counts']={k:'all' for k in ('train','validation','test')}
+        c['minimum_scene_visits']=max(1,c['minimum_scene_visits'])
     for name in ('updates','num_envs','rollout_steps'):
         if getattr(args,name) is not None:c[name]=getattr(args,name)
     for k in ('seed','tile_size','initial_size','spacing','budget','max_steps','num_envs','rollout_steps','updates',
@@ -44,10 +49,16 @@ def load_config(args,base=None):
             raise ValueError('frontier budgets must contain whole tiles')
         if c['max_steps']<max(budgets)//c['tile_size']**2-1:raise ValueError('max_steps would truncate the largest frontier budget')
         if not c.get('train_budgets',[c['budget']]):raise ValueError('empty training budget list')
+        if any(b<=c['initial_size']**2 for b in c.get('train_budgets',[c['budget']])):
+            raise ValueError('each training budget must allow an action after the initial tile')
     elif c['initial_size']<2*c['tile_size']:raise ValueError('window initial>=2*tile required')
     for key in ('evaluation_envs','evaluation_curve_stride','validation_probe_scenes'):
         if key in c and (type(c[key]) is not int or c[key]<1):raise ValueError('invalid '+key)
-    if any(type(v) is not int or v<1 for v in c['scene_counts'].values()):raise ValueError('positive scene counts required')
+    if (set(c['scene_counts'])!={'train','validation','test'} or
+            any(v!='all' and (type(v) is not int or v<1) for v in c['scene_counts'].values())):
+        raise ValueError('each scene count must be a positive integer or all')
+    if type(c.get('minimum_scene_visits',0)) is not int or c.get('minimum_scene_visits',0)<0:
+        raise ValueError('minimum_scene_visits must be a nonnegative integer')
     if c['budget']<=c['initial_size']**2:raise ValueError('training budget must exceed the initial observation')
     if any(type(b) is not int or b<c['initial_size']**2 for b in c['evaluation_budgets']):raise ValueError('invalid evaluation budgets')
     if type(c['bootstrap_repetitions']) is not int or c['bootstrap_repetitions']<1:raise ValueError('positive bootstrap repetitions required')
@@ -75,7 +86,8 @@ def truth(dataset,scene):
 def reset_many(contexts,indices,rows,protocol,c,locator,rng):
     selected=[]
     for i in indices:
-        scene=int(rng.choice(rows));w=protocol['initial_windows'][str(scene)]
+        scene=rows.next_scene() if hasattr(rows,'next_scene') else int(rng.choice(rows))
+        w=protocol['initial_windows'][str(scene)]
         if c.get('randomize_train_start',False) and c.get('initial_pixel') is None:
             side=c['initial_size'];limit=(locator.world-side)//c['tile_size']+1
             w=[int(rng.integers(limit))*c['tile_size'],int(rng.integers(limit))*c['tile_size'],side]
@@ -100,6 +112,7 @@ def collect(policy,contexts,protocol,c,locator,rng,training_rows=None):
         if finished:
             for i,m in zip(finished,metric_rows([contexts[i] for i in finished],locator)):
                 x=contexts[i];episodes.append(dict(scene_id=x.scene,spent=x.env.spent,steps=x.env.steps,**m))
+                if hasattr(training_rows,'finish_scene'):training_rows.finish_scene(x.scene)
         if finished:reset_many(contexts,finished,training_rows or protocol['scene_splits']['train'],protocol,c,locator,rng)
     with torch.no_grad():_,bootstrap=policy(*policy_inputs(contexts,locator))
     data={k:torch.stack(v) for k,v in data.items()}
@@ -205,7 +218,9 @@ def evaluate_rows(policy,protocol,c,locator,rank,world,*,split,baselines=False,i
                 rows.append(episode(initial if kind=='initial_policy' else policy,kind,scene,budget,protocol,c,locator,seed))
         if j%16==0:log(f'RL {split} rank={rank} scenes={j+1}/{len(ids)}')
     if world>1:
-        pieces=[None]*world;dist.all_gather_object(pieces,rows);rows=[r for piece in pieces for r in piece]
+        pieces=[None]*world if rank==0 else None
+        dist.gather_object(rows,pieces,dst=0)
+        rows=[r for piece in pieces for r in piece] if rank==0 else []
     return rows
 
 
@@ -253,19 +268,23 @@ def evaluate_frontier_rows(policy,protocol,c,locator,rank,world,*,split,baseline
                 seconds=elapsed/len(batch),timing='parallel batch amortized; shared cache'))
         if start%(width*8)==0:log(f'RL {split} rank={rank} episodes={min(start+width,len(jobs))}/{len(jobs)}')
     if world>1:
-        pieces=[None]*world;dist.all_gather_object(pieces,rows);rows=[r for piece in pieces for r in piece]
+        pieces=[None]*world if rank==0 else None
+        dist.gather_object(rows,pieces,dst=0)
+        rows=[r for piece in pieces for r in piece] if rank==0 else []
     return rows
 
 
 def train(policy,protocol,c,locator,output,rank,world):
     wrapped=DistributedDataParallel(policy,device_ids=[locator.device.index] if locator.device.type=='cuda' else None) if world>1 else policy
     optimizer=torch.optim.Adam(policy.parameters(),lr=c['learning_rate'],eps=1e-5)
-    start=0;best=-float('inf');history=[];last=output/'last.pt';fingerprint=sha(output/'protocol.json')
+    start=0;best=-float('inf');history=[];last=output/'last.pt';fingerprint=sha(output/'protocol.json');saved=None
     if last.is_file():
         saved=torch.load(last,map_location='cpu',weights_only=True)
         if saved['protocol_sha256']!=fingerprint:raise ValueError('RL checkpoint/protocol mismatch')
         policy.load_state_dict(saved['policy']);optimizer.load_state_dict(saved['optimizer'])
         start=saved['update'];best=saved['best'] if saved['best'] is not None else -float('inf');history=saved['history']
+        c['updates']=max(c['updates'],saved.get('config',{}).get('updates',0))
+        c['minimum_scene_visits']=max(c.get('minimum_scene_visits',0),saved.get('config',{}).get('minimum_scene_visits',0))
         log(f'RL resume after update={start}; partial simulator episodes restart')
     elif rank==0:atomic_save(output/'initial.pt',dict(policy=policy.state_dict(),config=c,protocol_sha256=fingerprint))
     if world>1:dist.barrier()
@@ -273,40 +292,84 @@ def train(policy,protocol,c,locator,output,rank,world):
     rng=np.random.default_rng(np.random.SeedSequence([c['seed'],rank,start,7]))
     training_rows=protocol['scene_splits']['train'][rank::world]
     if not training_rows:raise ValueError('more GPU ranks than training scenes')
+    schedule=None
+    if c.get('minimum_scene_visits',0):
+        if len(protocol['scene_splits']['train'])//world<c['num_envs']:
+            raise ValueError('reduce num_envs: full-coverage scheduling needs at least one distinct scene per environment on every GPU')
+        schedule=make_schedule(training_rows,c['minimum_scene_visits'],np.random.SeedSequence([c['seed'],rank,719]),
+            saved.get('scene_schedule_states') if saved else None)
+        training_rows=schedule
+    progress=coverage(schedule,locator.device,world)
+    eligible_best=schedule is None
+    if schedule is not None and (output/'best.pt').is_file():
+        previous_best=torch.load(output/'best.pt',map_location='cpu',weights_only=True)
+        if previous_best.get('protocol_sha256')!=fingerprint:raise ValueError('best policy/protocol mismatch')
+        previous_progress=previous_best['history'][-1].get('training_scene_coverage')
+        eligible_best=bool(previous_progress and previous_progress['minimum_completed_visits']>=schedule.required)
+    if not eligible_best:best=-float('inf')
+    if start>=c['updates'] and (progress is None or progress['coverage_complete']) and eligible_best:
+        log(f'RL already complete after update={start}; scene coverage={progress}')
+        return
     contexts=[None]*c['num_envs'];reset_many(contexts,list(range(len(contexts))),training_rows,protocol,c,locator,rng)
-    log(f'RL train | scenes={len(protocol["scene_splits"]["train"])} | ranks={world} | transitions/update={c["rollout_steps"]*c["num_envs"]*world:,} | configured total={c["updates"]*c["rollout_steps"]*c["num_envs"]*world:,} | budgets={c.get("train_budgets",[c["budget"]])}')
-    for update in range(start+1,c['updates']+1):
+    extent='minimum transitions' if schedule else 'configured transitions'
+    log(f'RL train | scenes={len(protocol["scene_splits"]["train"])} | ranks={world} | transitions/update={c["rollout_steps"]*c["num_envs"]*world:,} | {extent}={c["updates"]*c["rollout_steps"]*c["num_envs"]*world:,} | budgets={c.get("train_budgets",[c["budget"]])}')
+    update=start
+    while True:
+        update+=1
         tick=time.perf_counter();policy.train()
         if locator.device.type=='cuda':torch.cuda.reset_peak_memory_stats(locator.device)
         buffer,episodes=collect(policy,contexts,protocol,c,locator,rng,training_rows)
         metrics=ppo_update(wrapped,buffer,optimizer,c,world)
+        was_complete=bool(progress and progress['coverage_complete'])
+        progress=coverage(schedule,locator.device,world)
+        finished=update>=c['updates'] and (progress is None or progress['coverage_complete'])
         validation=None
-        if update%c['eval_every']==0 or update==c['updates']:
+        if update%c['eval_every']==0 or finished or (progress and progress['coverage_complete'] and not was_complete):
             policy.eval();rows=evaluate_rows(policy,protocol,c,locator,rank,world,split='validation')
-            validation=float(np.mean([r['score'] for r in rows]))
-        improved=validation is not None and validation>best
+            value=float(np.mean([r['score'] for r in rows])) if rank==0 else 0.
+            scalar=torch.tensor(value,device=locator.device,dtype=torch.float64)
+            if world>1:dist.broadcast(scalar,src=0)
+            validation=float(scalar)
+        improved=validation is not None and validation>best and (progress is None or progress['coverage_complete'])
         if improved:best=validation
         record=dict(update=update,seconds=time.perf_counter()-tick,validation_score=validation,
             mean_step_reward=float(buffer['reward'].mean()),completed_local_episodes=len(episodes),**metrics)
         record.update(phase1_queries=locator.queries,phase1_cache_hits=locator.hits,constant_tiles=locator.uniform,
             transitions=c['rollout_steps']*c['num_envs']*world,
             transitions_per_second=c['rollout_steps']*c['num_envs']*world/max(record['seconds'],1e-9),
-            peak_allocated_gib=torch.cuda.max_memory_allocated(locator.device)/1024**3 if locator.device.type=='cuda' else 0.)
+            peak_allocated_gib=torch.cuda.max_memory_allocated(locator.device)/1024**3 if locator.device.type=='cuda' else 0.,
+            training_scene_coverage=progress)
         history.append(record)
+        states=None
+        if schedule is not None:
+            if world>1:
+                states=[None]*world if rank==0 else None
+                dist.gather_object(schedule.state_dict(),states,dst=0)
+            else:states=[schedule.state_dict()]
         if rank==0:
             state=dict(schema='rind-active-rl-policy-v1',policy=policy.state_dict(),optimizer=optimizer.state_dict(),
-                locator_snapshot_sha256=protocol['snapshot_sha256'],update=update,best=best if math.isfinite(best) else None,history=history,config=c,protocol_sha256=fingerprint)
+                locator_snapshot_sha256=protocol['snapshot_sha256'],update=update,best=best if math.isfinite(best) else None,
+                history=history,config=c,protocol_sha256=fingerprint,scene_schedule_states=states)
             atomic_save(last,state)
             if improved:atomic_save(output/'best.pt',state)
             write_json(output/'training.json',dict(history=history,best_validation_score=best if math.isfinite(best) else None,
                 policy_parameters=sum(p.numel() for p in policy.parameters()),phase1_frozen=True,
                 fusion_method=c.get('fusion_method','product'),environment=c.get('environment','window'),
+                best_requires_complete_scene_coverage=schedule is not None,
+                training_scene_coverage=progress,coverage_complete=progress['coverage_complete'] if progress else None,
                 total_transitions=sum(h.get('transitions',c['rollout_steps']*c['num_envs']*world) for h in history),
                 transitions_per_update=c['rollout_steps']*c['num_envs']*world,world_size=world))
-            log(f'RL update={update}/{c["updates"]} reward={record["mean_step_reward"]:.4f} '
+            label=f'{update} (minimum {c["updates"]})' if schedule else f'{update}/{c["updates"]}'
+            log(f'RL update={label} reward={record["mean_step_reward"]:.4f} '
                 f'val={validation} KL={metrics["approx_kl"]:.4f} seconds={record["seconds"]:.1f} '
                 f'transitions/s={record["transitions_per_second"]:.1f} rank0 peak={record["peak_allocated_gib"]:.2f}GiB cache hits={locator.hits}')
+            if progress:
+                log(f'scene coverage | started={progress["started_unique_scenes"]:,}/{progress["training_scenes"]:,} '
+                    f'completed={progress["completed_unique_scenes"]:,}/{progress["training_scenes"]:,} '
+                    f'reached {progress["required_visits"]} visits={progress["scenes_reaching_target"]:,}/{progress["training_scenes"]:,} '
+                    f'min visits={progress["minimum_completed_visits"]}; minimum updates={c["updates"]}, complete={finished}')
         if world>1:dist.barrier()
+        if finished:break
 
 
 def save_trace(row,protocol,c,locator,output):
@@ -393,10 +456,13 @@ def summarize(rows,c,output,protocol,checkpoint):
         source_sha256=protocol['source_sha256'],reward='delta(.5 log mass16 + .5 log mass32), gamma=1',
         location_entropy_reward=False,source_containing_windows_filtered=False,constant_tiles='neutral evidence; cost counted',
         fusion=protocol['inference_fusion'],environment=c.get('environment','window'),fusion_method=c.get('fusion_method','product'),
+        selected_scene_counts={k:len(v) for k,v in protocol['scene_splits'].items()},
+        training_scene_coverage=checkpoint.get('training_scene_coverage'),
         tile_size=c['tile_size'],timing='shared locator cache; wall times are not a cold-cache latency benchmark')
     directory=output/'evaluation';write_json(directory/'metrics.json',result)
     write_json(directory/'episodes.json',rows)
     lines=['# 单源主动选窗测试','',f'固定测试场景：{result["scenes"]}；RL best update：{checkpoint["update"]}；冻结Phase1 epoch：{protocol["source_epoch"]}。',
+        f'实际训练/验证/测试场景：{result["selected_scene_counts"]}；所选权重的训练覆盖：{result["training_scene_coverage"]}。',
         '','奖励为16/32像素真源邻域对数质量的等权增量。概率场熵不进入奖励；策略动作熵仅用于PPO探索。',
         '','| 预算 | 策略 | M16 | M32 | MAP距离 | Recall@32 | 90%区域面积 | 真源覆盖率 | 实际像素 |',
         '|---|---|---:|---:|---:|---:|---:|---:|---:|']
@@ -420,7 +486,16 @@ def main():
     parser.add_argument('command',choices=('prepare','train','evaluate','all'))
     parser.add_argument('--config');parser.add_argument('--run-name',default='single_source_rl_v1')
     parser.add_argument('--phase1-run');parser.add_argument('--data-root');parser.add_argument('--device',choices=('cpu','cuda'),default='cuda')
-    parser.add_argument('--scene-counts',type=int,nargs=3);parser.add_argument('--updates',type=int)
+    def scene_count(value):
+        if value=='all':return value
+        try:count=int(value)
+        except ValueError:raise argparse.ArgumentTypeError('scene count must be a positive integer or all')
+        if count<1:raise argparse.ArgumentTypeError('scene count must be positive')
+        return count
+    selection=parser.add_mutually_exclusive_group()
+    selection.add_argument('--scene-counts',type=scene_count,nargs=3)
+    selection.add_argument('--all-scenes',action='store_true')
+    parser.add_argument('--updates',type=int)
     parser.add_argument('--num-envs',type=int);parser.add_argument('--rollout-steps',type=int)
     parser.add_argument('--set',action='append',default=[])
     args=parser.parse_args()
@@ -443,6 +518,9 @@ def main():
         if rank==0:prepare(c,output)
         if world>1:dist.barrier()
         protocol=json.loads((output/'protocol.json').read_text())
+        if (output/'last.pt').is_file():
+            last_settings=torch.load(output/'last.pt',map_location='cpu',weights_only=True).get('config',{})
+            for key in ('updates','minimum_scene_visits'):c[key]=max(c.get(key,0),last_settings.get(key,0))
         dataset=Phase1Dataset(protocol['data_root'])
         if sha(Path(protocol['data_root'])/'manifest.json')!=protocol['data_manifest_sha256']:raise ValueError('data changed after preparation')
         locator=FrozenLocator(dataset,output/'phase1_frozen.pt',device,tile=c['tile_size'],spacing=c['spacing'],
@@ -462,6 +540,10 @@ def main():
             if sha(checkpoint['snapshot'])!=checkpoint['sha256']:raise ValueError('evaluation policy snapshot changed')
             saved=torch.load(checkpoint['snapshot'],map_location='cpu',weights_only=True)
             checkpoint['update']=saved['update']
+            checkpoint['training_scene_coverage']=saved['history'][-1].get('training_scene_coverage')
+            if c.get('minimum_scene_visits',0) and (not checkpoint['training_scene_coverage'] or
+                    checkpoint['training_scene_coverage']['minimum_completed_visits']<c['minimum_scene_visits']):
+                raise RuntimeError('best policy has not met the requested full-scene coverage; resume training first')
             if saved['protocol_sha256']!=sha(output/'protocol.json'):raise ValueError('policy/protocol mismatch')
             policy.load_state_dict(saved['policy']);policy.eval()
             initial=make_policy(c).to(device)

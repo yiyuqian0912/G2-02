@@ -34,7 +34,7 @@
 | 旧权重保护与对比 | `model_comparison.py` | 相同完整名单；冻结旧最终best/last；未完成则pending |
 | 动态观测 | `run_active_observation.sh`；[说明](../Phase2_Multi_Source/docs/ACTIVE_OBSERVATION.zh-CN.md) | 环境、三基线和18条真实路径核对完成；无定位收益结论 |
 
-单源RL v1服务器结果已回收：冻结Phase1 epoch18，128个测试场景；25%面积预算下PPO Recall@32=41.41%，随机42.19%，优先扩窗44.53%，未证实RL收益。详见 [审核](../Phase1_Single_Source_Single_Intensity/docs/results/rl_single_source_v1_review.zh-CN.md)。新增v2采用16×16全边缘逐块扩展、原始概率逐点最小值融合、空间动作头及10,000/1,000/1,000场景；已完成本地流程检查，正式100k模型收益待验证。[运行指南](../Phase1_Single_Source_Single_Intensity/docs/FRONTIER16_MINIMUM_RL.zh-CN.md)。
+单源RL v1服务器结果已回收：冻结Phase1 epoch18，128个测试场景；25%面积预算下PPO Recall@32=41.41%，随机42.19%，优先扩窗44.53%，未证实RL收益。详见 [审核](../Phase1_Single_Source_Single_Intensity/docs/results/rl_single_source_v1_review.zh-CN.md)。新增v2采用16×16全边缘逐块扩展、原始概率逐点最小值融合和空间动作头；现支持继承100k单源划分全量训练，以完成全部训练场景访问为停止与best选优条件，覆盖状态可断点恢复/重新分卡；已完成本地流程检查，正式100k模型收益待验证。[运行指南](../Phase1_Single_Source_Single_Intensity/docs/FRONTIER16_MINIMUM_RL.zh-CN.md)。
 
 ## 仍需完成
 

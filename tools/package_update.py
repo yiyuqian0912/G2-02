@@ -50,6 +50,9 @@ def build(output, root=ROOT):
     records = {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
     required = ("run_single_source_rl.sh","run_single_source_rl_tmux.sh",
                 "Phase1_Single_Source_Single_Intensity/configs/active_rl_frontier16_minimum.json",
+                "Phase1_Single_Source_Single_Intensity/configs/active_rl_frontier16_minimum_full.json",
+                "Phase1_Single_Source_Single_Intensity/src/rind_phase1/active_rl/scene_schedule.py",
+                "Phase1_Single_Source_Single_Intensity/tests/test_rl_scene_schedule.py",
                 "Phase1_Single_Source_Single_Intensity/docs/FRONTIER16_MINIMUM_RL.zh-CN.md",
                 "Phase1_Single_Source_Single_Intensity/src/rind_phase1/active_rl/frontier.py",
                 "Phase1_Single_Source_Single_Intensity/src/rind_phase1/active_rl/trajectory_view.py",

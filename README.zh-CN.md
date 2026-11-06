@@ -90,15 +90,15 @@ unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_TMUX_SESSION
 
 ## 单源RL动态选窗（独立实验）
 
-冻结已有Phase1定位器，训练选路策略。新版从一个16×16块开始，每次在整个已观测区域的四邻接边缘添加一个新块；独立查询Phase1，保留原始小窗概率的逐点最小值，再归一化。默认10,000/1,000/1,000个场景，排除上轮审阅的128个测试场景。原64块乘积融合实验保留。
+冻结已有Phase1定位器，训练选路策略。新版从一个16×16块开始，每次在整个已观测区域的四邻接边缘添加一个新块；独立查询Phase1，保留原始小窗概率的逐点最小值，再归一化。新增全量配置，继承全部80,000/10,000/10,000场景划分，测试排除上轮审阅的128个场景；以实际解析数量为准。每个训练场景至少完成一条轨迹后才允许结束。原64块乘积融合实验保留。
 
 ```bash
 ./run_single_source_rl_tmux.sh start all --gpus auto \
-  --run-name single_source_rl_frontier16_minimum_v2 \
-  --config configs/active_rl_frontier16_minimum.json \
+  --run-name single_source_rl_frontier16_minimum_full \
+  --config configs/active_rl_frontier16_minimum_full.json \
   --phase1-run outputs/experiments/phase1_100k_multiscale_h20_memmap \
   --data-root data/raw/phase1-single-source-100k
-./run_single_source_rl_tmux.sh status --run-name single_source_rl_frontier16_minimum_v2
+./run_single_source_rl_tmux.sh status --run-name single_source_rl_frontier16_minimum_full
 ```
 
 运行、融合定义、参数与逐步HTML可视化见 [16块最小值版指南](Phase1_Single_Source_Single_Intensity/docs/FRONTIER16_MINIMUM_RL.zh-CN.md)。服务器原v1已完成128场景测试：观测扩展有效，但PPO未证明优于随机或直接扩窗；详见 [审核报告](Phase1_Single_Source_Single_Intensity/docs/results/rl_single_source_v1_review.zh-CN.md)。v2完成本地真实数据流程验证，100k模型的选路收益和H20效率待服务器评价。真源只用于训练奖励及离线评价，不进入策略。
