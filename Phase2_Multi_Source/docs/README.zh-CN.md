@@ -7,7 +7,8 @@
 1. [完整研究链路报告](../../docs/RIND_RESEARCH_CHAIN.zh-CN.md)：物理、数据、Phase1/Phase2演进、结果与下一步。
 2. [当前项目状态](../../docs/PROJECT_STATUS.zh-CN.md)：哪些结果已回收，哪些仍待验证。
 3. [v6两项等权监督、自主减法与守恒](SEQUENTIAL_COUNT_SHAPE.zh-CN.md)：当前模型、loss、约束、缓存复用、tmux和旧权重对比。
-4. [数据安装与拼接](../dataset_update/README.zh-CN.md)：随机强度派生、重复几何绑定和联合读取。
+4. [从v5 best epoch16继续训练](V6_BEST16_RUN.zh-CN.md)：当前启动命令、旧权重保护、GPU缓存、自动批量与复核。
+5. [数据安装与拼接](../dataset_update/README.zh-CN.md)：随机强度派生、重复几何绑定和联合读取。
 
 ## 历史流程和研究工具
 

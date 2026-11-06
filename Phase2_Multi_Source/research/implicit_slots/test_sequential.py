@@ -248,6 +248,15 @@ class SequentialTests(unittest.TestCase):
             self.assertEqual(saved[-3:],['--gpus','auto','--auto-batch'])
             self.assertIn('RIND_TMUX_TASK=all',saved)
             self.assertEqual(pointer.read_text().strip(),str(config))
+            (run/'exit_code.txt').write_text('1\n')
+            (run/'training.log').write_text('Traceback (most recent call last):\n'
+                '  File "sequential_objective.py", line 126, in training_assignment\n'
+                'torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB.\n'
+                'C++ CapturedTraceback:\n'+'native C++ stack tail\n'*120)
+            status=subprocess.run(['bash',str(frontend),'status'],env=env,text=True,capture_output=True,check=True)
+            self.assertIn('Tried to allocate 8.00 GiB',status.stdout)
+            self.assertIn('first Python traceback',status.stdout)
+            self.assertLess(status.stdout.count('native C++ stack tail'),30)
             pointer.write_text('preserve');env['MOCK_SESSION_RUNNING']='0'
             p=subprocess.run(command,env=env,text=True,capture_output=True)
             self.assertNotEqual(p.returncode,0);self.assertEqual(pointer.read_text(),'preserve')

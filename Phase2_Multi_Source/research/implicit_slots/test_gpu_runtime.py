@@ -104,17 +104,22 @@ class GPURuntimeTests(unittest.TestCase):
                 import numpy as np
                 b=example()
                 return {k:v[0].numpy() for k,v in b.items()}
-        for world in (1,2):
+        for sequential,world in ((False,1),(False,2),(True,1),(True,2)):
             sequences=[]
             for rank in range(world):
                 c=tiny_config();c['training'].update(batch_size=32,target_global_batch_size=256)
+                if sequential:
+                    c['model']['decomposition_architecture']='sequential_count_shape_v6'
+                    c['loss']={'objective':'sequential_count_shape_v6','count_weight':.5,'mask_weight':.5}
+                    c['training']['adaptive_checkpoint_min_layers']=3
                 model=make_model(c,1024,torch.device('cpu'),False).eval()
                 before={k:v.clone() for k,v in model.state_dict().items()};rng=torch.get_rng_state().clone()
                 current={'peak':0};sequence=[]
                 def measured(model,batch,*args,**kwargs):
-                    micro=len(batch['response']);sequence.append(micro);torch.rand(2)
+                    micro=len(batch['response']);sequence.append((micro,kwargs.get('horizon')));torch.rand(2)
                     current['peak']=int(micro/4*GIB)
-                    if micro>=128:raise torch.cuda.OutOfMemoryError('mocked device OOM')
+                    if micro>=128 or (sequential and kwargs.get('horizon')==2 and micro>=64):
+                        raise torch.cuda.OutOfMemoryError('mocked device OOM in this horizon profile')
                     return .1+micro/512
                 def to(tensor,*args,**kwargs):
                     if args and args[0] is device:return original_to(tensor,'cpu')
@@ -134,12 +139,13 @@ class GPURuntimeTests(unittest.TestCase):
                     stack.enter_context(patch('gpu_runtime._measure',side_effect=measured))
                     stack.enter_context(patch('torch.distributed.all_gather_object',side_effect=gather))
                     selected=calibrate_batch(model,Records(),c,device,rank,world,Path(tmp),0)
-                    self.assertEqual(selected,64 if world==1 else 32)
+                    self.assertEqual(selected,64 if world==1 and not sequential else 32)
                     self.assertEqual(c['training']['batch_size'],selected)
                     if rank==0:
                         report=json.loads((Path(tmp)/'gpu_batch_probe.json').read_text())
                         self.assertEqual(report['effective_global_batch'],256)
                         self.assertFalse(report['weights_updated'])
+                        if sequential:self.assertEqual([p['horizon'] for p in report['calibration_profiles']],[4,2])
                 self.assertFalse(model.training)
                 self.assertTrue(torch.equal(rng,torch.get_rng_state()))
                 for key,value in before.items():torch.testing.assert_close(model.state_dict()[key],value)

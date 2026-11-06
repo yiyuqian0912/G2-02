@@ -457,6 +457,13 @@ def decomposed_batches(records: DecompositionRecords, batch_size: int,
                        rank: int = 0, world_size: int = 1,
                        training: bool = True, sampling=None) -> Iterator[dict[str, torch.Tensor]]:
     groups = _batch_groups(records, batch_size, rng, rank, world_size, training, sampling)
+    device_batch = getattr(records, 'device_batch', None)
+    if device_batch is not None:
+        # CUDA kernels run on the consumer's stream, never in CPU prefetch
+        # threads. Packed/resident input avoids CPU dense-mask expansion.
+        for group in groups:
+            yield device_batch(group)
+        return
     def load(group: list[int]) -> dict[str, torch.Tensor]:
         return collate_decomposition_records([records[index] for index in group])
     if prefetch < 1:

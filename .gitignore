@@ -56,3 +56,6 @@ htmlcov/
 *.safetensors
 *.tgz
 *.tar
+
+# Downloaded local experiment artifacts, not source evidence
+/results/

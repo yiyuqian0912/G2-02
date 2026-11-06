@@ -11,15 +11,16 @@ fi
 [[ -n "$python_bin" ]] || { echo 'Python environment missing; set RIND_PYTHON' >&2;exit 1; }
 export RIND_PYTHON="$python_bin"
 source_session=rind_masks_disentangled_more
-source_root="";run_name="";source_set=0;arguments=()
+source_root="";run_name="";expected_epoch="";source_set=0;arguments=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --source-session|--source-root|--run-name)
+    --source-session|--source-root|--run-name|--expected-source-epoch)
       [[ $# -ge 2 ]] || { echo "Missing value for $1" >&2;exit 2; }
       case "$1" in
         --source-session) source_session="$2" ;;
         --source-root) source_root="$2" ;;
         --run-name) run_name="$2" ;;
+        --expected-source-epoch) expected_epoch="$2" ;;
       esac
       source_set=1;shift 2 ;;
     *) arguments+=("$1");shift ;;
@@ -41,6 +42,7 @@ if [[ "$action" == start ]]; then
       options=(--source-session "$source_session")
       if [[ -n "$source_root" ]]; then options+=(--source-root "$source_root");fi
       if [[ -n "$run_name" ]]; then options+=(--run-name "$run_name");fi
+      if [[ -n "$expected_epoch" ]]; then options+=(--expected-source-epoch "$expected_epoch");fi
       export RIND_MASKS_CONFIG="$("$python_bin" "$ROOT/Phase2_Multi_Source/research/implicit_slots/configure_sequential.py" "${options[@]}")"
     fi
   fi

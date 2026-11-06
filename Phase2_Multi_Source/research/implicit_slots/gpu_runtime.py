@@ -111,10 +111,22 @@ def choose_batch(measurements,world):
     return max(feasible)[1]
 
 
-def _measure(model,batch,loss_config,device,amp,steps):
+def calibration_profiles(model,sequential):
+    if not sequential:return [{'name':'native','horizon':None}]
+    profiles=[{'name':'full_horizon','horizon':model.max_slots}]
+    threshold=getattr(model,'adaptive_checkpoint_min_layers',0)
+    if not getattr(model,'activation_checkpoint_decomposer',False) and 1<threshold<=model.max_slots:
+        profiles.append({'name':'largest_uncheckpointed_horizon','horizon':threshold-1})
+    return profiles
+
+
+def _measure(model,batch,loss_config,device,amp,steps,*,horizon=None):
     import torch
     from decomposition_model import decomposition_training_loss
     durations=[];output=loss=None
+    old_horizon=getattr(model,'calibration_horizon',None)
+    had_horizon=hasattr(model,'calibration_horizon')
+    old_full=getattr(model,'calibration_full_horizon',False)
     try:
         for step in range(steps+1):
             model.zero_grad(set_to_none=True)
@@ -123,11 +135,16 @@ def _measure(model,batch,loss_config,device,amp,steps):
                 # Probe the worst autonomous horizon, not just the cheaper
                 # teacher-forced step. Restore the flag before real training.
                 sequential=loss_config.get('objective')=='sequential_count_shape_v6'
-                if sequential:model.calibration_full_horizon=True
+                if sequential:
+                    model.calibration_horizon=horizon if horizon is not None else model.max_slots
                 try:
-                    output=model(batch['response'],batch['obstacle'],batch['window'],None,None,compute_location=False)
+                    output=model(batch['response'],batch['obstacle'],batch['window'],None,None,compute_location=False,
+                                 **({'verify_constraints':False} if sequential else {}))
                 finally:
-                    if sequential:model.calibration_full_horizon=False
+                    if sequential:
+                        if had_horizon:model.calibration_horizon=old_horizon
+                        elif hasattr(model,'calibration_horizon'):del model.calibration_horizon
+                        model.calibration_full_horizon=old_full
             loss=decomposition_training_loss(output,batch,**loss_config)['loss']
             if not bool(torch.isfinite(loss)):raise FloatingPointError('nonfinite calibration loss')
             loss.backward();torch.cuda.synchronize(device)
@@ -152,34 +169,47 @@ def calibrate_batch(model,records,config,device,rank,world,output,seed):
     from train_decomposition import write_json
     setting=config['training'];base=setting['batch_size']
     options=batch_candidates(base,world,setting['target_global_batch_size'])
+    profiles=calibration_profiles(model,config['loss'].get('objective')=='sequential_count_shape_v6')
     # One largest-native training observation, copied/repeated on GPU. No bulk
     # CPU batch collation, no validation/test examples, no fit-weight updates.
     chosen=max(range(len(records)),key=lambda i:(records.entries[i]['size'],len(records.entries[i]['intensities'])))
-    single={k:v.to(device) for k,v in collate_decomposition_records([records[chosen]]).items()}
+    single=(records.device_batch([chosen]) if getattr(records,'device_batch',None) is not None else
+            {k:v.to(device) for k,v in collate_decomposition_records([records[chosen]]).items()})
     training=model.training;cpu_rng=torch.get_rng_state();gpu_rng=torch.cuda.get_rng_state(device)
     model.train();measurements=[]
     reserve_gib=float(os.environ.get('RIND_GPU_RESERVE_GIB','6'))
     if not math.isfinite(reserve_gib) or reserve_gib<0:raise ValueError('GPU reserve must be finite and nonnegative')
     try:
         for micro in options:
-            batch=None
+            batch=None;profile_results=[];active_profile='batch_inputs'
             try:
                 model.zero_grad(set_to_none=True);torch.cuda.empty_cache();torch.cuda.synchronize(device)
                 free,total=torch.cuda.mem_get_info(device)
                 budget=memory_budget(torch.cuda.memory_allocated(device),torch.cuda.memory_reserved(device),free,total,
                                      reserve_bytes=int(reserve_gib*GIB))
-                torch.cuda.reset_peak_memory_stats(device)
                 batch={k:v.expand(micro,*v.shape[1:]).contiguous() for k,v in single.items()}
-                seconds=_measure(model,batch,config['loss'],device,setting['amp_dtype']=='bfloat16',steps=2)
-                peak=torch.cuda.max_memory_reserved(device)
+                for profile in profiles:
+                    active_profile=profile['name']
+                    print(f'[GPU batch probe] rank={rank} micro={micro} '
+                          f'profile={active_profile} horizon={profile["horizon"]}',flush=True)
+                    model.zero_grad(set_to_none=True);torch.cuda.empty_cache()
+                    torch.cuda.reset_peak_memory_stats(device)
+                    seconds=_measure(model,batch,config['loss'],device,setting['amp_dtype']=='bfloat16',steps=2,
+                                     horizon=profile['horizon'])
+                    profile_results.append({**profile,'step_seconds':seconds,
+                        'peak_reserved_bytes':torch.cuda.max_memory_reserved(device)})
+                seconds=max(r['step_seconds'] for r in profile_results)
+                peak=max(r['peak_reserved_bytes'] for r in profile_results)
                 # Fresh Adam moments and DDP gradient buckets may not exist yet.
                 extra=12*sum(p.numel() for p in model.parameters() if p.requires_grad)
                 estimated=peak+extra
                 local={'rank':rank,'gpu_name':torch.cuda.get_device_name(device),'feasible':estimated<=budget,'step_seconds':seconds,
                        'peak_reserved_bytes':peak,'estimated_peak_with_adam_ddp_bytes':estimated,
-                       'budget_bytes':budget,'free_before_bytes':free,'total_bytes':total}
+                       'budget_bytes':budget,'free_before_bytes':free,'total_bytes':total,
+                       'profiles':profile_results}
             except torch.cuda.OutOfMemoryError:
-                local={'rank':rank,'feasible':False,'out_of_memory':True}
+                local={'rank':rank,'feasible':False,'out_of_memory':True,
+                       'failed_profile':active_profile,'profiles_completed':profile_results}
             finally:
                 batch=None;model.zero_grad(set_to_none=True);torch.cuda.empty_cache()
             ranks=[local]
@@ -190,7 +220,7 @@ def calibrate_batch(model,records,config,device,rank,world,output,seed):
                 print(f'[GPU batch probe] micro={micro} | '+ ' | '.join(
                     f'rank{r["rank"]}: '+(f'{r["estimated_peak_with_adam_ddp_bytes"]/GIB:.1f} GiB / '
                      f'{r["budget_bytes"]/GIB:.1f} GiB budget; {r["step_seconds"]:.3f}s; fits={r["feasible"]}'
-                     if 'step_seconds' in r else 'OOM') for r in ranks),flush=True)
+                     if 'step_seconds' in r else 'OOM '+r.get('failed_profile','')) for r in ranks),flush=True)
             # Always keep the common sequence: one rank OOM must never make
             # that rank leave while another enters a later collective.
         # Another retained worker can change its VRAM use during calibration.
@@ -212,6 +242,7 @@ def calibrate_batch(model,records,config,device,rank,world,output,seed):
                 'physical_gpu_ids':os.environ.get('RIND_PHYSICAL_GPU_IDS'),
                 'effective_global_batch':selected*world*math.ceil(setting['target_global_batch_size']/(selected*world)),
                 'worst_training_size':int(single['response'].shape[-1]),'reserve_gib':reserve_gib,
+                'calibration_profiles':profiles,
                 'budgets_at_selection':current_budgets,'seed':seed,'amp_dtype':setting['amp_dtype'],'candidate_batches':options,'measurements':measurements,'weights_updated':False,
                 'scope':'actual GPU forward/loss/backward; repeat one training observation; no disk/DDP timing'}
         if rank==0:

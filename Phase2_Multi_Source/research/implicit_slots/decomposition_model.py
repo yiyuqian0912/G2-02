@@ -10,6 +10,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from pairwise_ops import masked_pairwise_dot
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -363,9 +365,9 @@ def _decomposition_single_loss(
     empty_count = (~real).sum(-1).clamp_min(1)
     bce_pair = (
         (F.softplus(logit_flat) * free[:, None]).sum(-1)[:, None, :]
-        - torch.einsum("btp,bsp,bp->bts", target_flat, logit_flat, free)
+        - masked_pairwise_dot(target_flat, logit_flat, free)
     ) / free_count[:, None, None]
-    intersection = torch.einsum("btp,bsp,bp->bts", target_flat, mask_flat, free)
+    intersection = masked_pairwise_dot(target_flat, mask_flat, free)
     area_teacher = (target_flat * free[:, None]).sum(-1)[:, :, None]
     area_student = (mask_flat * free[:, None]).sum(-1)[:, None, :]
     dice_pair = 1 - (2 * intersection + 1e-6) / (area_teacher + area_student + 1e-6)

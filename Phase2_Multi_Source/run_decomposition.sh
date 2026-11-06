@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
-echo 'RIND build: phase2-2026-11-03-adaptive-gpu-runtime'
+echo 'RIND build: phase2-2026-11-04-best16-bounded-pairwise-oom-fix'
 task="${1:-}"
 shift || true
 case "$task" in install|bootstrap|prepare|index|train|evaluate|all) ;; *) echo 'Usage: run_decomposition.sh {install|bootstrap|prepare|index|train|evaluate|all} [--gpus auto|N] [--gpu-ids 2,3]' >&2; exit 2 ;; esac

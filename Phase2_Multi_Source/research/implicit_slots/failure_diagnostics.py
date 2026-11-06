@@ -9,6 +9,7 @@ from collections import Counter,defaultdict
 from pathlib import Path
 import numpy as np
 import torch
+from pairwise_ops import masked_pairwise_dot
 from decomposition_model import exact_batched_assignment,slot_activation
 
 
@@ -24,8 +25,8 @@ def evaluation_pair_cost(output,batch):
     z=output['mask_logits'].float().flatten(2);m=output['mask_probability'].float().flatten(2)
     target=batch['teacher_mask'].float().flatten(2);free=(~batch['obstacle']).float().flatten(1)
     pixels=free.sum(1).clamp_min(1)
-    bce=((F.softplus(z)*free[:,None]).sum(2)[:,None]-torch.einsum('btp,bsp,bp->bts',target,z,free))/pixels[:,None,None]
-    inter=torch.einsum('btp,bsp,bp->bts',target,m,free)
+    bce=((F.softplus(z)*free[:,None]).sum(2)[:,None]-masked_pairwise_dot(target, z, free))/pixels[:,None,None]
+    inter=masked_pairwise_dot(target, m, free)
     dice=1-(2*inter+1e-6)/((target*free[:,None]).sum(2)[:,:,None]+(m*free[:,None]).sum(2)[:,None]+1e-6)
     scale=batch['response'].float().amax((-1,-2)).clamp_min(1e-12)
     pa=torch.log((output['intensity'].float()/scale[:,None]).clamp_min(1e-12))

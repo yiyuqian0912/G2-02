@@ -9,7 +9,7 @@ import sys
 import threading
 
 import numpy as np
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 
 def _pack(array, dtype="<f8"):
@@ -71,6 +71,57 @@ def _highest_density_region(probability, mass):
     return probability >= cutoff - tolerance
 
 
+def scene_geometry(scene, world_size):
+    """Serialize original float64 geometry for display/export, never inference."""
+    names = {0: "rectangle", 1: "ellipse", 2: "triangle", 3: "polygon"}
+    types = np.asarray(scene["obstacle_types"])
+    params = np.asarray(scene["obstacle_params"], dtype=np.float64)
+    groups = np.asarray(scene["obstacle_group_ids"])
+    obstacles = []
+    for index, (kind, row, group) in enumerate(zip(types, params, groups)):
+        kind = int(kind)
+        if kind not in names:
+            raise ValueError("unsupported obstacle type: {}".format(kind))
+        item = {"index": index, "type_id": kind, "type": names[kind],
+                "group_id": int(group), "params": row.tolist()}
+        if kind in (0, 1):
+            cx, cy, a, b, theta = map(float, row[:5])
+            item.update(center=[cx, cy], theta_radians=theta)
+            if kind == 0:
+                item.update(half_size=[a, b], size=[2 * a, 2 * b])
+                local = np.array([[-a, -b], [a, -b], [a, b], [-a, b]])
+                rotation = np.array([[np.cos(theta), -np.sin(theta)],
+                                     [np.sin(theta), np.cos(theta)]])
+                item["vertices"] = (local @ rotation.T + [cx, cy]).tolist()
+            else:
+                item["radii"] = [a, b]
+        elif kind == 2:
+            item["vertices"] = row[:6].reshape(3, 2).tolist()
+        else:
+            count = int(row[0])
+            if count < 3 or 1 + 2 * count > len(row):
+                raise ValueError("invalid polygon vertex count")
+            item["vertices"] = row[1:1 + 2 * count].reshape(count, 2).tolist()
+        obstacles.append(item)
+    return {"schema": "rind-scene-geometry-v1", "scene_id": int(scene["scene_id"]),
+            "world_size": int(world_size),
+            "coordinates": {"origin": "top-left", "x": "right", "y": "down",
+                            "pixel_centers": "(x + 0.5, y + 0.5)", "angles": "radians"},
+            "obstacle_count": len(obstacles),
+            "logical_obstacle_count": len(set(map(int, groups))),
+            "obstacle_types": types.tolist(), "obstacle_params": params.tolist(),
+            "obstacle_group_ids": groups.tolist(), "obstacles": obstacles,
+            "local_views": np.asarray(scene["local_views"]).tolist(),
+            "sources_evaluation_only": np.column_stack(
+                (scene["drivers"], scene["driver_strengths"])).tolist(),
+            "parameter_layouts": {
+                "rectangle": "cx, cy, half_width, half_height, theta; remaining entries are padding",
+                "ellipse": "cx, cy, radius_x, radius_y, theta; remaining entries are padding",
+                "triangle": "x1, y1, x2, y2, x3, y3; remaining entries are padding",
+                "polygon": "vertex_count, x1, y1, ..., xn, yn; remaining entries are padding"},
+            "purpose": "ground-truth visualization/export only; not a new student input"}
+
+
 class Explorer:
     def __init__(self, bundle, project, device="cpu", chunk=4096,
                  student_run="layer_student_v4"):
@@ -110,6 +161,7 @@ class Explorer:
         self.model.to(self.device).eval()
         self.lock = threading.Lock()
         self.cache = {}
+        self.scene_cache = {}
         manifest = json.loads((self.teacher_root / "records.json").read_text())
         lookup = {(int(row["scene_id"]), int(row["view_id"])): row
                   for row in manifest["records"]["test"]}
@@ -136,6 +188,54 @@ class Explorer:
         if not entries:
             raise ValueError("bundle contains no complete teacher windows")
         self.entries = entries
+
+    def _scene_entry(self, index):
+        if not 0 <= index < len(self.entries):
+            raise ValueError("window index out of range")
+        return self.entries[index]
+
+    def geometry(self, index):
+        entry = self._scene_entry(index)
+        value = scene_geometry(self.dataset.get_scene(entry["scene_id"]),
+                               self.dataset.manifest["global_size"])
+        value["browser_views"] = [
+            {key: row[key] for key in ("index", "view_id", "size")}
+            for row in self.entries if row["scene_id"] == entry["scene_id"]]
+        return value
+
+    def geometry_collection(self):
+        seen, scenes = set(), []
+        for entry in self.entries:
+            scene_id = entry["scene_id"]
+            if scene_id not in seen:
+                scenes.append(self.geometry(entry["index"]))
+                seen.add(scene_id)
+        return {"schema": "rind-browser-scene-collection-v1",
+                "scope": "unique scenes represented by this browser's recovered test windows",
+                "window_count": len(self.entries), "scene_count": len(scenes), "scenes": scenes,
+                "student_run": self.student_run,
+                "purpose": "original geometry and evaluation truth export; not model inputs"}
+
+    def scene(self, index):
+        """Load saved additive full-field truth, independently of the student."""
+        entry = self._scene_entry(index)
+        scene_id = entry["scene_id"]
+        if scene_id not in self.scene_cache:
+            size = int(self.dataset.manifest["global_size"])
+            field = self.dataset.get_region(scene_id, 0, 0, size, size)
+            # get_region sums per-source visibility * true strength, not OR.
+            packet = {"geometry": self.geometry(index),
+                      "response": _pack(field["response"]),
+                      "obstacle": _pack(field["obstacle"], "|u1")}
+            if len(self.scene_cache) >= 2:
+                self.scene_cache.pop(next(iter(self.scene_cache)))
+            self.scene_cache[scene_id] = packet
+        value = self.scene_cache[scene_id]
+        window = value["geometry"]["local_views"][entry["view_id"]]
+        return {**value, "metadata": {"index": index, "scene_id": scene_id,
+                "view_id": entry["view_id"], "window": window,
+                "world_size": int(self.dataset.manifest["global_size"]),
+                "response_semantics": "sum of saved per-source binary visibility times source strength"}}
 
     def catalog(self):
         return {"entries": [{key: value for key, value in row.items() if key != "directory"}
@@ -317,6 +417,27 @@ def create_app(explorer, template_directory):
     @app.get("/api/catalog")
     def catalog():
         return jsonify(explorer.catalog())
+
+    @app.get("/api/scene")
+    def full_scene():
+        return jsonify(explorer.scene(int(request.args.get("index", 0))))
+
+    @app.get("/api/geometry")
+    def geometry_export():
+        scope = request.args.get("scope", "current")
+        if scope == "all":
+            payload = explorer.geometry_collection()
+            filename = "rind-test-scene-geometries.json"
+        elif scope == "current":
+            payload = explorer.geometry(int(request.args.get("index", 0)))
+            filename = "rind-scene-{}-geometry.json".format(payload["scene_id"])
+        else:
+            raise ValueError("geometry scope must be current or all")
+        response = Response(json.dumps(payload, ensure_ascii=False, allow_nan=False, indent=2),
+                            mimetype="application/json")
+        if request.args.get("download") == "1":
+            response.headers["Content-Disposition"] = 'attachment; filename="{}"'.format(filename)
+        return response
 
     @app.post("/api/result")
     def result():

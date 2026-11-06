@@ -67,6 +67,8 @@ worker() {
   local run_dir="$2"
   shift 2
   local log="$run_dir/training.log"
+  export PYTHONFAULTHANDLER=1
+  export TORCH_SHOW_CPP_STACKTRACES=1
   set +e
   (
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] tmux worker started | session=$session | pid=$$"
@@ -166,6 +168,10 @@ case "$action" in
         echo "exit code: $(<"$run_dir/exit_code.txt")"
       fi
       if [[ -f "$run_dir/training.log" ]]; then
+        if [[ -f "$run_dir/exit_code.txt" && "$(<"$run_dir/exit_code.txt")" != 0 ]]; then
+          echo "--- first Python traceback ---"
+          awk '/Traceback \(most recent call last\)/ {show=1} show {print; count++} show && (/C\+\+ CapturedTraceback/ || count>=90) {exit}' "$run_dir/training.log"
+        fi
         echo "--- last 20 log lines ---"
         tail -n 20 "$run_dir/training.log"
       fi

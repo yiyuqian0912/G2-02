@@ -52,19 +52,22 @@ export RIND_PYTHON="$PWD/.venv/bin/python"
 unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_TMUX_SESSION
 ./run_implicit_masks_tmux.sh start all \
   --source-root outputs/masks_disentangled_v5_complex245746 \
+  --expected-source-epoch 16 \
+  --run-name masks_implicit_v6_best16 \
+  --session rind_v6_best16 \
   --gpus auto --auto-batch
-./run_implicit_masks_tmux.sh status
+./run_implicit_masks_tmux.sh status --session rind_v6_best16
 ```
 
 全部原训练记录及追加复杂窗保留，验证/测试名单不变；真实数量以缓存索引和日志为准。任务在tmux后台运行，可断开SSH/VPN。再次启动复用配置与epoch末的 `last.pt`，不承诺恢复到中断batch。
 
 ```bash
-./run_implicit_masks_tmux.sh logs
-./run_implicit_masks_tmux.sh attach
-./run_implicit_masks_tmux.sh start evaluate --gpus auto --auto-batch
+./run_implicit_masks_tmux.sh logs --session rind_v6_best16
+./run_implicit_masks_tmux.sh attach --session rind_v6_best16
+./run_implicit_masks_tmux.sh start evaluate --session rind_v6_best16 --gpus auto
 ```
 
-最后一条只做正式评价。新输出默认位于 `Phase2_Multi_Source/outputs/<原实验名>_implicit_v6/`：
+最后一条只做正式评价。上述命令的新输出位于 `Phase2_Multi_Source/outputs/masks_implicit_v6_best16/`，保留旧权重，并检查继承的最佳轮次为16：
 
 - `models/seed_0/best.pt`、`last.pt`：最佳模型与恢复断点。
 - `training_summary.json`、`models/seed_0/training.json`：训练记录。
@@ -72,7 +75,7 @@ unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_TMUX_SESSION
 - `evaluation/seed_0/reference_comparison.zh-CN.md`：相同名单上的旧最终best/新best对比；旧训练未完成时记录pending。
 - `tmux_runs/`：持久日志、执行命令、退出码。
 
-完整协议见 [v6说明](Phase2_Multi_Source/docs/SEQUENTIAL_COUNT_SHAPE.zh-CN.md)。历史v1–v5、数据扩充、诊断、槽数搜索与动态观测入口集中在 [Phase2文档索引](Phase2_Multi_Source/docs/README.zh-CN.md)。旧定位浏览器仍可用于对应旧产物，当前纯分层结果不自动获得完整位置场可视化。
+当前运行和加速细节见 [best16续训说明](Phase2_Multi_Source/docs/V6_BEST16_RUN.zh-CN.md)，完整协议见 [v6说明](Phase2_Multi_Source/docs/SEQUENTIAL_COUNT_SHAPE.zh-CN.md)。历史v1–v5、数据扩充、诊断、槽数搜索与动态观测入口集中在 [Phase2文档索引](Phase2_Multi_Source/docs/README.zh-CN.md)。旧定位浏览器仍可用于对应旧产物，当前纯分层结果不自动获得完整位置场可视化。
 
 ## 检查与服务器包
 
@@ -84,3 +87,18 @@ unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_TMUX_SESSION
 默认生成 `dist/RIND_Phase2_Update.tar.gz`；解压前缀固定为 `RIND_Phase2_Training_Minimal`。可以用 `--output /path/to/RIND_Phase2_Update.tar.gz` 指定同名目标。源码包不含原始数据、缓存、虚拟环境、权重或逐窗结果。
 
 本地的这些实验产物仍保留，由 `.gitignore` 排除。GitHub保存源码、配置、测试、方法与紧凑证据。维护规则见 [仓库整理约定](docs/REPOSITORY_MAINTENANCE.zh-CN.md)。
+
+## 单源RL动态选窗（独立实验）
+
+冻结已有Phase1定位器，训练选路策略。新版从一个16×16块开始，每次在整个已观测区域的四邻接边缘添加一个新块；独立查询Phase1，保留原始小窗概率的逐点最小值，再归一化。默认10,000/1,000/1,000个场景，排除上轮审阅的128个测试场景。原64块乘积融合实验保留。
+
+```bash
+./run_single_source_rl_tmux.sh start all --gpus auto \
+  --run-name single_source_rl_frontier16_minimum_v2 \
+  --config configs/active_rl_frontier16_minimum.json \
+  --phase1-run outputs/experiments/phase1_100k_multiscale_h20_memmap \
+  --data-root data/raw/phase1-single-source-100k
+./run_single_source_rl_tmux.sh status --run-name single_source_rl_frontier16_minimum_v2
+```
+
+运行、融合定义、参数与逐步HTML可视化见 [16块最小值版指南](Phase1_Single_Source_Single_Intensity/docs/FRONTIER16_MINIMUM_RL.zh-CN.md)。服务器原v1已完成128场景测试：观测扩展有效，但PPO未证明优于随机或直接扩窗；详见 [审核报告](Phase1_Single_Source_Single_Intensity/docs/results/rl_single_source_v1_review.zh-CN.md)。v2完成本地真实数据流程验证，100k模型的选路收益和H20效率待服务器评价。真源只用于训练奖励及离线评价，不进入策略。

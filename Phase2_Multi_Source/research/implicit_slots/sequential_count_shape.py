@@ -110,10 +110,14 @@ class SequentialCountShapeField(DisentangledDecompositionField):
     The old intensity head is frozen and used only in the warm-started count
     encoder's internal refinement. Final strengths satisfy the known-response feasibility check.
     """
-    def __init__(self, *, roundoff_ulps=8,residual_gradient='none', **kwargs):
+    def __init__(self, *, roundoff_ulps=8,residual_gradient='none',adaptive_checkpoint_min_layers=0, **kwargs):
         super().__init__(**kwargs)
         if not isinstance(roundoff_ulps,int) or not 0<=roundoff_ulps<=64:
             raise ValueError('roundoff_ulps must be an integer in [0,64]')
+        if type(adaptive_checkpoint_min_layers) is not int or adaptive_checkpoint_min_layers<0:
+            raise ValueError('adaptive checkpoint threshold must be a nonnegative integer')
+        self.adaptive_checkpoint_min_layers=adaptive_checkpoint_min_layers
+        self._checkpoint_this_rollout=False
         self.roundoff_ulps=roundoff_ulps
         if residual_gradient not in ('none','straight_through'):
             raise ValueError('unknown residual gradient protocol')
@@ -156,7 +160,7 @@ class SequentialCountShapeField(DisentangledDecompositionField):
         return out
 
     def _step(self,context,residual,window,hidden,index):
-        if self.training and self.activation_checkpoint_decomposer:
+        if self.training and (self.activation_checkpoint_decomposer or self._checkpoint_this_rollout):
             return checkpoint(self._step_impl,context,residual,window,hidden,index,use_reentrant=False)
         return self._step_impl(context,residual,window,hidden,index)
 
@@ -184,7 +188,7 @@ class SequentialCountShapeField(DisentangledDecompositionField):
         return logits,probability,query
 
     def forward(self,response,obstacle,window,candidate_xy=None,support=None,candidate_chunk=None,
-                compute_location=None):
+                compute_location=None,verify_constraints=True):
         if compute_location:raise ValueError('sequential v6 trains decomposition only')
         if response.ndim!=3 or obstacle.shape!=response.shape or window.shape!=(len(response),3):
             raise ValueError('misaligned observation/window')
@@ -193,17 +197,35 @@ class SequentialCountShapeField(DisentangledDecompositionField):
         # A few input-float32 ULPs, NOT a percentage reconstruction allowance.
         tolerance=(response.float().amax((-1,-2)).double()*torch.finfo(torch.float32).eps*self.roundoff_ulps)
         common={key:counts[key] for key in ('count_logits','global_count_logits','slot_count_logits','predicted_count')}
-        return self._rollout(context,response,window,tolerance,common)
+        return self._rollout(context,response,window,tolerance,common,verify_constraints=verify_constraints)
 
-    def _rollout(self,context,response,window,tolerance,common):
+    def _rollout(self,context,response,window,tolerance,common,*,verify_constraints=True):
         b,h,w=response.shape
         residual=response.double();masks=[];logits=[];soft=[];strengths=[]
         hidden=torch.zeros(b,1,self.hidden,device=response.device,dtype=context[0].dtype)
         predicted_count=common['predicted_count']
-        horizon=self.max_slots if getattr(self,'calibration_full_horizon',False) else int(predicted_count.max())
+        probe_horizon=getattr(self,'calibration_horizon',None)
+        if probe_horizon is not None:
+            if type(probe_horizon) is not int or not 1<=probe_horizon<=self.max_slots:
+                raise ValueError('invalid calibration horizon')
+            # Calibration only: exercise every enabled recurrent step at this
+            # horizon. No optimizer update or teacher count chooses these steps.
+            horizon=probe_horizon
+            predicted_count=torch.full_like(predicted_count,horizon)
+            common={**common,'predicted_count':predicted_count}
+        else:horizon=self.max_slots if getattr(self,'calibration_full_horizon',False) else int(predicted_count.max())
+        self._checkpoint_this_rollout=bool(self.training and self.adaptive_checkpoint_min_layers and
+                                           horizon>=self.adaptive_checkpoint_min_layers)
+        if self.training and horizon == 0:
+            # A rank can autonomously predict zero layers. Keep the unused new
+            # modules in the DDP graph with exactly zero contribution/gradient.
+            anchor = sum(parameter.reshape(-1)[0] * 0 for module in
+                         (self.state_encoder, self.context_feature, self.residual_pixels)
+                         for parameter in module.parameters() if parameter.requires_grad)
+            common = {**common, 'count_logits': common['count_logits'] + anchor}
         for t in range(horizon):
             enabled=t<predicted_count
-            if getattr(self,'calibration_full_horizon',False):
+            if probe_horizon is not None or getattr(self,'calibration_full_horizon',False):
                 # Probe the actual full-batch worst case, even if the current
                 # warm-start happens to predict only a few layers.
                 z,p,next_hidden=self._step(context,residual,window,hidden,t)
@@ -231,15 +253,22 @@ class SequentialCountShapeField(DisentangledDecompositionField):
         zs=pack(logits,(h,w),torch.float32,-30.)
         a=pack(strengths,(),torch.float64)
         active=torch.arange(self.max_slots,device=response.device)[None]<predicted_count[:,None]
-        fit,fit_residual,accepted=conserved_strengths(hard,active,response,tolerance,a)
-        final_a=torch.where(accepted[:,None],fit,a)
-        final_residual=torch.where(accepted[:,None,None],fit_residual,residual)
+        if verify_constraints:
+            fit,fit_residual,accepted=conserved_strengths(hard,active,response,tolerance,a)
+            final_a=torch.where(accepted[:,None],fit,a)
+            final_residual=torch.where(accepted[:,None,None],fit_residual,residual)
+        else:
+            # The two supervised losses use only masks/counts. Defer the
+            # no-grad FP64 solve until formal inference; never claim acceptance.
+            final_a,final_residual=a,residual
+            accepted=torch.zeros(b,device=response.device,dtype=torch.bool)
         return {**common,'mask_probability':hard.float(),'soft_mask_probability':pack(soft,(h,w),torch.float32),
                 'mask_logits':zs,'intensity':final_a,'provisional_intensity':a,
                 'active_slots':active,'presence_logits':torch.where(active,20.,-20.),
                 'presence_probability':active.float(),'reconstruction':response.double()-final_residual,
                 'residual':final_residual,'internal_residual':residual,
                 'constraint_accepted':accepted,'constraint_tolerance':tolerance,
+                '_constraint_verified':bool(verify_constraints),
                 'executed_layers':((final_a>0)&active).sum(1),
                 '_count_log_space':True,'_sequential_rollout':True}
 
@@ -249,7 +278,7 @@ class SequentialCountShapeField(DisentangledDecompositionField):
 
 def accepted_layers(output,index):
     """The public decoder returns no claimed solution for an incomplete rollout."""
-    if not bool(output['constraint_accepted'][index]):return None
+    if not output.get('_constraint_verified',True) or not bool(output['constraint_accepted'][index]):return None
     on=output['active_slots'][index]
     return {'mask':output['mask_probability'][index,on].bool(),
             'intensity':output['intensity'][index,on],

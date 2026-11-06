@@ -113,6 +113,12 @@ def load_config(path):
                 raise ValueError(f"loss.{key} must be zero for decomposition_only")
         if "label_preparation" not in config:
             raise ValueError("mask-only configuration requires label_preparation")
+    if config['training'].get('gpu_inputs','off') not in ('off','auto','resident','stream'):
+        raise ValueError('unknown GPU input mode')
+    if type(config['training'].get('defer_constraint_verification',False)) is not bool:
+        raise ValueError('defer_constraint_verification must be boolean')
+    if type(config['training'].get('adaptive_checkpoint_min_layers',0)) is not int or config['training'].get('adaptive_checkpoint_min_layers',0)<0:
+        raise ValueError('invalid adaptive checkpoint threshold')
     runtime_batch=os.environ.get('RIND_BATCH_SIZE')
     if runtime_batch is not None:
         if not runtime_batch.isdigit() or int(runtime_batch)<1:raise ValueError('RIND_BATCH_SIZE must be positive integer')
@@ -124,7 +130,9 @@ def semantic_config(config):
     value = copy.deepcopy(config)
     for key in ("batch_size", "candidate_chunk", "prefetch_batches", "num_threads",
                 "progress_every_batches", "gpu_devices", "activation_checkpoint_candidates",
-                "activation_checkpoint_locator_encoder", "channels_last", "device"):
+                "activation_checkpoint_locator_encoder", "channels_last", "device",
+                "gpu_inputs", "gpu_cache_fraction", "gpu_cache_reserve_gib", "gpu_upload_chunk_mib",
+                "defer_constraint_verification", "adaptive_checkpoint_min_layers"):
         value["training"].pop(key, None)
     for name in ('evaluation_expansion', 'training_expansion'):
         if value.get(name):
@@ -166,6 +174,7 @@ def make_model(config, world_size, device, initialize):
         model_class = SequentialCountShapeField
         extra['roundoff_ulps'] = model_config.get('roundoff_ulps',8)
         extra['residual_gradient'] = model_config.get('residual_gradient','none')
+        extra['adaptive_checkpoint_min_layers'] = training.get('adaptive_checkpoint_min_layers',0)
     model = model_class(
         max_slots=model_config["max_slots"], backbone_config=backbone,
         decomposition_hidden=model_config["decomposition_hidden"],
@@ -191,6 +200,12 @@ def make_model(config, world_size, device, initialize):
         saved = torch.load(resolve(warm_start), map_location="cpu", weights_only=True)
         if saved.get("schema") != "phase2-local-mask-decomposition-v1":
             raise ValueError("initial_decomposition_checkpoint must be a mask-only checkpoint")
+        frozen=config.get('source_training_protocol',{}).get('warm_start')
+        if architecture=='sequential_count_shape_v6' and frozen:
+            from evaluation_snapshot import sha256_file
+            if (saved['epoch']!=frozen['epoch'] or saved['signature']!=frozen['model_signature'] or
+                    sha256_file(resolve(warm_start))!=frozen['snapshot_sha256']):
+                raise ValueError('frozen warm-start checkpoint changed; refusing to initialize from different weights')
         old_architecture = saved['config']['model'].get('decomposition_architecture','legacy')
         migrate = (architecture == 'disentangled_slots_v5' and old_architecture == 'boundary_refined_slots'
                    and training.get('allow_v3_warm_start') is True)
@@ -206,6 +221,15 @@ def make_model(config, world_size, device, initialize):
         permitted = lambda key: key.startswith('locator.') or (migrate and key.startswith('global_count_head.')) or (sequential_migrate and key.startswith(('state_encoder.','context_feature.','residual_pixels.')))
         if unexpected or any(not permitted(key) for key in missing):
             raise ValueError("decomposition warm-start weights do not match")
+        if sequential_migrate:
+            parameters=dict(model.named_parameters())
+            model.warm_start_load_report={
+                'checkpoint':str(resolve(warm_start)), 'source_epoch':int(saved['epoch']),
+                'source_architecture':old_architecture, 'target_architecture':architecture,
+                'inherited_parameters':sum(p.numel() for name,p in parameters.items() if name in state),
+                'new_parameters':sum(p.numel() for name,p in parameters.items() if name in missing),
+                'new_parameter_names':sorted(name for name in missing if name in parameters),
+                'optimizer_inherited':False}
         if migrate:
             expected_missing = {name for name in model.state_dict() if name.startswith('global_count_head.')}
             if set(missing) != expected_missing:
@@ -248,8 +272,9 @@ def run_epoch(model, records, config, device, epoch, rank, world_size, optimizer
     else:
         batch_stream=((number,batch,None) for number,batch in enumerate(raw_batches,1))
     for number,batch,normalizers in batch_stream:
-        batch = {key: value.pin_memory().to(device, non_blocking=True)
-                 if device.type == "cuda" else value.to(device) for key, value in batch.items()}
+        batch = {key: (value if value.device == device else
+                       value.pin_memory().to(device, non_blocking=True) if device.type == "cuda"
+                       else value.to(device)) for key, value in batch.items()}
         if observed_groups is not None:
             r = batch['layer_mask'].sum(1)
             observed_groups += torch.stack(((r == 1).sum(), (r == 2).sum(), ((r >= 3) & (r <= 4)).sum(), (r >= 5).sum()))
@@ -261,10 +286,12 @@ def run_epoch(model, records, config, device, epoch, rank, world_size, optimizer
         with synchronization, torch.set_grad_enabled(learning):
             with torch.autocast(device.type, dtype=torch.bfloat16,
                                 enabled=device.type == "cuda" and training["amp_dtype"] == "bfloat16"):
+                forward_options = ({'verify_constraints': False} if sequential and
+                                   training.get('defer_constraint_verification', False) else {})
                 result = model(batch["response"], batch["obstacle"], batch["window"],
                                batch.get("candidate_xy"), batch.get("support"),
                                candidate_chunk=training["candidate_chunk"],
-                               compute_location=compute_location)
+                               compute_location=compute_location, **forward_options)
             runtime_loss_config=dict(loss_config)
             if normalizers is not None:runtime_loss_config['optimizer_normalizers']=normalizers
             losses=decomposition_training_loss(result,batch,**runtime_loss_config)
@@ -420,6 +447,12 @@ def train(config, output, index, *, epoch_limit=None):
             log(output, "model", f"architecture={config['model'].get('decomposition_architecture', 'legacy')} | parameters={sum(p.numel() for p in model.parameters()):,} | rounds={getattr(model, 'refinement_rounds', 1)} | train/validation/test="
                 + "/".join(str(len(splits[n])) if n in splits else "locked" for n in ("train", "validation", "test"))
                 + f" | GPU ranks={world} | AMP={setting['amp_dtype']} | locator={model.locator is not None}")
+            if hasattr(model,'warm_start_load_report'):
+                inherited=model.warm_start_load_report
+                write_json(run/'warm_start_load.json',inherited)
+                log(output,'warm_start',f"loaded source best epoch={inherited['source_epoch']} | "
+                    f"inherited={inherited['inherited_parameters']:,}, new={inherited['new_parameters']:,} parameters | "
+                    'new optimizer; original weights preserved')
         # Keep parameters registered throughout the schedule. Locator weights
         # are frozen with its explicit method before wrapping below.
         model.set_locator_trainable(False)
@@ -469,6 +502,21 @@ def train(config, output, index, *, epoch_limit=None):
                     raise ValueError('count-first checkpoint lacks selection state')
                 selection_best = (-best,)
             selection_best = tuple(selection_best)
+            if rank==0:log(output,'resume',f'resuming new experiment after epoch={start}; model and optimizer restored from {last}')
+        if cuda and config['loss'].get('objective')=='sequential_count_shape_v6':
+            from sequential_objective import verify_effective_assignment
+            checked=verify_effective_assignment(device)
+            write_json(output/'runtime/matching'/f'seed{seed}-rank{rank}.json',checked)
+            log(output,'matching_preflight',f'rank={rank} effective-layer matching parity passed on {device}')
+        if cuda and masks_only and setting.get('gpu_inputs', 'off') != 'off':
+            from gpu_mask_inputs import enable_gpu_inputs
+            for split_name, records in splits.items():
+                pipeline = enable_gpu_inputs(records, device, setting)
+                if pipeline is not None:
+                    write_json(output/'runtime/gpu_inputs'/f'seed{seed}-rank{rank}-{split_name}.json',pipeline)
+                    log(output,'gpu_inputs',f'rank={rank} split={split_name} input={pipeline["mode"]} '
+                        f'packed={pipeline["packed_cache_bytes"]/2**30:.2f} GiB; GPU bit decode; '
+                        f'{pipeline["reason"]}')
         if os.environ.get('RIND_AUTO_BATCH','0') == '1':
             from gpu_runtime import calibrate_batch
             calibrate_batch(model,splits['train'],config,device,rank,world,output,seed)

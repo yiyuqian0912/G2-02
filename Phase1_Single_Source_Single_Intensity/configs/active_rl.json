@@ -1,0 +1,42 @@
+{
+  "phase1_run": "outputs/experiments/phase1_100k_multiscale_h20_memmap",
+  "variant": "response",
+  "seed": 20261105,
+  "scene_counts": {
+    "train": 2048,
+    "validation": 128,
+    "test": 128
+  },
+  "tile_size": 64,
+  "initial_size": 128,
+  "spacing": 16,
+  "budget": 262144,
+  "evaluation_budgets": [
+    65536,
+    131072,
+    262144
+  ],
+  "max_steps": 32,
+  "fusion_discount": 0.5,
+  "locator_batch_size": 16,
+  "candidate_chunk": 256,
+  "tile_cache_size": 16384,
+  "hidden": 128,
+  "num_envs": 32,
+  "rollout_steps": 32,
+  "updates": 200,
+  "ppo_epochs": 4,
+  "minibatch_size": 256,
+  "learning_rate": 0.0003,
+  "clip_ratio": 0.2,
+  "gae_lambda": 0.95,
+  "action_entropy_bonus": 0.01,
+  "value_weight": 0.5,
+  "target_kl": 0.03,
+  "grad_clip": 0.5,
+  "eval_every": 10,
+  "bootstrap_repetitions": 1000,
+  "plot_scenes": 3,
+  "threads": 8,
+  "randomize_train_start": true
+}

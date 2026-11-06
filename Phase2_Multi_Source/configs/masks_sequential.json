@@ -84,7 +84,13 @@
     "minimum_lr_ratio": 0.1,
     "new_module_lr_multiplier": 3.0,
     "evaluate_test_after_training": false,
-    "loss_normalization": "optimizer_step"
+    "loss_normalization": "optimizer_step",
+    "gpu_inputs": "auto",
+    "gpu_cache_fraction": 0.55,
+    "gpu_cache_reserve_gib": 32.0,
+    "gpu_upload_chunk_mib": 64,
+    "defer_constraint_verification": true,
+    "adaptive_checkpoint_min_layers": 9
   },
   "loss": {
     "objective": "sequential_count_shape_v6",

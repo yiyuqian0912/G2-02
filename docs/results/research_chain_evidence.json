@@ -814,5 +814,376 @@
   "phase2_v6": {
     "final_evaluation_available": false,
     "note": "delivered implementation and partial training progress do not establish final validation/test performance"
+  },
+  "phase2_v5_final": {
+    "as_of": "2026-11-04",
+    "training": {
+      "best_epoch": 16,
+      "trained_through_epoch": 26,
+      "records": {
+        "train": 345746,
+        "validation": 12500,
+        "test": 12500
+      },
+      "elapsed_seconds": 91997.10837056884,
+      "selection_options": {
+        "metric": "count_group_macro",
+        "max_single_layer_drop": 0.005,
+        "max_overall_drop": 0.005,
+        "quality_max_drop": {
+          "mask_dice": 0.01,
+          "strength_within_10pct": 0.01,
+          "strict_decomposition_success": 0.005
+        }
+      }
+    },
+    "test_windows": 12500,
+    "test_scene_ids": 8481,
+    "bootstrap": {
+      "repetitions": 1000,
+      "seed": 20261104,
+      "unit": "paired scene_id",
+      "geometry_cluster_mapping_available": false
+    },
+    "checkpoint": {
+      "before": {
+        "source_checkpoint_path": "/home/qq/yiyu/RIND_Phase2_Training_Minimal/Phase2_Multi_Source/outputs/masks_boundary_balanced_v3/models/seed_0/best.pt",
+        "source_checkpoint_sha256": "27e5474a42e2d819e669e25612811565ae6f6fefd471ed8f7e72e0fca810f161",
+        "snapshot_path": "/home/qq/yiyu/RIND_Phase2_Training_Minimal/Phase2_Multi_Source/outputs/masks_disentangled_v5_complex245746/diagnostics/.checkpoint_snapshots/27e5474a42e2d819e669e25612811565ae6f6fefd471ed8f7e72e0fca810f161/model.pt",
+        "snapshot_sha256": "5339b93b3487e5c04964a8877ce80b4e10ad937341b3c1a015e99158d893b522",
+        "epoch": 0,
+        "model_signature": "f79b25117d3f8b851b7895bafb9d9667e26e9393420824a037d2b931070f2df2",
+        "optimizer_included": false,
+        "checkpoint_kind": "initial_reference",
+        "split": "test",
+        "seed": 0,
+        "experiment_root": "/home/qq/yiyu/RIND_Phase2_Training_Minimal/Phase2_Multi_Source/outputs/masks_disentangled_v5_complex245746",
+        "cache_corpus_sha256": "c50b991fb2ceb2d7cbef5cb800fa0497abcd90dee8e732e2063c5abb47ab9806",
+        "evaluated_window_list_sha256": "4e4d47ddf5d524022c77d3ddc49fabf63b0a4c5f808f30d434a81eb420cf4647",
+        "diagnostic_code_sha256": {
+          "evaluate_masks.py": "e1ab97c0f1f575996c314d7b25ac6015b7c121e3fc1085b4d17be78094081b3f",
+          "failure_diagnostics.py": "8c1c6cfaec4a7cc9ca282f528c0afee8478354a1ca67a1aa687c5794ab323471",
+          "evaluation_snapshot.py": "7419d44b907d538efe028825ed69579fedc7ee990bca7eca3aba01c2a6ed669c",
+          "decomposition_model.py": "ae94163e37f915038874492c4486d35332469c1a0b090d829289d97500c9e9dd"
+        },
+        "original_success_thresholds": {
+          "mask_iou": 0.9,
+          "relative_strength": 0.1,
+          "relative_reconstruction": 0.05
+        },
+        "original_matching": "shape_strength_v5",
+        "geometry_independence_verified": false
+      },
+      "after": {
+        "source_checkpoint_path": "/home/qq/yiyu/RIND_Phase2_Training_Minimal/Phase2_Multi_Source/outputs/masks_disentangled_v5_complex245746/models/seed_0/best.pt",
+        "source_checkpoint_sha256": "bd622be1dfd4bf4324e0bcce57ac6c34102b8fd5f0d5aca3eb4c90878431fc81",
+        "snapshot_path": "/home/qq/yiyu/RIND_Phase2_Training_Minimal/Phase2_Multi_Source/outputs/masks_disentangled_v5_complex245746/diagnostics/.checkpoint_snapshots/bd622be1dfd4bf4324e0bcce57ac6c34102b8fd5f0d5aca3eb4c90878431fc81/model.pt",
+        "snapshot_sha256": "c7012cb0ebd426bc11699d4741b822970efa07bca192428633376a114e1b4c04",
+        "epoch": 16,
+        "model_signature": "ebe5fea8f1bfaf6f3219dd357ca4e52cddc0bbaccaf4f364d96f8b5999cf5a97",
+        "optimizer_included": false,
+        "checkpoint_kind": "best",
+        "split": "test",
+        "seed": 0,
+        "experiment_root": "/home/qq/yiyu/RIND_Phase2_Training_Minimal/Phase2_Multi_Source/outputs/masks_disentangled_v5_complex245746",
+        "cache_corpus_sha256": "c50b991fb2ceb2d7cbef5cb800fa0497abcd90dee8e732e2063c5abb47ab9806",
+        "evaluated_window_list_sha256": "4e4d47ddf5d524022c77d3ddc49fabf63b0a4c5f808f30d434a81eb420cf4647",
+        "diagnostic_code_sha256": {
+          "evaluate_masks.py": "e1ab97c0f1f575996c314d7b25ac6015b7c121e3fc1085b4d17be78094081b3f",
+          "failure_diagnostics.py": "8c1c6cfaec4a7cc9ca282f528c0afee8478354a1ca67a1aa687c5794ab323471",
+          "evaluation_snapshot.py": "7419d44b907d538efe028825ed69579fedc7ee990bca7eca3aba01c2a6ed669c",
+          "decomposition_model.py": "ae94163e37f915038874492c4486d35332469c1a0b090d829289d97500c9e9dd"
+        },
+        "original_success_thresholds": {
+          "mask_iou": 0.9,
+          "relative_strength": 0.1,
+          "relative_reconstruction": 0.05
+        },
+        "original_matching": "shape_strength_v5",
+        "geometry_independence_verified": false
+      }
+    },
+    "matching_caveat": "uses the exported deployed assignments; original matching may include strength; not a fresh common shape-only assignment",
+    "paired": {
+      "all": {
+        "before": {
+          "windows": 12500,
+          "layers": 21465,
+          "count_correct": 11366,
+          "count_accuracy": 0.90928,
+          "shape_pass": 17840,
+          "layer_accuracy": 0.8311204286047054,
+          "missing_layers": 527,
+          "active_shape_failures": 3098,
+          "overcount_windows": 745,
+          "undercount_windows": 389,
+          "count_correct_but_shape_incomplete": 800
+        },
+        "after": {
+          "windows": 12500,
+          "layers": 21465,
+          "count_correct": 11685,
+          "count_accuracy": 0.9348,
+          "shape_pass": 17761,
+          "layer_accuracy": 0.8274400186349872,
+          "missing_layers": 478,
+          "active_shape_failures": 3226,
+          "overcount_windows": 473,
+          "undercount_windows": 342,
+          "count_correct_but_shape_incomplete": 1124
+        },
+        "count_change": 0.025519999999999987,
+        "layer_change": -0.0036804099697181902,
+        "count_change_95ci": [
+          0.02077855367071278,
+          0.030396958037208325
+        ],
+        "layer_change_95ci": [
+          -0.007561576149554759,
+          4.8761565553998906e-05
+        ]
+      },
+      "R=1": {
+        "before": {
+          "windows": 7453,
+          "layers": 7453,
+          "count_correct": 7427,
+          "count_accuracy": 0.9965114718905139,
+          "shape_pass": 7445,
+          "layer_accuracy": 0.9989266067355428,
+          "missing_layers": 0,
+          "active_shape_failures": 8,
+          "overcount_windows": 26,
+          "undercount_windows": 0,
+          "count_correct_but_shape_incomplete": 0
+        },
+        "after": {
+          "windows": 7453,
+          "layers": 7453,
+          "count_correct": 7444,
+          "count_accuracy": 0.9987924325774856,
+          "shape_pass": 7450,
+          "layer_accuracy": 0.9995974775258285,
+          "missing_layers": 0,
+          "active_shape_failures": 3,
+          "overcount_windows": 9,
+          "undercount_windows": 0,
+          "count_correct_but_shape_incomplete": 0
+        },
+        "count_change": 0.0022809606869717003,
+        "layer_change": 0.0006708707902857158,
+        "count_change_95ci": [
+          0.001077256151601634,
+          0.003646234276241116
+        ],
+        "layer_change_95ci": [
+          0.00013507581729866623,
+          0.0013294734752592094
+        ]
+      },
+      "R=2": {
+        "before": {
+          "windows": 2953,
+          "layers": 5906,
+          "count_correct": 2736,
+          "count_accuracy": 0.9265154080596004,
+          "shape_pass": 5696,
+          "layer_accuracy": 0.9644429393836776,
+          "missing_layers": 9,
+          "active_shape_failures": 201,
+          "overcount_windows": 208,
+          "undercount_windows": 9,
+          "count_correct_but_shape_incomplete": 132
+        },
+        "after": {
+          "windows": 2953,
+          "layers": 5906,
+          "count_correct": 2636,
+          "count_accuracy": 0.89265154080596,
+          "shape_pass": 5716,
+          "layer_accuracy": 0.9678293261090416,
+          "missing_layers": 5,
+          "active_shape_failures": 185,
+          "overcount_windows": 312,
+          "undercount_windows": 5,
+          "count_correct_but_shape_incomplete": 109
+        },
+        "count_change": -0.033863867253640434,
+        "layer_change": 0.0033863867253639546,
+        "count_change_95ci": [
+          -0.045377637798712775,
+          -0.021950818978221202
+        ],
+        "layer_change_95ci": [
+          -0.0018336253981711612,
+          0.008412553856248233
+        ]
+      },
+      "R=3": {
+        "before": {
+          "windows": 1215,
+          "layers": 3645,
+          "count_correct": 845,
+          "count_accuracy": 0.6954732510288066,
+          "shape_pass": 2752,
+          "layer_accuracy": 0.7550068587105624,
+          "missing_layers": 104,
+          "active_shape_failures": 789,
+          "overcount_windows": 266,
+          "undercount_windows": 104,
+          "count_correct_but_shape_incomplete": 368
+        },
+        "after": {
+          "windows": 1215,
+          "layers": 3645,
+          "count_correct": 1113,
+          "count_accuracy": 0.9160493827160494,
+          "shape_pass": 2728,
+          "layer_accuracy": 0.7484224965706447,
+          "missing_layers": 20,
+          "active_shape_failures": 897,
+          "overcount_windows": 82,
+          "undercount_windows": 20,
+          "count_correct_but_shape_incomplete": 569
+        },
+        "count_change": 0.22057613168724277,
+        "layer_change": -0.006584362139917643,
+        "count_change_95ci": [
+          0.19632352199888295,
+          0.24772542808966191
+        ],
+        "layer_change_95ci": [
+          -0.019702390971776375,
+          0.008239971380386247
+        ]
+      },
+      "R=4": {
+        "before": {
+          "windows": 518,
+          "layers": 2072,
+          "count_correct": 256,
+          "count_accuracy": 0.4942084942084942,
+          "shape_pass": 1216,
+          "layer_accuracy": 0.5868725868725869,
+          "missing_layers": 123,
+          "active_shape_failures": 733,
+          "overcount_windows": 147,
+          "undercount_windows": 115,
+          "count_correct_but_shape_incomplete": 201
+        },
+        "after": {
+          "windows": 518,
+          "layers": 2072,
+          "count_correct": 387,
+          "count_accuracy": 0.747104247104247,
+          "shape_pass": 1152,
+          "layer_accuracy": 0.555984555984556,
+          "missing_layers": 105,
+          "active_shape_failures": 815,
+          "overcount_windows": 28,
+          "undercount_windows": 103,
+          "count_correct_but_shape_incomplete": 341
+        },
+        "count_change": 0.25289575289575283,
+        "layer_change": -0.030888030888030937,
+        "count_change_95ci": [
+          0.20265028303480903,
+          0.3006632284435786
+        ],
+        "layer_change_95ci": [
+          -0.04957691180688038,
+          -0.011709872159090917
+        ]
+      },
+      "R>=5": {
+        "before": {
+          "windows": 361,
+          "layers": 2389,
+          "count_correct": 102,
+          "count_accuracy": 0.28254847645429365,
+          "shape_pass": 731,
+          "layer_accuracy": 0.3059857681038091,
+          "missing_layers": 291,
+          "active_shape_failures": 1367,
+          "overcount_windows": 98,
+          "undercount_windows": 161,
+          "count_correct_but_shape_incomplete": 99
+        },
+        "after": {
+          "windows": 361,
+          "layers": 2389,
+          "count_correct": 105,
+          "count_accuracy": 0.29085872576177285,
+          "shape_pass": 715,
+          "layer_accuracy": 0.29928840519045624,
+          "missing_layers": 348,
+          "active_shape_failures": 1326,
+          "overcount_windows": 42,
+          "undercount_windows": 214,
+          "count_correct_but_shape_incomplete": 105
+        },
+        "count_change": 0.0083102493074792,
+        "layer_change": -0.006697362913352878,
+        "count_change_95ci": [
+          -0.05540550938750385,
+          0.07849245492552913
+        ],
+        "layer_change_95ci": [
+          -0.023458605664488017,
+          0.007582585493874262
+        ]
+      },
+      "R>=3": {
+        "before": {
+          "windows": 2094,
+          "layers": 8106,
+          "count_correct": 1203,
+          "count_accuracy": 0.5744985673352435,
+          "shape_pass": 4699,
+          "layer_accuracy": 0.5796940537873181,
+          "missing_layers": 518,
+          "active_shape_failures": 2889,
+          "overcount_windows": 511,
+          "undercount_windows": 380,
+          "count_correct_but_shape_incomplete": 668
+        },
+        "after": {
+          "windows": 2094,
+          "layers": 8106,
+          "count_correct": 1605,
+          "count_accuracy": 0.7664756446991404,
+          "shape_pass": 4595,
+          "layer_accuracy": 0.5668640513200098,
+          "missing_layers": 473,
+          "active_shape_failures": 3038,
+          "overcount_windows": 152,
+          "undercount_windows": 337,
+          "count_correct_but_shape_incomplete": 1015
+        },
+        "count_change": 0.1919770773638969,
+        "layer_change": -0.012830002467308255,
+        "count_change_95ci": [
+          0.16985898236904365,
+          0.21309912984952648
+        ],
+        "layer_change_95ci": [
+          -0.022125997682353602,
+          -0.0035410586115972717
+        ]
+      }
+    },
+    "source_sha256": {
+      "training.json": "247b077e376f068d9a57784a3f30e1e02a40813c8e6855c175dddea172dcc669",
+      "training_summary.json": "36808118e002c1079bb92dfde8504b65161e9be374261c21e58367120d8e821e",
+      "progress.jsonl": "82931fc9512a3c07d6daae46253e4ff5fca273e23158833d4985faa4aa42c0e0",
+      "evaluation/decomposition_metrics.json": "c0c863eda73dad1fe77beb617a35bd0b6189d2b4fb0b0ab0a8ebb7b625b27c85",
+      "evaluation/initial_reference/decomposition_metrics.json": "10c305859950c86000dee76c0077784c9ebde36f3bf6070f583d8dc8118b1d5e",
+      "evaluation/decomposition_metrics_diagnostics/checkpoint_metadata.json": "53b0183e7dafe20ff7230258285aa58f5c5687dc319f3f0d0c3d1512c2450444",
+      "evaluation/decomposition_metrics_diagnostics/layers.csv.gz": "4cd9781c0f26edc90d317cc24546048070697ccceade64ed3d4363245ba2fd63",
+      "evaluation/decomposition_metrics_diagnostics/windows.csv.gz": "4efadf3180453e8d79971752852f119b5f53eaf4e194f11a6e49687d9958caed",
+      "evaluation/initial_reference/decomposition_metrics_diagnostics/checkpoint_metadata.json": "e1c14d0eb41e0ef252795786fd3fbfd2b079366d89a095a8090303036091dad1",
+      "evaluation/initial_reference/decomposition_metrics_diagnostics/layers.csv.gz": "ca589ca8b7f28dfd6b0456a11053787cada98c8414228595324b4a5b753f5457",
+      "evaluation/initial_reference/decomposition_metrics_diagnostics/windows.csv.gz": "a7670cbde60fabf5533cd3706ae8129ea0c588a313b3ee394842cbc91acfba23"
+    }
   }
 }

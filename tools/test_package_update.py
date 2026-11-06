@@ -16,7 +16,22 @@ class PackageTests(unittest.TestCase):
             output = module.build(Path(temporary) / "RIND_Phase2_Update.tar.gz")
             with tarfile.open(output) as tar:
                 names = set(tar.getnames())
-                for name in ('Phase2_Multi_Source/research/implicit_slots/model_comparison.py',
+                for name in ("run_single_source_rl.sh","run_single_source_rl_tmux.sh",
+                             "Phase1_Single_Source_Single_Intensity/configs/active_rl_frontier16_minimum.json",
+                             "Phase1_Single_Source_Single_Intensity/src/rind_phase1/active_rl/frontier.py",
+                             "Phase1_Single_Source_Single_Intensity/src/rind_phase1/active_rl/trajectory_view.py",
+                             "Phase1_Single_Source_Single_Intensity/docs/FRONTIER16_MINIMUM_RL.zh-CN.md",
+                             "Phase1_Single_Source_Single_Intensity/configs/active_rl.json",
+                             "Phase1_Single_Source_Single_Intensity/src/rind_phase1/active_rl/deploy.py",
+                             "Phase1_Single_Source_Single_Intensity/docs/SINGLE_SOURCE_ACTIVE_RL.zh-CN.md",'Phase2_Multi_Source/research/implicit_slots/gpu_mask_inputs.py',
+                             'Phase2_Multi_Source/research/implicit_slots/pairwise_ops.py',
+                             'Phase2_Multi_Source/research/implicit_slots/test_pairwise_memory.py',
+                             'Phase2_Multi_Source/research/implicit_slots/test_effective_assignment.py',
+                             'Phase2_Multi_Source/docs/V6_RUNTIME_AUDIT.zh-CN.md',
+                             'Phase2_Multi_Source/research/implicit_slots/test_gpu_mask_inputs.py',
+                             'Phase2_Multi_Source/research/implicit_slots/test_sequential_fast.py',
+                             'Phase2_Multi_Source/docs/V6_BEST16_RUN.zh-CN.md',
+                             'Phase2_Multi_Source/research/implicit_slots/model_comparison.py',
                              'Phase2_Multi_Source/research/implicit_slots/test_model_comparison.py',
                              'Phase2_Multi_Source/research/implicit_slots/test_optimizer_normalization.py',
                              'run_implicit_masks_tmux.sh',

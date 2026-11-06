@@ -44,7 +44,13 @@ def _evaluate_one(config,output,index,seed=0,repetitions=1000,*,split='test',che
     metadata['model_selection']=saved['config']['training'].get('model_selection')
     model=make_model(saved['config'],index['global_size'],device,False)
     model.load_state_dict(saved['model'],strict=True);model.eval()
+    if cuda:
+        from sequential_objective import verify_effective_assignment
+        verify_effective_assignment(device)
     rows_in=index['records'][split];records=MaskRecords(rows_in,output/'mask_cache',split,config['model']['max_slots'])
+    if cuda and config['training'].get('gpu_inputs', 'off') != 'off':
+        from gpu_mask_inputs import enable_gpu_inputs
+        enable_gpu_inputs(records, device, config['training'])
     counts=torch.zeros(33,4,device=device,dtype=torch.int64);rows=[];started=time.perf_counter()
     with torch.inference_mode():
         for number,batch in enumerate(decomposed_batches(records,config['training']['batch_size'],
@@ -56,8 +62,8 @@ def _evaluate_one(config,output,index,seed=0,repetitions=1000,*,split='test',che
                 from decomposition_model import slot_activation
                 out['active_slots']=slot_activation(out)
             out['predicted_count']=out['active_slots'].sum(1)
-            counts+=primary_counts(out,batch)
             assignment=activation_assignment(out,batch)
+            counts+=primary_counts(out,batch,assignment=assignment)
             m=out['mask_probability'].gather(1,assignment[...,None,None].expand_as(out['mask_probability']))>=.5
             m &= out['active_slots'].gather(1,assignment)[...,None,None]
             t=batch['teacher_mask'].bool();free=(~batch['obstacle'])[:,None]
@@ -93,6 +99,7 @@ def _evaluate_one(config,output,index,seed=0,repetitions=1000,*,split='test',che
                            {'count_accuracy':[1]*len(rows),'layer_accuracy':[r['layers'] for r in rows]},repetitions,seed)
     summary=summarize_primary(counts.cpu())
     report={'schema':'rind-primary-model-evaluation-v1','checkpoint':metadata,'epoch':saved['epoch'],'split':split,
+        'matching_protocol':'enabled-shape-only-empty-padding-compacted-v2',
         'windows':len(rows),'scenes':len({r['scene_id'] for r in rows}),'candidate_renders':0,
         'inference_teacher_inputs':False,'metrics':rates,'by_R':summary['primary_by_R'],
         'by_group':summary['primary_by_group'],'by_size':{},
