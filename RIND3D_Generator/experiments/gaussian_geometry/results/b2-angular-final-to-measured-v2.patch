@@ -1,0 +1,155 @@
+--- a/experiments/gaussian_geometry/b2_angular/angular.hpp
++++ b/experiments/gaussian_geometry/b2_angular/angular.hpp
+@@ -64,12 +64,10 @@
+ };
+ 
+ struct Settings {
+-  // 0 point outer-cover control, 1 adaptive spatial, 2 angular single,
+-  // 3 angular union, 4 hybrid.
++  // 1 adaptive spatial, 2 angular single, 3 angular union, 4 hybrid.
+   int method = 3, cover_depth = 6, cover_nodes = 32769, shadow_boxes = 256;
+   int adaptive_depth = 9, adaptive_nodes = 8192, adaptive_batch = 8;
+   int angular_depth = 10, angular_nodes = 32766, angular_references = 2000000;
+-  int angular_boxes = -1; // -1 all independently certified inner leaves.
+   int prefix_builds = 512;
+   double cover_seconds = 15., adaptive_seconds = 10.;
+   bool empty_prefix = false, trace = false;
+@@ -83,7 +81,7 @@
+   double setup_seconds = 0, cover_seconds = 0, region_seconds = 0,
+          angular_seconds = 0, angular_setup_seconds = 0,
+          angular_leaf_seconds = 0, adaptive_seconds = 0, fallback_seconds = 0,
+-         assembly_seconds = 0, point_cover_seconds = 0;
++         assembly_seconds = 0;
+ };
+ class Engine {
+   struct Impl;
+--- a/experiments/gaussian_geometry/b2_angular/field.cpp
++++ b/experiments/gaussian_geometry/b2_angular/field.cpp
+@@ -7,8 +7,7 @@
+   AngularOptions{angular_depth, angular_nodes, angular_references,
+                  method != 2,   empty_prefix,  prefix_builds}
+       .validate();
+-  if (method < 0 || method > 4 || angular_boxes < -1 ||
+-      angular_boxes > 100000 || cover_depth < 0 || cover_depth > 10 ||
++  if (method < 1 || method > 4 || cover_depth < 0 || cover_depth > 10 ||
+       cover_nodes < 1 || cover_nodes > 1000000 || shadow_boxes < 0 ||
+       shadow_boxes > 100000 || adaptive_depth < cover_depth ||
+       adaptive_depth > 12 || adaptive_nodes < 0 || adaptive_nodes > 1000000 ||
+@@ -360,9 +359,8 @@
+                        cfg.angular_references, cfg.method != 2,
+                        cfg.empty_prefix, cfg.prefix_builds},
+         f.stats);
+-    for (std::size_t i = 0; i < tree.inner.size(); ++i)
+-      if (cfg.angular_boxes < 0 || int(i) < cfg.angular_boxes)
+-        map->add_inner(tree.nodes[tree.inner[i]].box);
++    for (int id : tree.inner)
++      map->add_inner(tree.nodes[id].box);
+     inserted = tree.inner.size();
+     result.angular_setup_seconds = elapsed(t0);
+     result.angular_seconds += result.angular_setup_seconds;
+@@ -375,8 +373,7 @@
+       outer_nodes = tree.nodes.size();
+     }
+     for (; inserted < tree.inner.size(); ++inserted)
+-      if (cfg.angular_boxes < 0 || int(inserted) < cfg.angular_boxes)
+-        map->add_inner(tree.nodes[tree.inner[inserted]].box);
++      map->add_inner(tree.nodes[tree.inner[inserted]].box);
+     auto decision = map->query(
+         r, [&](int face, double u0, double u1, double v0, double v1) {
+           return p->prefix(tree, source, face, u0, u1, v0, v1, f.stats);
+@@ -534,16 +531,6 @@
+             continue;
+           }
+           std::uint8_t ev = evidence;
+-          if (visible < 0 && cfg.method == 0) {
+-            auto pt = Clock::now();
+-            f.stats.add("point_cover_leaf_queries");
+-            if (p->free_volume(tree, 0, source, {v, v}, f.stats)) {
+-              visible = 1;
+-              ev = 4;
+-              f.stats.add("point_cover_rays_avoided");
+-            }
+-            result.point_cover_seconds += elapsed(pt);
+-          }
+           if (visible < 0 && map) {
+             auto d = query_angular({v, v}, true);
+             if (d.visibility >= 0) {
+--- a/experiments/gaussian_geometry/b2_angular/bindings.cpp
++++ b/experiments/gaussian_geometry/b2_angular/bindings.cpp
+@@ -28,7 +28,6 @@
+   out["assembly_seconds"] = r.assembly_seconds;
+   out["angular_setup_seconds"] = r.angular_setup_seconds;
+   out["angular_leaf_seconds"] = r.angular_leaf_seconds;
+-  out["point_cover_seconds"] = r.point_cover_seconds;
+   if (!r.evaluation_path.empty()) {
+     for (auto pair :
+          {std::pair{"evaluation_path", &r.evaluation_path},
+@@ -74,7 +73,6 @@
+       .def_readwrite("angular_depth", &Settings::angular_depth)
+       .def_readwrite("angular_nodes", &Settings::angular_nodes)
+       .def_readwrite("angular_references", &Settings::angular_references)
+-      .def_readwrite("angular_boxes", &Settings::angular_boxes)
+       .def_readwrite("prefix_builds", &Settings::prefix_builds)
+       .def_readwrite("cover_seconds", &Settings::cover_seconds)
+       .def_readwrite("empty_prefix", &Settings::empty_prefix)
+--- a/experiments/gaussian_geometry/b2_angular/benchmark.py
++++ b/experiments/gaussian_geometry/b2_angular/benchmark.py
+@@ -17,7 +17,7 @@
+ from .api import AngularOracle
+ from .build import sources
+ 
+-METHODS={'A_fixed6':None,'A_fixed7':None,'B_spatial':1,'C_angular':2,'D_union':3,'E_hybrid':4,'P_empty_prefix':3,'Q_hybrid_prefix':4,'R_point_cover':0,'S_all_inner':None}
++METHODS={'A_fixed6':None,'A_fixed7':None,'B_spatial':1,'C_angular':2,'D_union':3,'E_hybrid':4,'P_empty_prefix':3,'Q_hybrid_prefix':4}
+ 
+ 
+ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+@@ -30,15 +30,13 @@
+     t=time.perf_counter();native=NativeOracle(scene,independent=independent)
+     assert native.source_clearance(source).status=='FREE';clearance=time.perf_counter()-t
+     cpu=time.process_time();t=time.perf_counter()
+-    if method.startswith('A_') or method=='S_all_inner':
++    if method.startswith('A_'):
+         engine=RegionOracle(scene,independent=independent,mode=5,cover_depth=7 if method=='A_fixed7' else 6,
+-                            cover_nodes=131073 if method=='A_fixed7' else 32769,
+-                            shadow_boxes=100000 if method=='S_all_inner' else 256,trace=True)
++                            cover_nodes=131073 if method=='A_fixed7' else 32769,trace=True)
+     else:
+         engine=AngularOracle(scene,independent=independent,method=METHODS[method],cover_depth=args.cover_depth,
+                              cover_nodes=args.cover_nodes,adaptive_nodes=args.adaptive_nodes,adaptive_batch=args.adaptive_batch,
+                              angular_depth=args.angular_depth,angular_nodes=args.angular_nodes,
+-                             angular_boxes=args.angular_boxes,
+                              empty_prefix=method in ('P_empty_prefix','Q_hybrid_prefix'),prefix_builds=args.prefix_builds,trace=True)
+     setup=time.perf_counter()-t;t=time.perf_counter()
+     if args.tile_origin is None:row=engine.field(source,n,args.seconds)
+@@ -50,13 +48,7 @@
+                                        if not k.startswith('_') and isinstance(getattr(engine.options,k),(bool,int,float))}
+     arrays={k:row.pop(k) for k in ('response','solid','valid','evaluation_path','ray_nanoseconds','point_nanoseconds') if k in row}
+     for k in ('visibility_evidence','angular_tiles'):
+-        if k in row:
+-            arrays[k]=np.asarray(row.pop(k))
+-            if k=='angular_tiles':
+-                tiles=arrays[k].reshape(-1,8)
+-                row['angular_leaf_tile_summary']={'leaves':len(tiles),'finite_H_leaves':int(np.isfinite(tiles[:,5]).sum()),
+-                    'nonnegative_L_leaves':int((tiles[:,6]>=0).sum()),
+-                    'scope':'Unique retained angular leaves, not all cached ancestor certificates or a sampled first-hit map.'}
++        if k in row:arrays[k]=np.asarray(row.pop(k))
+     t=time.perf_counter();archive=args.output/f'{label}.npz';np.savez_compressed(archive,**arrays);write=time.perf_counter()-t
+     row.update(case=case,resolution=n,method=method,backend=backend,geometry_id=record(scene)['geometry_id'],
+                source_coordinates_SHA256=hashlib.sha256(np.asarray(source,dtype='<f8').tobytes()).hexdigest(),
+@@ -88,7 +80,6 @@
+     p.add_argument('--adaptive-nodes',type=int,default=8192);p.add_argument('--adaptive-batch',type=int,default=8)
+     p.add_argument('--angular-depth',type=int,default=10);p.add_argument('--angular-nodes',type=int,default=32766)
+     p.add_argument('--prefix-builds',type=int,default=512)
+-    p.add_argument('--angular-boxes',type=int,default=-1,help='-1 all inner proofs; 256 isolates the old inner subset')
+     p.add_argument('--tile-origin',type=int,nargs=3);p.add_argument('--world-grid',type=int,default=1024)
+     p.add_argument('--one',action='store_true',help=argparse.SUPPRESS);args=p.parse_args();args.output.mkdir(parents=True,exist_ok=True)
+     if args.one:run_one(args);return
+@@ -114,7 +105,7 @@
+                                  '--ordinals',str(ordinal),'--resolutions',str(n),'--methods',method,'--backends',backend,
+                                  '--seconds',str(args.seconds),'--cover-depth',str(args.cover_depth),'--cover-nodes',str(args.cover_nodes),
+                                  '--adaptive-nodes',str(args.adaptive_nodes),'--adaptive-batch',str(args.adaptive_batch),
+-                                 '--angular-depth',str(args.angular_depth),'--angular-nodes',str(args.angular_nodes),'--prefix-builds',str(args.prefix_builds),'--angular-boxes',str(args.angular_boxes)]
++                                 '--angular-depth',str(args.angular_depth),'--angular-nodes',str(args.angular_nodes),'--prefix-builds',str(args.prefix_builds)]
+                         if args.tile_origin is not None:command+=['--tile-origin',*map(str,args.tile_origin),'--world-grid',str(args.world_grid)]
+                         start=time.perf_counter();subprocess.run(command,check=True,timeout=args.seconds+120)
+                         row=json.loads(checkpoint.read_text());row['fresh_process_end_to_end_seconds']=time.perf_counter()-start;atomic_json(checkpoint,row)
