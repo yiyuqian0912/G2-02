@@ -1,0 +1,37 @@
+{
+  "schema": "b2-precision-v1",
+  "baseline_commit": "acac1b6d188e9a0577c3b0a6939a820dcb712282",
+  "baseline_generated_sources": {
+    "CMakeLists.txt": "afc3c90100663fa8a5dcccdc4b49d7a5fc52e55b32e2ee8fbad38c0020f71b83",
+    "bindings.cpp": "055cf219e775dca8819484b9c5f30cae0230952627d64b9ffd3ac7d84788da3a",
+    "common.hpp": "db9e3f91201740711a172af8cb48a6c42db248b9b967ec779c9ffc2fc8108f35",
+    "exp.hpp": "06b5f40d5b909fa2d8238d4ea57ce01f3c7cd6ea323ec00fff091be962e2c910",
+    "field.hpp": "6ea78b8d38f65472b1d7274fc47e97ac115285bf668d2df6a58ae322be28ef02",
+    "interval.hpp": "851a2d63d18fc33601c8e33bcfe321597c7dc32dfe612483d6c5dc655d52070c",
+    "local_search.hpp": "5bfbbd4633a0ee93a41636aea2355c3114bbd269b8e1379b16930226dacf3deb",
+    "primary.cpp": "ee7018028a6bd7c6fadbb4f289f5e9e37b5af657e1ddbb2040babc4718ce94b0",
+    "profile.hpp": "ac4e69597585f31237a819f027b19ef717e139eed020a234a39a71b2f468154b",
+    "reference.cpp": "1ad271358b8ec52cedce9f98c0465b48cc8ac817433d4f11ebc242c2db126498",
+    "regions.cpp": "547709d0515bb8b689f094350d3d06b0c238cb61100bd1b0c51f7c918082a985",
+    "regions.hpp": "a0a72015c110b577d9a9ec89c2e9720d87f885ac7eb45c5b015c82f52d1afd50"
+  },
+  "audit_seed": 2026110717,
+  "audit_samples_per_label": 512,
+  "heldout_master_seed": 202611071642,
+  "heldout": {
+    "72": 0.025,
+    "75": 0.05
+  },
+  "historical_cases": [
+    0,
+    7,
+    14,
+    21
+  ],
+  "prior_holdout_cases": [
+    60,
+    62,
+    63,
+    64
+  ]
+}
