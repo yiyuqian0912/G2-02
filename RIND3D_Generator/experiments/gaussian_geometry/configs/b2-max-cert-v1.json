@@ -1,0 +1,29 @@
+{
+  "experiment": "continuous-B2-one-dimensional-maximum-and-MISS-certificates-v1",
+  "base_commit": "d67215cce0f6dcfccb504813da5c1e52feb18547",
+  "frozen_cases": [0, 7, 14, 21],
+  "selection_version": "trace-cost-and-approximate-margin-v1",
+  "development_rays": 126,
+  "evaluation_rays": 248,
+  "methods": ["A_primary", "A_independent", "B_derivative", "C_stationary", "D_hybrid", "D_proof", "E_lean", "E_lean_proof"],
+  "endpoint_probe_ablation": {
+    "D_initial_endpoint_probes": true,
+    "E_initial_endpoint_probes": false,
+    "all_proofs_cover_closed_endpoints": true,
+    "status": "post-hoc after complete-field overhead diagnosis; 512 new distinct cost-unselected residual holdouts frozen before E timing"
+  },
+  "max_nodes": 16384,
+  "max_depth": 40,
+  "query_seconds": 2.0,
+  "fallback": false,
+  "hybrid_order": ["natural", "point_witness", "monotonicity", "local_signed_Taylor", "stationary_localization", "subdivide"],
+  "stationary_contraction_fraction": 0.75,
+  "checker_precision": 256,
+  "checker_precision_secondary_ablation": 128,
+  "maximum_certificate_intervals": 8192,
+  "repeats": 3,
+  "independent_renderer_retained": true,
+  "B2_ready_capable": false,
+  "new_READY_scenes": 0,
+  "full_1024_fields": 0
+}

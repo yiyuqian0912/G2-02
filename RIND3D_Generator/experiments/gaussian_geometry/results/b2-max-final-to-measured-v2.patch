@@ -1,0 +1,200 @@
+--- a/max.hpp
++++ b/max.hpp
+@@ -6,7 +6,7 @@
+ struct Settings {
+   int method=3, max_nodes=4096, max_depth=48;
+   double seconds=2.;
+-  bool fallback=false,endpoint_probes=true;
++  bool fallback=false;
+   void validate() const;
+ };
+ // Closed intervals with binary64 (therefore lossless dyadic) endpoints.
+--- a/solver.cpp
++++ b/solver.cpp
+@@ -131,7 +131,7 @@
+     auto &middle=ray.point(mid);
+     if(hit(middle))return finish(1,"certified_midpoint_witness",nodes,depth);
+     if(nodes==1) {
+-      if(o.endpoint_probes&&(hit(ray.point(0))||hit(ray.point(1))))return finish(1,"closed_endpoint_witness",nodes,depth);
++      if(hit(ray.point(0))||hit(ray.point(1)))return finish(1,"closed_endpoint_witness",nodes,depth);
+       std::vector<std::size_t> rank(ray.q.size());std::iota(rank.begin(),rank.end(),0);
+       std::stable_sort(rank.begin(),rank.end(),[&](auto a,auto b){return range.terms[a].hi>range.terms[b].hi;});
+       for(std::size_t j=0;j<std::min<std::size_t>(2,rank.size());j++) {
+--- a/bindings.cpp
++++ b/bindings.cpp
+@@ -10,8 +10,7 @@
+   m.attr("ready_capable")=false;m.attr("mpfr_version")=mpfr_get_version();
+   py::class_<Settings>(m,"Settings").def(py::init<>())
+     .def_readwrite("method",&Settings::method).def_readwrite("max_nodes",&Settings::max_nodes)
+-    .def_readwrite("max_depth",&Settings::max_depth).def_readwrite("seconds",&Settings::seconds).def_readwrite("fallback",&Settings::fallback)
+-    .def_readwrite("endpoint_probes",&Settings::endpoint_probes);
++    .def_readwrite("max_depth",&Settings::max_depth).def_readwrite("seconds",&Settings::seconds).def_readwrite("fallback",&Settings::fallback);
+   py::class_<Leaf>(m,"Leaf").def(py::init<>())
+     .def_readwrite("lo",&Leaf::lo).def_readwrite("hi",&Leaf::hi).def_readwrite("upper",&Leaf::upper)
+     .def_readwrite("op",&Leaf::op).def_readwrite("jlo",&Leaf::jlo).def_readwrite("jhi",&Leaf::jhi)
+--- a/benchmark.py
++++ b/benchmark.py
+@@ -17,7 +17,7 @@
+     if any(saved.get(k)!=v for k,v in {'ray_id':row['ray_id'],'case':row['case'],'expected':row['expected'],'method':method,'repetition':repetition}.items()):
+         raise ValueError('Conflicting ray checkpoint identity')
+     if saved.get('status') not in (row['expected'],'UNKNOWN'):raise ValueError('Invalid physical checkpoint')
+-    if method.endswith('_proof') and saved['status']=='MISS':
++    if method=='D_proof' and saved['status']=='MISS':
+         if not saved.get('checker',{}).get('accepted'):raise ValueError('Failed proof checkpoint is not completed work')
+         if not certificate_path.exists() or hashlib.sha256(certificate_path.read_bytes()).hexdigest()!=saved.get('proof_SHA256'):
+             raise ValueError('Missing or changed certificate checkpoint')
+@@ -27,7 +27,7 @@
+     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--root',type=Path,default=Path('outputs/gaussian-b2-max-cert-v1'))
+     p.add_argument('--input',type=Path,default=Path('outputs/gaussian-geometry-v1/distribution-v2'));p.add_argument('--output',type=Path,required=True)
+     p.add_argument('--split',choices=['development','evaluation','all'],default='development');p.add_argument('--repeats',type=int,default=1)
+-    p.add_argument('--methods',nargs='+',default=['A_primary','A_independent','B_derivative','C_stationary','D_hybrid','D_proof','E_lean','E_lean_proof'])
++    p.add_argument('--methods',nargs='+',default=['A_primary','A_independent','B_derivative','C_stationary','D_hybrid','D_proof'])
+     p.add_argument('--seconds',type=float,default=2.);p.add_argument('--max-nodes',type=int,default=16384);p.add_argument('--precision',type=int,default=256)
+     a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True);fixture=a.root/'frozen-rays.json';f=json.loads(fixture.read_text())
+     selected=[r for r in f['rays'] if a.split=='all' or r['split']==a.split]
+@@ -49,7 +49,7 @@
+         for method in a.methods:
+             t=time.perf_counter()
+             if method.startswith('A_'):engine=NativeOracle(scene,independent=method=='A_independent',max_nodes=a.max_nodes,query_seconds=a.seconds)
+-            else:engine=MaximumOracle(scene,method={'B_derivative':1,'C_stationary':2,'D_hybrid':3,'D_proof':3,'E_lean':3,'E_lean_proof':3}[method],max_nodes=a.max_nodes,max_depth=40,seconds=a.seconds,endpoint_probes=not method.startswith('E_'))
++            else:engine=MaximumOracle(scene,method={'B_derivative':1,'C_stationary':2,'D_hybrid':3,'D_proof':3}[method],max_nodes=a.max_nodes,max_depth=40,seconds=a.seconds)
+             engines[method]=engine;setup[method]=time.perf_counter()-t
+         t=time.perf_counter();checker=CertificateChecker(scene);setup['checker']=time.perf_counter()-t
+         rows=[r for r in selected if r['case']==case]
+@@ -64,28 +64,26 @@
+                 methods=a.methods[repetition%len(a.methods):]+a.methods[:repetition%len(a.methods)]
+                 for method in methods:
+                     path=a.output/f'{row["ray_id"]}-{method}-{repetition}.json'
+-                    proof_path=a.output/f'certificate-{row["ray_id"]}-{method}-{repetition}.json'
+                     if path.exists():
+-                        saved=json.loads(path.read_text());validate_checkpoint(saved,row,method,repetition,proof_path)
++                        saved=json.loads(path.read_text());validate_checkpoint(saved,row,method,repetition,a.output/f'certificate-{row["ray_id"]}-{repetition}.json')
+                         results.append(saved);continue
+                     engine=engines[method];t=time.perf_counter();c=time.process_time()
+                     if method.startswith('A_'):
+                         previous=engine.work.copy();decision=engine.segment(row['source_xyz'],row['receiver_xyz']);data={'status':decision.status,'reason':decision.reason,'nodes':decision.nodes,'depth':decision.depth,'work':dict(engine.work-previous)}
+-                    else:data=engine.segment(row['source_xyz'],row['receiver_xyz'],proof=method.endswith('_proof'))
++                    else:data=engine.segment(row['source_xyz'],row['receiver_xyz'],proof=method=='D_proof')
+                     api_time=time.perf_counter()-t;cpu=time.process_time()-c;certificate=data.pop('certificate',None)
+                     assert data['status'] in (row['expected'],'UNKNOWN'),('OPPOSITE PHYSICAL LABEL',row,method,data)
+                     result={'ray_id':row['ray_id'],'case':case,'split':row['split'],'expected':row['expected'],'strata':row['strata'],'method':method,'repetition':repetition,'wall_seconds':api_time,'CPU_seconds':cpu,**data}
+-                    if method.endswith('_proof') and data['status']=='MISS' and certificate:
++                    if method=='D_proof' and data['status']=='MISS' and certificate:
+                         t=time.perf_counter();encoded=dumps(certificate);serialization=time.perf_counter()-t
+                         t=time.perf_counter();c=time.process_time();checked=checker.check(encoded,row['source_xyz'],row['receiver_xyz'],precision=a.precision,seconds=a.seconds)
+                         result.update(checker_wall_seconds=time.perf_counter()-t,checker_CPU_seconds=time.process_time()-c,serialization_seconds=serialization,proof_bytes=len(encoded),proof_intervals=len(certificate['partition']),proof_operations=dict(Counter(r['op'] for r in certificate['partition'])),checker=checked)
+-                        t=time.perf_counter();proof_path.write_bytes(encoded)
++                        t=time.perf_counter();(a.output/f'certificate-{row["ray_id"]}-{repetition}.json').write_bytes(encoded)
+                         result['proof_persistence_seconds']=time.perf_counter()-t
+                         result['proof_SHA256']=hashlib.sha256(encoded).hexdigest()
+-                        result['proof_file']=proof_path.name
+                         if not checked['accepted']:
+                             atomic_json(path,result);raise AssertionError(('CHECKER REJECTED',row['ray_id'],checked))
+-                    atomic_json(path,result);validate_checkpoint(result,row,method,repetition,proof_path);results.append(result)
++                    atomic_json(path,result);validate_checkpoint(result,row,method,repetition,a.output/f'certificate-{row["ray_id"]}-{repetition}.json');results.append(result)
+         print(json.dumps({'case':case,'rays':len(rows),'records':len(results),'elapsed':time.perf_counter()-started}),flush=True)
+     atomic_json(a.output/'summary.json',{'identity':identity,'results':results,'setups':setups,'orchestration_wall_seconds':time.perf_counter()-started,'orchestration_CPU_seconds':time.process_time()-cpu_start,
+                 'existing_independent_renderer_retained':True,'checker_is_not_an_independent_renderer':True,'new_READY_scenes':0})
+--- a/field_bridge.py
++++ b/field_bridge.py
+@@ -29,7 +29,6 @@
+     b2max::Settings settings;settings.method=cfg.maximum_method;
+     settings.max_nodes=o.max_nodes;settings.max_depth=o.max_depth;
+     settings.seconds=o.query_seconds;settings.fallback=true;
+-    settings.endpoint_probes=cfg.initial_endpoint_probes;
+     auto result=maximum->solve(source,x,settings,cfg.check_miss_proof);
+     s.add("maximum_calls");s.add("maximum_nanoseconds",std::uint64_t(result.seconds*1e9));
+     s.add("maximum_prepare_nanoseconds",std::uint64_t(result.preparation_seconds*1e9));
+@@ -53,7 +52,7 @@
+ '''
+     for name in ('regions.hpp','regions.cpp','bindings.cpp'):
+         old=(regions/name).read_text();text=old
+-        if name=='regions.hpp':text=text.replace('  int mode =','  int maximum_method=3,checker_precision=256;\n  bool check_miss_proof=false,initial_endpoint_probes=true;\n  int mode =')
++        if name=='regions.hpp':text=text.replace('  int mode =','  int maximum_method=3,checker_precision=256;\n  bool check_miss_proof=false;\n  int mode =')
+         elif name=='regions.cpp':
+             text='#include "max.hpp"\n'+text
+             text=text.replace('  std::unique_ptr<Primary> a;','  std::unique_ptr<b2max::Solver> maximum;\n  std::unique_ptr<b2max::Checker> checker;\n  std::unique_ptr<Primary> a;')
+@@ -66,7 +65,7 @@
+             text=text.replace('PYBIND11_MODULE(_b2_regions, m)','PYBIND11_MODULE(_b2_max_field, m)')
+             text=text.replace('py::class_<Settings>(m, "Settings")','py::class_<Settings>(m, "Settings",py::module_local())')
+             text=text.replace('py::class_<Engine>(m, "Engine")','py::class_<Engine>(m, "Engine",py::module_local())')
+-            text=text.replace('      .def_readwrite("mode", &Settings::mode)','      .def_readwrite("maximum_method", &Settings::maximum_method)\n      .def_readwrite("checker_precision", &Settings::checker_precision)\n      .def_readwrite("check_miss_proof", &Settings::check_miss_proof)\n      .def_readwrite("initial_endpoint_probes", &Settings::initial_endpoint_probes)\n      .def_readwrite("mode", &Settings::mode)')
++            text=text.replace('      .def_readwrite("mode", &Settings::mode)','      .def_readwrite("maximum_method", &Settings::maximum_method)\n      .def_readwrite("checker_precision", &Settings::checker_precision)\n      .def_readwrite("check_miss_proof", &Settings::check_miss_proof)\n      .def_readwrite("mode", &Settings::mode)')
+         (src/name).write_text(text);patch.extend(difflib.unified_diff(old.splitlines(True),text.splitlines(True),fromfile=name,tofile='isolated-hook/'+name))
+     (output/'scalar-hook.patch').write_text(''.join(patch))
+     cmake='''cmake_minimum_required(VERSION 3.23)
+@@ -102,4 +101,4 @@
+ 
+ 
+ if __name__=='__main__':
+-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,default=Path('outputs/gaussian-b2-max-cert-v1/field-hook-v3'));a=p.parse_args();build(a.output)
++    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,default=Path('outputs/gaussian-b2-max-cert-v1/field-hook-v2'));a=p.parse_args();build(a.output)
+--- a/fields.py
++++ b/fields.py
+@@ -16,7 +16,7 @@
+ from .api import parameters
+ from .field_bridge import extension,source_identity
+ 
+-METHODS=['A_primary','A_independent','D_hybrid','D_checked','E_lean','E_checked']
++METHODS=['A_primary','A_independent','D_hybrid','D_checked']
+ 
+ 
+ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+@@ -33,8 +33,7 @@
+     else:
+         m=extension(args.hook);engine=m.Engine(*parameters(scene),False);settings=m.Settings();options=m.Options()
+         settings.mode=5;settings.cover_depth=7;settings.cover_nodes=131073;settings.shadow_boxes=256;settings.trace=True
+-        settings.maximum_method=3;settings.check_miss_proof=method.endswith('checked');settings.checker_precision=256
+-        settings.initial_endpoint_probes=not method.startswith('E_')
++        settings.maximum_method=3;settings.check_miss_proof=method=='D_checked';settings.checker_precision=256
+         options.max_nodes=16384;options.max_depth=40
+         engine_setup=time.perf_counter()-start;t=time.perf_counter();data=engine.field(source,n,args.seconds,options,settings)
+     call=time.perf_counter()-t;cpu_seconds=time.process_time()-cpu
+@@ -42,20 +41,11 @@
+     valid=arrays['valid'].astype(bool);response=arrays['response'].astype(bool);solid=arrays['solid'].astype(bool)
+     # The original frozen complete field is an additional immutable comparison.
+     baseline=args.previous/f'{case}-{n}-A_fixed7-independent.npz'
+-    if not baseline.exists():baseline=args.previous/f'{case}-{n}-A_independent.npz'
+-    if not baseline.exists():baseline=args.output/f'{case}-{n}-A_independent.npz'
+     if baseline.exists():
+-        metadata=json.loads(baseline.with_suffix('.json').read_text())
+-        assert metadata['geometry_id']==record(scene)['geometry_id'],'Independent geometry identity mismatch'
+-        expected_source=hashlib.sha256(np.asarray(source,dtype='<f8').tobytes()).hexdigest()
+-        assert metadata.get('source_SHA256',metadata.get('source_coordinates_SHA256'))==expected_source,'Independent source identity mismatch'
+         saved=np.load(baseline);common=saved['valid']&valid
+-        assert saved['valid'].all(),'Independent baseline is incomplete'
+         mismatches=sum(int(np.count_nonzero((saved[k]!=arrays[k])&common)) for k in ('response','solid'))
+         assert mismatches==0
+-    else:
+-        if not method.startswith('A_'):raise ValueError('Run a complete original independent field first, or pass --previous')
+-        mismatches=None
++    else:mismatches=None
+     name=f'{case}-{n}-{method}';archive=args.output/(name+'.npz');t=time.perf_counter();np.savez_compressed(archive,**arrays);write=time.perf_counter()-t
+     data.update(case=case,resolution=n,method=method,geometry_id=record(scene)['geometry_id'],source_SHA256=hashlib.sha256(np.array(source,dtype='<f8').tobytes()).hexdigest(),
+                 source_clearance='FREE',source_clearance_and_setup_seconds=clearance,engine_setup_seconds=engine_setup,field_call_seconds=call,
+@@ -65,8 +55,6 @@
+                 valid_voxels=int(valid.sum()),archive_SHA256=sha(archive),archive_bytes=archive.stat().st_size,
+                 physical_bits_SHA256=hashlib.sha256(np.packbits(response).tobytes()+np.packbits(solid).tobytes()).hexdigest(),
+                 frozen_independent_bit_mismatches=mismatches,
+-                frozen_independent_archive_SHA256=sha(baseline) if baseline.exists() else None,
+-                experimental_ray_policy={'local_maximum_method':3,'initial_endpoint_probes':not method.startswith('E_'),'old_fallback':True,'checker_precision':256,'proof_check':method.endswith('checked')},
+                 proof_transport='Native interval objects only; no per-voxel JSON serialization in field timings',
+                 unchanged_independent_renderer_still_required=True,new_READY_scenes=0)
+     atomic_json(args.output/(name+'.json'),data)
+@@ -76,7 +64,7 @@
+ def main():
+     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--input',type=Path,default=Path('outputs/gaussian-geometry-v1/distribution-v2'))
+     p.add_argument('--previous',type=Path,default=Path('outputs/gaussian-b2-angular-v1/depth7-scales-v3'))
+-    p.add_argument('--hook',type=Path,default=Path('outputs/gaussian-b2-max-cert-v1/field-hook-v3'));p.add_argument('--output',type=Path,required=True)
++    p.add_argument('--hook',type=Path,default=Path('outputs/gaussian-b2-max-cert-v1/field-hook-v2'));p.add_argument('--output',type=Path,required=True)
+     p.add_argument('--ordinals',type=int,nargs='+',default=[14,7]);p.add_argument('--resolutions',type=int,nargs='+',default=[32,64])
+     p.add_argument('--methods',choices=METHODS,nargs='+',default=METHODS);p.add_argument('--seconds',type=float,default=480)
+     p.add_argument('--one',action='store_true',help=argparse.SUPPRESS);a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
+@@ -84,7 +72,6 @@
+     if a.one:worker(a);return
+     identity={'sources':source_identity(),'driver_SHA256':sha(Path(__file__)),'hook_identity':json.loads((a.hook/'identity.json').read_text()),
+               'ordinals':a.ordinals,'resolutions':a.resolutions,'methods':a.methods,'seconds':a.seconds,'source_clearance_unchanged':True}
+-    identity['frozen_inputs']={f'gaussian_sum-{i:03d}':{name:sha(a.input/f'gaussian_sum-{i:03d}'/name) for name in ('geometry.json','result.json')} for i in a.ordinals}
+     manifest=a.output/'manifest.json'
+     if manifest.exists():assert json.loads(manifest.read_text())==identity,'Use a new field-run identity'
+     else:atomic_json(manifest,identity)
