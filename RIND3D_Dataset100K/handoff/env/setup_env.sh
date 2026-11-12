@@ -34,8 +34,16 @@ rm -f /tmp/r3d_req_$$.txt
 
 # 2. NVRTC matching the driver: the certified renderer JIT-compiles PTX through the driver, which rejects PTX newer
 #    than its own CUDA version. cupy itself loads cubins and works with any 12.x driver.
-DRV_CUDA="$(nvidia-smi 2>/dev/null | sed -n 's/.*CUDA Version: \([0-9]*\)\.\([0-9]*\).*/\1.\2/p' | head -1)"
-if [[ -z "${DRV_CUDA}" ]]; then echo "[setup] nvidia-smi not available: cannot pin NVRTC"; exit 1; fi
+# driver CUDA version: from the driver API (cuDriverGetVersion via cupy), else parsed from nvidia-smi
+# ("CUDA Version: X.Y" on older drivers, "CUDA UMD Version: X.Y" on newer ones), else R3D_DRIVER_CUDA
+DRV_CUDA="${R3D_DRIVER_CUDA:-}"
+if [[ -z "${DRV_CUDA}" ]]; then
+  DRV_CUDA="$("${PYBIN}" -c 'import cupy; v = cupy.cuda.runtime.driverGetVersion(); print(f"{v // 1000}.{(v % 1000) // 10}")' 2>/dev/null || true)"
+fi
+if [[ -z "${DRV_CUDA}" ]]; then
+  DRV_CUDA="$(nvidia-smi 2>/dev/null | sed -n 's/.*CUDA[A-Z ]*Version: \([0-9]*\)\.\([0-9]*\).*/\1.\2/p' | head -1)"
+fi
+if [[ -z "${DRV_CUDA}" ]]; then echo "[setup] cannot determine the driver CUDA version (set R3D_DRIVER_CUDA=12.4)"; exit 1; fi
 DRV_MAJ="${DRV_CUDA%%.*}"; DRV_MIN="${DRV_CUDA##*.}"
 if [[ "${DRV_MAJ}" -ge 13 ]]; then NVRTC_SPEC="nvidia-cuda-nvrtc-cu12==12.9.*"; else NVRTC_SPEC="nvidia-cuda-nvrtc-cu12==12.${DRV_MIN}.*"; fi
 echo "[setup] driver CUDA ${DRV_CUDA}; installing ${NVRTC_SPEC}"

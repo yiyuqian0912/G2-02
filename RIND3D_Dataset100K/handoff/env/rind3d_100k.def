@@ -18,9 +18,7 @@ From: ubuntu:24.04
     rm -rf /var/lib/apt/lists/*
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH=/root/.local/bin:$PATH
-    printf '#!/bin/sh\necho "CUDA Version: %s"\n' "{{ DRIVER_CUDA }}" > /usr/local/bin/nvidia-smi && chmod +x /usr/local/bin/nvidia-smi
-    cd /opt/rind3d && bash RIND3D_Dataset100K/handoff/env/setup_env.sh
-    rm -f /usr/local/bin/nvidia-smi
+    cd /opt/rind3d && R3D_DRIVER_CUDA="{{ DRIVER_CUDA }}" bash RIND3D_Dataset100K/handoff/env/setup_env.sh
 
 %environment
     export PATH=/opt/rind3d/.venv/bin:$PATH
