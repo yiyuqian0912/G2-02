@@ -151,3 +151,36 @@ A separation constraint couples the sources. Given s_j, each other source is uni
 **Common structure.** Both share the same structure: the quota normalisation 1/P(accept | G, S) must be undone by a weight proportional to the scene-level acceptance rate.
 
 **Bias without the weight.** Phase 1 measured TV 0.02–0.11 for the analogous v0.1 factor on extended posteriors. That is why ω is mandatory for training on the 1K labels.
+
+## 8. Estimating ω in the release (measured on `release_1k_v1`, 1000 scenes × 3 sides)
+
+The theorem of §2 needs a weight with E[ω̂ | G, S] = Λ_L(G, S) that is independent of the accepted windows' content given (G, S). Two independent streams provide one each:
+
+| estimator | definition | why it is valid |
+|---|---|---|
+| **rate** (contract default) | Λ̂_rate = accepts / 1024 on the rate stream | separate keyed stream; binomial, unbiased |
+| **quota** | Λ̂_quota = (r − 1)/(N − 1): r = quota (16 or 24), N = quota proposals (repeats excluded) | inverse (negative-binomial) sampling has this unbiased estimator. For i.i.d. proposals, the accepted windows are independent of the gaps between acceptances, so the estimate does not depend on which windows were accepted. |
+| **combined** | (1 − a_L) Λ̂_rate + a_L Λ̂_quota, with fixed a_L = 0.20 / 0.09 / 0.04 | a constant convex mix of two unbiased, mutually independent estimators. It is strictly positive (Λ̂_quota > 0). a_L is the inverse-variance weight at the median Λ of each side. |
+
+**Measured:**
+
+| side | mean Λ̂_rate | mean Λ̂_quota | corr | rate = 0 | median relative s.e.: rate | quota | combined |
+|---|---|---|---|---|---|---|---|
+| 64 | 0.0746 | 0.0736 | 0.93 | 1 scene | 0.130 | 0.260 | 0.116 |
+| 128 | 0.2375 | 0.2382 | 0.93 | 0 | 0.059 | 0.189 | 0.056 |
+| 256 | 0.4746 | 0.4770 | 0.94 | 0 | 0.033 | 0.155 | 0.032 |
+
+**Readings:**
+* The two estimators agree in mean on every side. That is an empirical check of the rate stream and of the quota bookkeeping.
+* One scene-side (L = 64) has Λ̂_rate = 0: no rate-stream accept, although the quota filled. Under the rate estimator its 16 windows get zero weight. This is still unbiased, but it wastes data.
+* The combined estimator avoids zero weights and lowers the relative s.e. modestly.
+
+**Interface (`rind3d_1k.loader`):**
+* Every window record carries `weight` (rate, the contract default) and `weights` = {rate, quota, combined}.
+* `flatten(..., weight="rate" | "quota" | "combined")` attaches the chosen ω to every example.
+* ω is a **loss weight**, never a model input.
+
+**Scene rejection:**
+* All 1000 slots were accepted at attempt 0; no proposal stream hit the 6000 cap. The largest proposal counts were 4658 (L64), 2678 (L128) and 979 (L256).
+* So r̂ = 0/1000. The one-sided 99% binomial upper bound on r is 1 − 0.01^{1/1000} = 0.0046.
+* The §3 bound on the dataset-average label error from conditioning on acceptance is therefore r/(1 − r) ≤ 0.0046 (99% confidence).

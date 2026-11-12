@@ -10,14 +10,27 @@ Flattening into single-source examples is a downstream adapter (`flatten`). It n
 Views:
 * student: local inputs only (SOLID crop, one or all response channels, window side; the origin is optional);
 * target: posterior labels, with TV bound and status;
-* privileged (research_access=True only): source coordinates, global geometry, selection log, weights.
+* training weight (always present, a loss weight, never a model input): `weight` = omega, the scene-level acceptance
+  rate of the window's side (docs/SELECTION_LAW_1K.md section 2). Training MUST weight each example by it, otherwise
+  the per-channel target is not the certified posterior. `weights` holds the available unbiased estimators:
+  - "rate": rate-stream estimate Lambda_hat (1024 proposals; contract default);
+  - "quota": inverse-sampling estimate (r - 1) / (N - 1) from the quota stream (r = quota, N = proposals);
+  - "combined": (1 - a_L) * rate + a_L * quota with fixed a_L = 0.20 / 0.09 / 0.04 (L = 64 / 128 / 256),
+    strictly positive and of lower variance; unbiased because a_L is a constant and both streams are independent of
+    the accepted windows' content given the scene.
+* privileged (research_access=True only): source coordinates, global geometry, selection log.
 Splits are by scene: sha256(scene_id) mod 100 < 80 train, < 90 val, else test."""
+
 import hashlib
 import json
 from pathlib import Path
 
 import numpy as np
 import zstandard
+
+
+QUOTA = {64: 16, 128: 24, 256: 24}
+ALPHA_QUOTA = {64: 0.20, 128: 0.09, 256: 0.04}     # fixed inverse-variance mixing weights (release_1k_v1 medians)
 
 
 def split_of(scene_id):
@@ -36,6 +49,22 @@ class Scene:
         self._dz = zstandard.ZstdDecompressor()
         lab = self.dir / "labels" / "LABELS.json"
         self.labels = {(x["window"], x["source"]): x for x in json.loads(lab.read_text())["labels"]} if lab.exists() else {}
+        self.side = {int(x["Lp"]): x for x in self.meta.get("sides", [])}
+
+    def weights(self, Lp):
+        """Unbiased estimators of the training weight omega = Lambda_L(G, S) of side Lp (see the module docstring)."""
+        Lp = int(Lp)
+        rate = float(self.meta["Lambda_hat"][str(Lp)])
+        out = dict(rate=rate)
+        sd = self.side.get(Lp)
+        if sd is not None:
+            r = int(self.meta.get("quota", {}).get(str(Lp), QUOTA[Lp]))
+            n = int(sd["proposals"]) - int(sd["reasons"].get("repeat", 0))
+            if n > 1 and r > 1:
+                out["quota"] = (r - 1) / (n - 1)
+                a = ALPHA_QUOTA[Lp]
+                out["combined"] = (1 - a) * rate + a * out["quota"]
+        return out
 
     @property
     def blob(self):
@@ -76,12 +105,13 @@ class Scene:
                    origin=(int(r["x"]), int(r["y"]), int(r["z"])), k=k, m=int(r["m"]),
                    informative=[bool((int(r["mask"]) >> j) & 1) for j in range(k)],
                    solid=self._crop(w, -1), responses=np.stack([self._crop(w, j) for j in range(k)]))
+        rec["weights"] = self.weights(r["Lp"])
+        rec["weight"] = rec["weights"]["rate"]          # contract default omega (loss weight, not a model input)
         if with_labels:
             rec["posteriors"] = [self.posterior(w, j) for j in range(k)]
         if research_access:
             src = json.loads((self.dir / "privileged" / "sources.json").read_text())
             rec["sources"] = np.array([[float.fromhex(v) for v in s] for s in src["sources_hex"]])
-            rec["weight_Lambda_hat"] = self.meta["Lambda_hat"][str(int(r["Lp"]))]
         return rec
 
 
@@ -109,8 +139,10 @@ class RIND3D1K:
         return self.scene(idx // 64).window(idx % 64)
 
 
-def flatten(ds, informative_only=True, certified_only=True, max_tv=0.05):
-    """Downstream adapter: yields single-source examples (solid, response_j, L, origin, label_j, ids)."""
+def flatten(ds, informative_only=True, certified_only=True, max_tv=0.05, weight="rate"):
+    """Downstream adapter: yields single-source examples (solid, response_j, L, origin, label_j, weight, ids).
+    `weight` selects the omega estimator ("rate" = contract default, "quota", "combined"); every example of a window
+    carries its window's omega, and training must use it as the loss weight."""
     for i in range(len(ds.scenes)):
         S = ds.scene(i)
         for w in range(len(S.W)):
@@ -122,4 +154,5 @@ def flatten(ds, informative_only=True, certified_only=True, max_tv=0.05):
                 if certified_only and not (lab.get("status") == "certified" and lab.get("tv_bound", 1) <= max_tv):
                     continue
                 yield dict(scene_id=rec["scene_id"], window=w, source=j, L=rec["L"], origin=rec["origin"],
-                           solid=rec["solid"], response=rec["responses"][j], label=lab)
+                           solid=rec["solid"], response=rec["responses"][j], label=lab,
+                           weight=rec["weights"].get(weight, rec["weight"]))
