@@ -68,3 +68,24 @@ The rerun on v3.1 runs with per-side limits of 7200 / 14400 / 14400 s. Results a
 * **Projection.** 159,802 informative labels at the Stage-B costs (6.2 / 24.3 / 106.7 worker-s per label for L = 64 / 128 / 256) come to ≈ 141 h on the full machine (16 hardware threads, 6 GPU-assisted).
 * **Resuming.** Every pass skips finished task files. Stop with `touch <root>/STOP` (between passes) or SIGTERM to the runner. To resume, rerun `production_loop.sh` with the same arguments.
 * **Quarantined tasks.** They are retried only with `run_labels.py ... --retry-failed`.
+
+## 6. Stopped (2026-11-12, ≈ 12:10 EST, on request)
+
+* **What was stopped.** The user stopped the campaign to rethink the labelling cost. The production loop, both label runners and the release validator were stopped. `<root>/STOP` is present.
+* **State preserved.**
+  * Physical stage: complete, all 1000 scenes.
+  * Labels: 333 certified (333/333) in scenes 000000–000003.
+  * Scene 000001: five `engine_failure` slots. Their v3.1 reruns were still busy after 16 min and were stopped.
+  * `VALIDATION.json` was not produced, because the validator was stopped. `RELEASE_STATS.json` was produced.
+* **Measured cost of the release labels so far (CPU-s per label):**
+
+| side | labels | mean | median | p95 | max |
+|---|---|---|---|---|---|
+| L = 64 | 66 | 7.5 | 4.3 | 17 | 54 |
+| L = 128 | 102 | 14.0 | 4.1 | 75 | 98 |
+| L = 256 | 165 | 139 | 114 | 440 | 726 |
+
+* **Where the cost goes.**
+  * L = 256 windows are 92% of the CPU.
+  * The most expensive 10% of labels are 50% of the CPU.
+* **Resuming.** Remove `STOP` and rerun `production_loop.sh` with the same arguments. Finished task files are kept and skipped.
