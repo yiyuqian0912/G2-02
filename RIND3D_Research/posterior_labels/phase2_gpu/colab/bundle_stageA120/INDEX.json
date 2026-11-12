@@ -1,0 +1,1686 @@
+{
+ "source": "/home/yushu/Projects/RIND/RIND3D_PosteriorLabels2/outputs/stageA_windows",
+ "rule": 20261112,
+ "windows": [
+  {
+   "name": "1ea84aaf_249",
+   "scene": "1ea84aaf73ea08bffbb4980773ce7c254e790272c4af6d232ee9e38284880363",
+   "wid": 249,
+   "side": 32,
+   "origin": [
+    83,
+    76,
+    37
+   ],
+   "dark": 26019,
+   "lit": 2765,
+   "solid": 3984
+  },
+  {
+   "name": "1ea84aaf_182",
+   "scene": "1ea84aaf73ea08bffbb4980773ce7c254e790272c4af6d232ee9e38284880363",
+   "wid": 182,
+   "side": 32,
+   "origin": [
+    93,
+    7,
+    82
+   ],
+   "dark": 6913,
+   "lit": 25499,
+   "solid": 356
+  },
+  {
+   "name": "1ea84aaf_141",
+   "scene": "1ea84aaf73ea08bffbb4980773ce7c254e790272c4af6d232ee9e38284880363",
+   "wid": 141,
+   "side": 16,
+   "origin": [
+    67,
+    43,
+    18
+   ],
+   "dark": 398,
+   "lit": 1816,
+   "solid": 1882
+  },
+  {
+   "name": "1ea84aaf_102",
+   "scene": "1ea84aaf73ea08bffbb4980773ce7c254e790272c4af6d232ee9e38284880363",
+   "wid": 102,
+   "side": 16,
+   "origin": [
+    71,
+    82,
+    42
+   ],
+   "dark": 261,
+   "lit": 134,
+   "solid": 3701
+  },
+  {
+   "name": "1ea84aaf_1",
+   "scene": "1ea84aaf73ea08bffbb4980773ce7c254e790272c4af6d232ee9e38284880363",
+   "wid": 1,
+   "side": 8,
+   "origin": [
+    97,
+    85,
+    32
+   ],
+   "dark": 410,
+   "lit": 102,
+   "solid": 0
+  },
+  {
+   "name": "1ea84aaf_104",
+   "scene": "1ea84aaf73ea08bffbb4980773ce7c254e790272c4af6d232ee9e38284880363",
+   "wid": 104,
+   "side": 16,
+   "origin": [
+    89,
+    63,
+    14
+   ],
+   "dark": 4063,
+   "lit": 33,
+   "solid": 0
+  },
+  {
+   "name": "f7130c10_218",
+   "scene": "f7130c10d3776a30bf180d57c06c13dc83ad1fd45de8562fc01a855dd9ca8ba2",
+   "wid": 218,
+   "side": 32,
+   "origin": [
+    6,
+    17,
+    80
+   ],
+   "dark": 3023,
+   "lit": 29218,
+   "solid": 527
+  },
+  {
+   "name": "f7130c10_88",
+   "scene": "f7130c10d3776a30bf180d57c06c13dc83ad1fd45de8562fc01a855dd9ca8ba2",
+   "wid": 88,
+   "side": 16,
+   "origin": [
+    60,
+    88,
+    48
+   ],
+   "dark": 1588,
+   "lit": 2508,
+   "solid": 0
+  },
+  {
+   "name": "f7130c10_139",
+   "scene": "f7130c10d3776a30bf180d57c06c13dc83ad1fd45de8562fc01a855dd9ca8ba2",
+   "wid": 139,
+   "side": 16,
+   "origin": [
+    63,
+    7,
+    47
+   ],
+   "dark": 116,
+   "lit": 3956,
+   "solid": 24
+  },
+  {
+   "name": "f7130c10_7",
+   "scene": "f7130c10d3776a30bf180d57c06c13dc83ad1fd45de8562fc01a855dd9ca8ba2",
+   "wid": 7,
+   "side": 8,
+   "origin": [
+    9,
+    71,
+    92
+   ],
+   "dark": 9,
+   "lit": 503,
+   "solid": 0
+  },
+  {
+   "name": "f7130c10_164",
+   "scene": "f7130c10d3776a30bf180d57c06c13dc83ad1fd45de8562fc01a855dd9ca8ba2",
+   "wid": 164,
+   "side": 16,
+   "origin": [
+    44,
+    107,
+    36
+   ],
+   "dark": 3088,
+   "lit": 1008,
+   "solid": 0
+  },
+  {
+   "name": "f7130c10_252",
+   "scene": "f7130c10d3776a30bf180d57c06c13dc83ad1fd45de8562fc01a855dd9ca8ba2",
+   "wid": 252,
+   "side": 32,
+   "origin": [
+    18,
+    26,
+    28
+   ],
+   "dark": 33,
+   "lit": 32524,
+   "solid": 211
+  },
+  {
+   "name": "1484961d_90",
+   "scene": "1484961d7a69a312895970246aae11c24f6fe29512f219c2ed185e8d4fc23207",
+   "wid": 90,
+   "side": 16,
+   "origin": [
+    96,
+    9,
+    56
+   ],
+   "dark": 2463,
+   "lit": 1633,
+   "solid": 0
+  },
+  {
+   "name": "1484961d_44",
+   "scene": "1484961d7a69a312895970246aae11c24f6fe29512f219c2ed185e8d4fc23207",
+   "wid": 44,
+   "side": 8,
+   "origin": [
+    112,
+    36,
+    54
+   ],
+   "dark": 314,
+   "lit": 198,
+   "solid": 0
+  },
+  {
+   "name": "1484961d_229",
+   "scene": "1484961d7a69a312895970246aae11c24f6fe29512f219c2ed185e8d4fc23207",
+   "wid": 229,
+   "side": 32,
+   "origin": [
+    48,
+    34,
+    0
+   ],
+   "dark": 6786,
+   "lit": 12535,
+   "solid": 13447
+  },
+  {
+   "name": "1484961d_109",
+   "scene": "1484961d7a69a312895970246aae11c24f6fe29512f219c2ed185e8d4fc23207",
+   "wid": 109,
+   "side": 16,
+   "origin": [
+    8,
+    2,
+    5
+   ],
+   "dark": 3291,
+   "lit": 805,
+   "solid": 0
+  },
+  {
+   "name": "1484961d_80",
+   "scene": "1484961d7a69a312895970246aae11c24f6fe29512f219c2ed185e8d4fc23207",
+   "wid": 80,
+   "side": 8,
+   "origin": [
+    120,
+    20,
+    76
+   ],
+   "dark": 287,
+   "lit": 225,
+   "solid": 0
+  },
+  {
+   "name": "1484961d_165",
+   "scene": "1484961d7a69a312895970246aae11c24f6fe29512f219c2ed185e8d4fc23207",
+   "wid": 165,
+   "side": 16,
+   "origin": [
+    110,
+    74,
+    30
+   ],
+   "dark": 711,
+   "lit": 2917,
+   "solid": 468
+  },
+  {
+   "name": "e324ba2f_53",
+   "scene": "e324ba2f7ba9a58fed8f29fbe27c9ddf98dcc769c2272b1c9490dcad92339b92",
+   "wid": 53,
+   "side": 8,
+   "origin": [
+    94,
+    82,
+    44
+   ],
+   "dark": 466,
+   "lit": 11,
+   "solid": 35
+  },
+  {
+   "name": "e324ba2f_36",
+   "scene": "e324ba2f7ba9a58fed8f29fbe27c9ddf98dcc769c2272b1c9490dcad92339b92",
+   "wid": 36,
+   "side": 8,
+   "origin": [
+    99,
+    4,
+    76
+   ],
+   "dark": 150,
+   "lit": 362,
+   "solid": 0
+  },
+  {
+   "name": "e324ba2f_114",
+   "scene": "e324ba2f7ba9a58fed8f29fbe27c9ddf98dcc769c2272b1c9490dcad92339b92",
+   "wid": 114,
+   "side": 16,
+   "origin": [
+    71,
+    27,
+    27
+   ],
+   "dark": 172,
+   "lit": 3368,
+   "solid": 556
+  },
+  {
+   "name": "e324ba2f_236",
+   "scene": "e324ba2f7ba9a58fed8f29fbe27c9ddf98dcc769c2272b1c9490dcad92339b92",
+   "wid": 236,
+   "side": 32,
+   "origin": [
+    40,
+    91,
+    58
+   ],
+   "dark": 15456,
+   "lit": 16052,
+   "solid": 1260
+  },
+  {
+   "name": "e324ba2f_199",
+   "scene": "e324ba2f7ba9a58fed8f29fbe27c9ddf98dcc769c2272b1c9490dcad92339b92",
+   "wid": 199,
+   "side": 32,
+   "origin": [
+    93,
+    66,
+    95
+   ],
+   "dark": 28902,
+   "lit": 3679,
+   "solid": 187
+  },
+  {
+   "name": "e324ba2f_0",
+   "scene": "e324ba2f7ba9a58fed8f29fbe27c9ddf98dcc769c2272b1c9490dcad92339b92",
+   "wid": 0,
+   "side": 8,
+   "origin": [
+    95,
+    54,
+    48
+   ],
+   "dark": 95,
+   "lit": 417,
+   "solid": 0
+  },
+  {
+   "name": "c6375435_165",
+   "scene": "c6375435ed2e54bc2db08e87c1c71765a27704cb1b2f35c59d605577dd7549cc",
+   "wid": 165,
+   "side": 16,
+   "origin": [
+    106,
+    27,
+    51
+   ],
+   "dark": 62,
+   "lit": 4019,
+   "solid": 15
+  },
+  {
+   "name": "c6375435_192",
+   "scene": "c6375435ed2e54bc2db08e87c1c71765a27704cb1b2f35c59d605577dd7549cc",
+   "wid": 192,
+   "side": 32,
+   "origin": [
+    70,
+    82,
+    34
+   ],
+   "dark": 30885,
+   "lit": 451,
+   "solid": 1432
+  },
+  {
+   "name": "c6375435_54",
+   "scene": "c6375435ed2e54bc2db08e87c1c71765a27704cb1b2f35c59d605577dd7549cc",
+   "wid": 54,
+   "side": 8,
+   "origin": [
+    101,
+    75,
+    77
+   ],
+   "dark": 275,
+   "lit": 237,
+   "solid": 0
+  },
+  {
+   "name": "c6375435_108",
+   "scene": "c6375435ed2e54bc2db08e87c1c71765a27704cb1b2f35c59d605577dd7549cc",
+   "wid": 108,
+   "side": 16,
+   "origin": [
+    91,
+    93,
+    102
+   ],
+   "dark": 114,
+   "lit": 3982,
+   "solid": 0
+  },
+  {
+   "name": "c6375435_74",
+   "scene": "c6375435ed2e54bc2db08e87c1c71765a27704cb1b2f35c59d605577dd7549cc",
+   "wid": 74,
+   "side": 8,
+   "origin": [
+    37,
+    82,
+    83
+   ],
+   "dark": 470,
+   "lit": 42,
+   "solid": 0
+  },
+  {
+   "name": "c6375435_247",
+   "scene": "c6375435ed2e54bc2db08e87c1c71765a27704cb1b2f35c59d605577dd7549cc",
+   "wid": 247,
+   "side": 32,
+   "origin": [
+    19,
+    70,
+    22
+   ],
+   "dark": 27897,
+   "lit": 97,
+   "solid": 4774
+  },
+  {
+   "name": "4a6d0aca_29",
+   "scene": "4a6d0acad56fea89296a3d1e44e26bb508b3795669903d67eda08f9ac3f96cd3",
+   "wid": 29,
+   "side": 8,
+   "origin": [
+    70,
+    56,
+    51
+   ],
+   "dark": 409,
+   "lit": 37,
+   "solid": 66
+  },
+  {
+   "name": "4a6d0aca_46",
+   "scene": "4a6d0acad56fea89296a3d1e44e26bb508b3795669903d67eda08f9ac3f96cd3",
+   "wid": 46,
+   "side": 8,
+   "origin": [
+    5,
+    110,
+    60
+   ],
+   "dark": 470,
+   "lit": 42,
+   "solid": 0
+  },
+  {
+   "name": "4a6d0aca_166",
+   "scene": "4a6d0acad56fea89296a3d1e44e26bb508b3795669903d67eda08f9ac3f96cd3",
+   "wid": 166,
+   "side": 16,
+   "origin": [
+    61,
+    90,
+    14
+   ],
+   "dark": 984,
+   "lit": 3112,
+   "solid": 0
+  },
+  {
+   "name": "4a6d0aca_201",
+   "scene": "4a6d0acad56fea89296a3d1e44e26bb508b3795669903d67eda08f9ac3f96cd3",
+   "wid": 201,
+   "side": 32,
+   "origin": [
+    35,
+    32,
+    94
+   ],
+   "dark": 16934,
+   "lit": 13289,
+   "solid": 2545
+  },
+  {
+   "name": "4a6d0aca_175",
+   "scene": "4a6d0acad56fea89296a3d1e44e26bb508b3795669903d67eda08f9ac3f96cd3",
+   "wid": 175,
+   "side": 32,
+   "origin": [
+    1,
+    76,
+    51
+   ],
+   "dark": 15391,
+   "lit": 17127,
+   "solid": 250
+  },
+  {
+   "name": "4a6d0aca_238",
+   "scene": "4a6d0acad56fea89296a3d1e44e26bb508b3795669903d67eda08f9ac3f96cd3",
+   "wid": 238,
+   "side": 32,
+   "origin": [
+    5,
+    72,
+    35
+   ],
+   "dark": 22156,
+   "lit": 10085,
+   "solid": 527
+  },
+  {
+   "name": "ae6f5493_194",
+   "scene": "ae6f54935d565f8633d075c8a9d8a1a6de9857b4acba3fddfd83f0bf90d931a7",
+   "wid": 194,
+   "side": 32,
+   "origin": [
+    16,
+    50,
+    12
+   ],
+   "dark": 19065,
+   "lit": 13697,
+   "solid": 6
+  },
+  {
+   "name": "ae6f5493_31",
+   "scene": "ae6f54935d565f8633d075c8a9d8a1a6de9857b4acba3fddfd83f0bf90d931a7",
+   "wid": 31,
+   "side": 8,
+   "origin": [
+    64,
+    83,
+    63
+   ],
+   "dark": 335,
+   "lit": 177,
+   "solid": 0
+  },
+  {
+   "name": "ae6f5493_79",
+   "scene": "ae6f54935d565f8633d075c8a9d8a1a6de9857b4acba3fddfd83f0bf90d931a7",
+   "wid": 79,
+   "side": 8,
+   "origin": [
+    25,
+    23,
+    82
+   ],
+   "dark": 68,
+   "lit": 444,
+   "solid": 0
+  },
+  {
+   "name": "ae6f5493_176",
+   "scene": "ae6f54935d565f8633d075c8a9d8a1a6de9857b4acba3fddfd83f0bf90d931a7",
+   "wid": 176,
+   "side": 32,
+   "origin": [
+    80,
+    88,
+    46
+   ],
+   "dark": 2716,
+   "lit": 30052,
+   "solid": 0
+  },
+  {
+   "name": "ae6f5493_68",
+   "scene": "ae6f54935d565f8633d075c8a9d8a1a6de9857b4acba3fddfd83f0bf90d931a7",
+   "wid": 68,
+   "side": 8,
+   "origin": [
+    38,
+    113,
+    66
+   ],
+   "dark": 430,
+   "lit": 82,
+   "solid": 0
+  },
+  {
+   "name": "ae6f5493_184",
+   "scene": "ae6f54935d565f8633d075c8a9d8a1a6de9857b4acba3fddfd83f0bf90d931a7",
+   "wid": 184,
+   "side": 32,
+   "origin": [
+    71,
+    61,
+    83
+   ],
+   "dark": 13378,
+   "lit": 18719,
+   "solid": 671
+  },
+  {
+   "name": "1a6e5495_250",
+   "scene": "1a6e5495e05813591aed7e9e4fd27e53c207171bf6e4794df5acd97b2b4d3b00",
+   "wid": 250,
+   "side": 32,
+   "origin": [
+    2,
+    66,
+    52
+   ],
+   "dark": 24,
+   "lit": 32680,
+   "solid": 64
+  },
+  {
+   "name": "1a6e5495_151",
+   "scene": "1a6e5495e05813591aed7e9e4fd27e53c207171bf6e4794df5acd97b2b4d3b00",
+   "wid": 151,
+   "side": 16,
+   "origin": [
+    97,
+    38,
+    110
+   ],
+   "dark": 3572,
+   "lit": 524,
+   "solid": 0
+  },
+  {
+   "name": "1a6e5495_111",
+   "scene": "1a6e5495e05813591aed7e9e4fd27e53c207171bf6e4794df5acd97b2b4d3b00",
+   "wid": 111,
+   "side": 16,
+   "origin": [
+    111,
+    91,
+    30
+   ],
+   "dark": 3163,
+   "lit": 791,
+   "solid": 142
+  },
+  {
+   "name": "1a6e5495_233",
+   "scene": "1a6e5495e05813591aed7e9e4fd27e53c207171bf6e4794df5acd97b2b4d3b00",
+   "wid": 233,
+   "side": 32,
+   "origin": [
+    5,
+    22,
+    20
+   ],
+   "dark": 40,
+   "lit": 30135,
+   "solid": 2593
+  },
+  {
+   "name": "1a6e5495_107",
+   "scene": "1a6e5495e05813591aed7e9e4fd27e53c207171bf6e4794df5acd97b2b4d3b00",
+   "wid": 107,
+   "side": 16,
+   "origin": [
+    24,
+    49,
+    83
+   ],
+   "dark": 466,
+   "lit": 3367,
+   "solid": 263
+  },
+  {
+   "name": "1a6e5495_200",
+   "scene": "1a6e5495e05813591aed7e9e4fd27e53c207171bf6e4794df5acd97b2b4d3b00",
+   "wid": 200,
+   "side": 32,
+   "origin": [
+    1,
+    35,
+    92
+   ],
+   "dark": 155,
+   "lit": 32613,
+   "solid": 0
+  },
+  {
+   "name": "a4b039f7_96",
+   "scene": "a4b039f70499446f13fb8a48d5d86967f3b2bc89a88c4066f4f53d56a1089445",
+   "wid": 96,
+   "side": 16,
+   "origin": [
+    82,
+    74,
+    15
+   ],
+   "dark": 994,
+   "lit": 3102,
+   "solid": 0
+  },
+  {
+   "name": "a4b039f7_141",
+   "scene": "a4b039f70499446f13fb8a48d5d86967f3b2bc89a88c4066f4f53d56a1089445",
+   "wid": 141,
+   "side": 16,
+   "origin": [
+    27,
+    88,
+    11
+   ],
+   "dark": 2,
+   "lit": 4094,
+   "solid": 0
+  },
+  {
+   "name": "a4b039f7_193",
+   "scene": "a4b039f70499446f13fb8a48d5d86967f3b2bc89a88c4066f4f53d56a1089445",
+   "wid": 193,
+   "side": 32,
+   "origin": [
+    66,
+    95,
+    88
+   ],
+   "dark": 7,
+   "lit": 32761,
+   "solid": 0
+  },
+  {
+   "name": "a4b039f7_7",
+   "scene": "a4b039f70499446f13fb8a48d5d86967f3b2bc89a88c4066f4f53d56a1089445",
+   "wid": 7,
+   "side": 8,
+   "origin": [
+    3,
+    92,
+    66
+   ],
+   "dark": 106,
+   "lit": 405,
+   "solid": 1
+  },
+  {
+   "name": "a4b039f7_76",
+   "scene": "a4b039f70499446f13fb8a48d5d86967f3b2bc89a88c4066f4f53d56a1089445",
+   "wid": 76,
+   "side": 8,
+   "origin": [
+    97,
+    74,
+    27
+   ],
+   "dark": 217,
+   "lit": 295,
+   "solid": 0
+  },
+  {
+   "name": "a4b039f7_69",
+   "scene": "a4b039f70499446f13fb8a48d5d86967f3b2bc89a88c4066f4f53d56a1089445",
+   "wid": 69,
+   "side": 8,
+   "origin": [
+    9,
+    118,
+    103
+   ],
+   "dark": 469,
+   "lit": 43,
+   "solid": 0
+  },
+  {
+   "name": "5aac9cd3_169",
+   "scene": "5aac9cd3c329c54b5983cc17b7f8b3175f710bc08c0b623836faa4cd4bef9b9b",
+   "wid": 169,
+   "side": 16,
+   "origin": [
+    73,
+    12,
+    94
+   ],
+   "dark": 3010,
+   "lit": 1086,
+   "solid": 0
+  },
+  {
+   "name": "5aac9cd3_113",
+   "scene": "5aac9cd3c329c54b5983cc17b7f8b3175f710bc08c0b623836faa4cd4bef9b9b",
+   "wid": 113,
+   "side": 16,
+   "origin": [
+    9,
+    111,
+    109
+   ],
+   "dark": 3325,
+   "lit": 771,
+   "solid": 0
+  },
+  {
+   "name": "5aac9cd3_71",
+   "scene": "5aac9cd3c329c54b5983cc17b7f8b3175f710bc08c0b623836faa4cd4bef9b9b",
+   "wid": 71,
+   "side": 8,
+   "origin": [
+    98,
+    17,
+    95
+   ],
+   "dark": 39,
+   "lit": 473,
+   "solid": 0
+  },
+  {
+   "name": "5aac9cd3_171",
+   "scene": "5aac9cd3c329c54b5983cc17b7f8b3175f710bc08c0b623836faa4cd4bef9b9b",
+   "wid": 171,
+   "side": 32,
+   "origin": [
+    35,
+    6,
+    77
+   ],
+   "dark": 364,
+   "lit": 31970,
+   "solid": 434
+  },
+  {
+   "name": "5aac9cd3_76",
+   "scene": "5aac9cd3c329c54b5983cc17b7f8b3175f710bc08c0b623836faa4cd4bef9b9b",
+   "wid": 76,
+   "side": 8,
+   "origin": [
+    63,
+    88,
+    94
+   ],
+   "dark": 300,
+   "lit": 212,
+   "solid": 0
+  },
+  {
+   "name": "5aac9cd3_209",
+   "scene": "5aac9cd3c329c54b5983cc17b7f8b3175f710bc08c0b623836faa4cd4bef9b9b",
+   "wid": 209,
+   "side": 32,
+   "origin": [
+    92,
+    49,
+    49
+   ],
+   "dark": 18409,
+   "lit": 11752,
+   "solid": 2607
+  },
+  {
+   "name": "1c34d487_203",
+   "scene": "1c34d4874d850934956d914230f4f21137e45746b8ff854e1e956c9c4ef8665d",
+   "wid": 203,
+   "side": 32,
+   "origin": [
+    59,
+    47,
+    14
+   ],
+   "dark": 298,
+   "lit": 32470,
+   "solid": 0
+  },
+  {
+   "name": "1c34d487_176",
+   "scene": "1c34d4874d850934956d914230f4f21137e45746b8ff854e1e956c9c4ef8665d",
+   "wid": 176,
+   "side": 32,
+   "origin": [
+    1,
+    59,
+    58
+   ],
+   "dark": 4401,
+   "lit": 28367,
+   "solid": 0
+  },
+  {
+   "name": "1c34d487_218",
+   "scene": "1c34d4874d850934956d914230f4f21137e45746b8ff854e1e956c9c4ef8665d",
+   "wid": 218,
+   "side": 32,
+   "origin": [
+    78,
+    13,
+    60
+   ],
+   "dark": 25830,
+   "lit": 6783,
+   "solid": 155
+  },
+  {
+   "name": "1c34d487_125",
+   "scene": "1c34d4874d850934956d914230f4f21137e45746b8ff854e1e956c9c4ef8665d",
+   "wid": 125,
+   "side": 16,
+   "origin": [
+    104,
+    5,
+    97
+   ],
+   "dark": 4018,
+   "lit": 78,
+   "solid": 0
+  },
+  {
+   "name": "1c34d487_29",
+   "scene": "1c34d4874d850934956d914230f4f21137e45746b8ff854e1e956c9c4ef8665d",
+   "wid": 29,
+   "side": 8,
+   "origin": [
+    15,
+    67,
+    26
+   ],
+   "dark": 461,
+   "lit": 49,
+   "solid": 2
+  },
+  {
+   "name": "1c34d487_61",
+   "scene": "1c34d4874d850934956d914230f4f21137e45746b8ff854e1e956c9c4ef8665d",
+   "wid": 61,
+   "side": 8,
+   "origin": [
+    88,
+    23,
+    63
+   ],
+   "dark": 443,
+   "lit": 69,
+   "solid": 0
+  },
+  {
+   "name": "a636b0aa_45",
+   "scene": "a636b0aa3a3540f7c409937a6b08d2ed58ba4800acb8f8c9797f490fd2741252",
+   "wid": 45,
+   "side": 8,
+   "origin": [
+    26,
+    84,
+    1
+   ],
+   "dark": 329,
+   "lit": 183,
+   "solid": 0
+  },
+  {
+   "name": "a636b0aa_89",
+   "scene": "a636b0aa3a3540f7c409937a6b08d2ed58ba4800acb8f8c9797f490fd2741252",
+   "wid": 89,
+   "side": 16,
+   "origin": [
+    82,
+    66,
+    20
+   ],
+   "dark": 181,
+   "lit": 3915,
+   "solid": 0
+  },
+  {
+   "name": "a636b0aa_21",
+   "scene": "a636b0aa3a3540f7c409937a6b08d2ed58ba4800acb8f8c9797f490fd2741252",
+   "wid": 21,
+   "side": 8,
+   "origin": [
+    27,
+    101,
+    2
+   ],
+   "dark": 236,
+   "lit": 276,
+   "solid": 0
+  },
+  {
+   "name": "a636b0aa_54",
+   "scene": "a636b0aa3a3540f7c409937a6b08d2ed58ba4800acb8f8c9797f490fd2741252",
+   "wid": 54,
+   "side": 8,
+   "origin": [
+    46,
+    119,
+    38
+   ],
+   "dark": 503,
+   "lit": 9,
+   "solid": 0
+  },
+  {
+   "name": "a636b0aa_195",
+   "scene": "a636b0aa3a3540f7c409937a6b08d2ed58ba4800acb8f8c9797f490fd2741252",
+   "wid": 195,
+   "side": 32,
+   "origin": [
+    25,
+    92,
+    26
+   ],
+   "dark": 3050,
+   "lit": 29470,
+   "solid": 248
+  },
+  {
+   "name": "a636b0aa_35",
+   "scene": "a636b0aa3a3540f7c409937a6b08d2ed58ba4800acb8f8c9797f490fd2741252",
+   "wid": 35,
+   "side": 8,
+   "origin": [
+    30,
+    109,
+    1
+   ],
+   "dark": 147,
+   "lit": 365,
+   "solid": 0
+  },
+  {
+   "name": "47fa8c99_13",
+   "scene": "47fa8c999d59cdcbcf4ca96036217e3d933b235038b3e1eec3222c74b6898392",
+   "wid": 13,
+   "side": 8,
+   "origin": [
+    81,
+    13,
+    3
+   ],
+   "dark": 408,
+   "lit": 104,
+   "solid": 0
+  },
+  {
+   "name": "47fa8c99_143",
+   "scene": "47fa8c999d59cdcbcf4ca96036217e3d933b235038b3e1eec3222c74b6898392",
+   "wid": 143,
+   "side": 16,
+   "origin": [
+    59,
+    84,
+    43
+   ],
+   "dark": 58,
+   "lit": 9,
+   "solid": 4029
+  },
+  {
+   "name": "47fa8c99_73",
+   "scene": "47fa8c999d59cdcbcf4ca96036217e3d933b235038b3e1eec3222c74b6898392",
+   "wid": 73,
+   "side": 8,
+   "origin": [
+    46,
+    114,
+    73
+   ],
+   "dark": 197,
+   "lit": 188,
+   "solid": 127
+  },
+  {
+   "name": "47fa8c99_5",
+   "scene": "47fa8c999d59cdcbcf4ca96036217e3d933b235038b3e1eec3222c74b6898392",
+   "wid": 5,
+   "side": 8,
+   "origin": [
+    34,
+    8,
+    10
+   ],
+   "dark": 213,
+   "lit": 299,
+   "solid": 0
+  },
+  {
+   "name": "47fa8c99_140",
+   "scene": "47fa8c999d59cdcbcf4ca96036217e3d933b235038b3e1eec3222c74b6898392",
+   "wid": 140,
+   "side": 16,
+   "origin": [
+    99,
+    110,
+    79
+   ],
+   "dark": 3652,
+   "lit": 444,
+   "solid": 0
+  },
+  {
+   "name": "47fa8c99_80",
+   "scene": "47fa8c999d59cdcbcf4ca96036217e3d933b235038b3e1eec3222c74b6898392",
+   "wid": 80,
+   "side": 8,
+   "origin": [
+    17,
+    56,
+    83
+   ],
+   "dark": 198,
+   "lit": 96,
+   "solid": 218
+  },
+  {
+   "name": "f4a3c120_27",
+   "scene": "f4a3c120856b0a96e30a79480871d86b902874774193df766d2464e3f0bccca3",
+   "wid": 27,
+   "side": 8,
+   "origin": [
+    97,
+    82,
+    45
+   ],
+   "dark": 157,
+   "lit": 355,
+   "solid": 0
+  },
+  {
+   "name": "f4a3c120_242",
+   "scene": "f4a3c120856b0a96e30a79480871d86b902874774193df766d2464e3f0bccca3",
+   "wid": 242,
+   "side": 32,
+   "origin": [
+    75,
+    65,
+    86
+   ],
+   "dark": 14594,
+   "lit": 16830,
+   "solid": 1344
+  },
+  {
+   "name": "f4a3c120_192",
+   "scene": "f4a3c120856b0a96e30a79480871d86b902874774193df766d2464e3f0bccca3",
+   "wid": 192,
+   "side": 32,
+   "origin": [
+    94,
+    27,
+    71
+   ],
+   "dark": 13170,
+   "lit": 11675,
+   "solid": 7923
+  },
+  {
+   "name": "f4a3c120_105",
+   "scene": "f4a3c120856b0a96e30a79480871d86b902874774193df766d2464e3f0bccca3",
+   "wid": 105,
+   "side": 16,
+   "origin": [
+    59,
+    58,
+    68
+   ],
+   "dark": 821,
+   "lit": 16,
+   "solid": 3259
+  },
+  {
+   "name": "f4a3c120_39",
+   "scene": "f4a3c120856b0a96e30a79480871d86b902874774193df766d2464e3f0bccca3",
+   "wid": 39,
+   "side": 8,
+   "origin": [
+    78,
+    48,
+    46
+   ],
+   "dark": 18,
+   "lit": 188,
+   "solid": 306
+  },
+  {
+   "name": "f4a3c120_72",
+   "scene": "f4a3c120856b0a96e30a79480871d86b902874774193df766d2464e3f0bccca3",
+   "wid": 72,
+   "side": 8,
+   "origin": [
+    104,
+    109,
+    81
+   ],
+   "dark": 216,
+   "lit": 296,
+   "solid": 0
+  },
+  {
+   "name": "cb4e8a92_164",
+   "scene": "cb4e8a9228d57f5658b60f2739e50ae036b3a5ba02fd6fbe89f8759465f1848c",
+   "wid": 164,
+   "side": 16,
+   "origin": [
+    74,
+    39,
+    38
+   ],
+   "dark": 1741,
+   "lit": 2346,
+   "solid": 9
+  },
+  {
+   "name": "cb4e8a92_38",
+   "scene": "cb4e8a9228d57f5658b60f2739e50ae036b3a5ba02fd6fbe89f8759465f1848c",
+   "wid": 38,
+   "side": 8,
+   "origin": [
+    88,
+    48,
+    42
+   ],
+   "dark": 298,
+   "lit": 214,
+   "solid": 0
+  },
+  {
+   "name": "cb4e8a92_28",
+   "scene": "cb4e8a9228d57f5658b60f2739e50ae036b3a5ba02fd6fbe89f8759465f1848c",
+   "wid": 28,
+   "side": 8,
+   "origin": [
+    75,
+    64,
+    78
+   ],
+   "dark": 320,
+   "lit": 192,
+   "solid": 0
+  },
+  {
+   "name": "cb4e8a92_6",
+   "scene": "cb4e8a9228d57f5658b60f2739e50ae036b3a5ba02fd6fbe89f8759465f1848c",
+   "wid": 6,
+   "side": 8,
+   "origin": [
+    84,
+    46,
+    27
+   ],
+   "dark": 415,
+   "lit": 97,
+   "solid": 0
+  },
+  {
+   "name": "cb4e8a92_41",
+   "scene": "cb4e8a9228d57f5658b60f2739e50ae036b3a5ba02fd6fbe89f8759465f1848c",
+   "wid": 41,
+   "side": 8,
+   "origin": [
+    81,
+    46,
+    59
+   ],
+   "dark": 298,
+   "lit": 214,
+   "solid": 0
+  },
+  {
+   "name": "cb4e8a92_102",
+   "scene": "cb4e8a9228d57f5658b60f2739e50ae036b3a5ba02fd6fbe89f8759465f1848c",
+   "wid": 102,
+   "side": 16,
+   "origin": [
+    54,
+    43,
+    0
+   ],
+   "dark": 2940,
+   "lit": 1156,
+   "solid": 0
+  },
+  {
+   "name": "fbc80b9e_39",
+   "scene": "fbc80b9e2f9a873af6d794ddb543ee74932fb4f61ea1d5cb8ffb7c5cca70b8a9",
+   "wid": 39,
+   "side": 8,
+   "origin": [
+    65,
+    110,
+    73
+   ],
+   "dark": 229,
+   "lit": 139,
+   "solid": 144
+  },
+  {
+   "name": "fbc80b9e_138",
+   "scene": "fbc80b9e2f9a873af6d794ddb543ee74932fb4f61ea1d5cb8ffb7c5cca70b8a9",
+   "wid": 138,
+   "side": 16,
+   "origin": [
+    26,
+    67,
+    97
+   ],
+   "dark": 3093,
+   "lit": 513,
+   "solid": 490
+  },
+  {
+   "name": "fbc80b9e_57",
+   "scene": "fbc80b9e2f9a873af6d794ddb543ee74932fb4f61ea1d5cb8ffb7c5cca70b8a9",
+   "wid": 57,
+   "side": 8,
+   "origin": [
+    73,
+    57,
+    108
+   ],
+   "dark": 231,
+   "lit": 281,
+   "solid": 0
+  },
+  {
+   "name": "fbc80b9e_240",
+   "scene": "fbc80b9e2f9a873af6d794ddb543ee74932fb4f61ea1d5cb8ffb7c5cca70b8a9",
+   "wid": 240,
+   "side": 32,
+   "origin": [
+    82,
+    58,
+    0
+   ],
+   "dark": 13856,
+   "lit": 513,
+   "solid": 18399
+  },
+  {
+   "name": "fbc80b9e_96",
+   "scene": "fbc80b9e2f9a873af6d794ddb543ee74932fb4f61ea1d5cb8ffb7c5cca70b8a9",
+   "wid": 96,
+   "side": 16,
+   "origin": [
+    56,
+    20,
+    80
+   ],
+   "dark": 86,
+   "lit": 3213,
+   "solid": 797
+  },
+  {
+   "name": "fbc80b9e_27",
+   "scene": "fbc80b9e2f9a873af6d794ddb543ee74932fb4f61ea1d5cb8ffb7c5cca70b8a9",
+   "wid": 27,
+   "side": 8,
+   "origin": [
+    27,
+    10,
+    59
+   ],
+   "dark": 81,
+   "lit": 431,
+   "solid": 0
+  },
+  {
+   "name": "71904d2c_205",
+   "scene": "71904d2c5f367eab8600b3e21e45503b5bfbee18e766ac2c2b11187f012b5ab3",
+   "wid": 205,
+   "side": 32,
+   "origin": [
+    92,
+    36,
+    44
+   ],
+   "dark": 13427,
+   "lit": 3,
+   "solid": 19338
+  },
+  {
+   "name": "71904d2c_228",
+   "scene": "71904d2c5f367eab8600b3e21e45503b5bfbee18e766ac2c2b11187f012b5ab3",
+   "wid": 228,
+   "side": 32,
+   "origin": [
+    95,
+    53,
+    47
+   ],
+   "dark": 10837,
+   "lit": 3682,
+   "solid": 18249
+  },
+  {
+   "name": "71904d2c_165",
+   "scene": "71904d2c5f367eab8600b3e21e45503b5bfbee18e766ac2c2b11187f012b5ab3",
+   "wid": 165,
+   "side": 16,
+   "origin": [
+    13,
+    61,
+    89
+   ],
+   "dark": 4060,
+   "lit": 2,
+   "solid": 34
+  },
+  {
+   "name": "71904d2c_148",
+   "scene": "71904d2c5f367eab8600b3e21e45503b5bfbee18e766ac2c2b11187f012b5ab3",
+   "wid": 148,
+   "side": 16,
+   "origin": [
+    20,
+    110,
+    17
+   ],
+   "dark": 703,
+   "lit": 3290,
+   "solid": 103
+  },
+  {
+   "name": "71904d2c_104",
+   "scene": "71904d2c5f367eab8600b3e21e45503b5bfbee18e766ac2c2b11187f012b5ab3",
+   "wid": 104,
+   "side": 16,
+   "origin": [
+    3,
+    63,
+    80
+   ],
+   "dark": 2283,
+   "lit": 1813,
+   "solid": 0
+  },
+  {
+   "name": "71904d2c_157",
+   "scene": "71904d2c5f367eab8600b3e21e45503b5bfbee18e766ac2c2b11187f012b5ab3",
+   "wid": 157,
+   "side": 16,
+   "origin": [
+    55,
+    101,
+    60
+   ],
+   "dark": 1392,
+   "lit": 1046,
+   "solid": 1658
+  },
+  {
+   "name": "f402ba60_155",
+   "scene": "f402ba601e859270fe38595bcac13cf3a15c027bb897a1eedc76db511c96d9e0",
+   "wid": 155,
+   "side": 16,
+   "origin": [
+    29,
+    87,
+    57
+   ],
+   "dark": 599,
+   "lit": 3497,
+   "solid": 0
+  },
+  {
+   "name": "f402ba60_243",
+   "scene": "f402ba601e859270fe38595bcac13cf3a15c027bb897a1eedc76db511c96d9e0",
+   "wid": 243,
+   "side": 32,
+   "origin": [
+    24,
+    94,
+    69
+   ],
+   "dark": 3676,
+   "lit": 29091,
+   "solid": 1
+  },
+  {
+   "name": "f402ba60_83",
+   "scene": "f402ba601e859270fe38595bcac13cf3a15c027bb897a1eedc76db511c96d9e0",
+   "wid": 83,
+   "side": 8,
+   "origin": [
+    109,
+    72,
+    22
+   ],
+   "dark": 68,
+   "lit": 444,
+   "solid": 0
+  },
+  {
+   "name": "f402ba60_252",
+   "scene": "f402ba601e859270fe38595bcac13cf3a15c027bb897a1eedc76db511c96d9e0",
+   "wid": 252,
+   "side": 32,
+   "origin": [
+    63,
+    93,
+    55
+   ],
+   "dark": 30181,
+   "lit": 298,
+   "solid": 2289
+  },
+  {
+   "name": "f402ba60_125",
+   "scene": "f402ba601e859270fe38595bcac13cf3a15c027bb897a1eedc76db511c96d9e0",
+   "wid": 125,
+   "side": 16,
+   "origin": [
+    63,
+    87,
+    78
+   ],
+   "dark": 4032,
+   "lit": 5,
+   "solid": 59
+  },
+  {
+   "name": "f402ba60_183",
+   "scene": "f402ba601e859270fe38595bcac13cf3a15c027bb897a1eedc76db511c96d9e0",
+   "wid": 183,
+   "side": 32,
+   "origin": [
+    76,
+    63,
+    37
+   ],
+   "dark": 19734,
+   "lit": 5715,
+   "solid": 7319
+  },
+  {
+   "name": "b3680e39_6",
+   "scene": "b3680e39984f19de4fe884bcc637114c7019f55ac30ef06a78d5500609901ab4",
+   "wid": 6,
+   "side": 8,
+   "origin": [
+    76,
+    119,
+    63
+   ],
+   "dark": 419,
+   "lit": 93,
+   "solid": 0
+  },
+  {
+   "name": "b3680e39_65",
+   "scene": "b3680e39984f19de4fe884bcc637114c7019f55ac30ef06a78d5500609901ab4",
+   "wid": 65,
+   "side": 8,
+   "origin": [
+    53,
+    117,
+    49
+   ],
+   "dark": 218,
+   "lit": 294,
+   "solid": 0
+  },
+  {
+   "name": "b3680e39_154",
+   "scene": "b3680e39984f19de4fe884bcc637114c7019f55ac30ef06a78d5500609901ab4",
+   "wid": 154,
+   "side": 16,
+   "origin": [
+    58,
+    103,
+    64
+   ],
+   "dark": 3926,
+   "lit": 170,
+   "solid": 0
+  },
+  {
+   "name": "b3680e39_208",
+   "scene": "b3680e39984f19de4fe884bcc637114c7019f55ac30ef06a78d5500609901ab4",
+   "wid": 208,
+   "side": 32,
+   "origin": [
+    55,
+    93,
+    70
+   ],
+   "dark": 12164,
+   "lit": 20604,
+   "solid": 0
+  },
+  {
+   "name": "b3680e39_255",
+   "scene": "b3680e39984f19de4fe884bcc637114c7019f55ac30ef06a78d5500609901ab4",
+   "wid": 255,
+   "side": 32,
+   "origin": [
+    33,
+    94,
+    58
+   ],
+   "dark": 22400,
+   "lit": 10368,
+   "solid": 0
+  },
+  {
+   "name": "b3680e39_102",
+   "scene": "b3680e39984f19de4fe884bcc637114c7019f55ac30ef06a78d5500609901ab4",
+   "wid": 102,
+   "side": 16,
+   "origin": [
+    29,
+    111,
+    77
+   ],
+   "dark": 409,
+   "lit": 3687,
+   "solid": 0
+  },
+  {
+   "name": "99cd7675_28",
+   "scene": "99cd7675936e2badc07cc35ed0b915ee26d836c714bda33ac59a57ab0c4fabc3",
+   "wid": 28,
+   "side": 8,
+   "origin": [
+    44,
+    84,
+    77
+   ],
+   "dark": 181,
+   "lit": 323,
+   "solid": 8
+  },
+  {
+   "name": "99cd7675_210",
+   "scene": "99cd7675936e2badc07cc35ed0b915ee26d836c714bda33ac59a57ab0c4fabc3",
+   "wid": 210,
+   "side": 32,
+   "origin": [
+    21,
+    69,
+    39
+   ],
+   "dark": 19353,
+   "lit": 11997,
+   "solid": 1418
+  },
+  {
+   "name": "99cd7675_45",
+   "scene": "99cd7675936e2badc07cc35ed0b915ee26d836c714bda33ac59a57ab0c4fabc3",
+   "wid": 45,
+   "side": 8,
+   "origin": [
+    70,
+    4,
+    22
+   ],
+   "dark": 1,
+   "lit": 511,
+   "solid": 0
+  },
+  {
+   "name": "99cd7675_70",
+   "scene": "99cd7675936e2badc07cc35ed0b915ee26d836c714bda33ac59a57ab0c4fabc3",
+   "wid": 70,
+   "side": 8,
+   "origin": [
+    13,
+    40,
+    63
+   ],
+   "dark": 207,
+   "lit": 305,
+   "solid": 0
+  },
+  {
+   "name": "99cd7675_112",
+   "scene": "99cd7675936e2badc07cc35ed0b915ee26d836c714bda33ac59a57ab0c4fabc3",
+   "wid": 112,
+   "side": 16,
+   "origin": [
+    73,
+    78,
+    77
+   ],
+   "dark": 1079,
+   "lit": 2996,
+   "solid": 21
+  },
+  {
+   "name": "99cd7675_32",
+   "scene": "99cd7675936e2badc07cc35ed0b915ee26d836c714bda33ac59a57ab0c4fabc3",
+   "wid": 32,
+   "side": 8,
+   "origin": [
+    25,
+    53,
+    64
+   ],
+   "dark": 507,
+   "lit": 5,
+   "solid": 0
+  }
+ ]
+}

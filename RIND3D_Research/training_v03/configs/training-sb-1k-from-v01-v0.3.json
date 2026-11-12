@@ -1,0 +1,10 @@
+{"release": "rind3d-training-sb-1k-v0.3 (built from v0.1 lite-core 1K; no physics regenerated)",
+ "status": "BUILT in this assignment as a training candidate (derived index + two-view export only)",
+ "inputs": {"fields": "restricted v0.1 campaign lite-core-1k-v01 (read-only; private labels read in the trusted exporter only)",
+            "prior_tag": "v0.1: S ~ Uniform(D(G)) | coverage-eligible (3 of 1003 source trials rejected, all on one geometry that was dropped)"},
+ "index": {"policy": "obs-index-v0.3", "profile": "P256", "seed": "HMAC(private index key, policy, release, scene_id)"},
+ "export": {"name": "v01-sb-v03", "views": ["student", "privileged"], "scenes_per_shard": 16},
+ "commands": ["./run.sh rind3d_training.index v01 --profile P256 --workers 12",
+              "./run.sh rind3d_training.export v01 --name v01-sb-v03 --workers 12",
+              "./run.sh rind3d_training.leakage v01-sb-v03",
+              "./run_gpu.sh rind3d_training.bench_student v01-sb-v03"]}

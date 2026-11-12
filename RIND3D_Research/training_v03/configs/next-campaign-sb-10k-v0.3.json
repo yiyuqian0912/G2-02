@@ -1,0 +1,13 @@
+{"campaign": "rind3d-production-sb-10k-v0.3 (PROPOSAL - NOT LAUNCHED; requires explicit authorization and an approved budget)",
+ "generator": "rind3d_production.runner with the frozen rind3d-production-contract-v0.2 physics, SB profile only",
+ "seed_file": "REPLACE: private 256-bit hexadecimal master seed file (mode 0600; never committed, never published)",
+ "slots": 10008, "shard_size": 24,
+ "profile_schedule": ["SB"], "multi_K": [2, 3, 4], "renderer_backend": "cuda_certified", "max_attempts": 2,
+ "caps": {"scene_seconds": 600, "field_seconds": 300, "verification_seconds": 300, "canary_wall_seconds": 172800},
+ "training_layer": {"contract": "rind3d-training-contract-v0.3", "index": "obs-index-v0.3 P256 (private HMAC index key)",
+                    "export": "two-view student/privileged, 16 scenes per shard", "tests": "tests/test_training_ready.py + leakage audit"},
+ "stages": ["canary: first 216 slots, gates C1-C8 of v0.2 + v0.3 leakage/interop tests; stop on any failure",
+            "bulk: remaining slots in resumable sessions (journal + atomic shards)",
+            "validate (V1-V11), index, export, leakage audit, loader benchmark"],
+ "budget_estimate": "see RIND3D_TRAINING_SCALE_COST.json scenario SB-only/10000/P256",
+ "MA": "separate later release rind3d-production-ma-v0.3 sized after an MA-specific Student study; not part of this campaign"}

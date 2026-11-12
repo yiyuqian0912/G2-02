@@ -1,0 +1,150 @@
+{
+ "contract_id": "rind3d-production-contract-v0.2",
+ "status": "CANDIDATE (frozen for the production-format canary on 2026-11-09; not READY, not a release)",
+ "supersedes": "nothing; RIND3D v0.1 (READY_LITE, rind3d-lite-v0.1) and its frozen authority are unchanged",
+ "layers": {
+  "generator": "rind3d.lite_generators lite-convex-recipes-v0.1: nine certified convex-union families (rotated_boxes, thin_slabs, prisms, wedges, convex_polyhedra, multiscale_convex, corridors, barriers, occluder_clusters), unchanged recipes, family = FAMILIES[slot mod 9]",
+  "canonical_geometry": "rind CanonicalBundle, binary64 parameters interpreted exactly, top-level union of 1..64 bounded convex components (<= 64 planes each) strictly inside the open world; stored losslessly as public/geometry.npz; this is the physical truth",
+  "acceleration_geometry": "optional and never truth: directly triangulated float32 component meshes + BVH (Embree/Warp) may be used only as a screen whose every disagreement / translation-unstable ray is arbitrated by the certified predicate; overlapping component surfaces are valid for any-hit occlusion between FREE points, never for inside/outside parity",
+  "physical_oracle": {
+   "primary": "certified native convex predicates (parametric interval clipping + GMP fallback) and their CUDA directed-binary64 raster with exact CPU fallback",
+   "independent": "rational Fourier-Motzkin shadow projection (does not share visibility decisions with the primary)",
+   "identity": "producer scientific identity e19b3004fc9e733cdb7cb345846c9ed14fea8eebd447a304f2ba41927a5aed3e, certification outputs/integration/scientific-certification.json of the producer checkout",
+   "numerical_policy": {
+    "max_precision_bits": 256,
+    "max_subdivisions_per_item": 4096,
+    "max_arrangement_events_per_item": 1048576,
+    "qfnra_rlimit_per_item": 4194304
+   },
+   "semantics": "closed segments; contact and tangency block; SOLID = closed union (interior or boundary); UNKNOWN/ABORTED never become labels"
+  }
+ },
+ "world": {
+  "domain": "[0,1]^3",
+  "resolution": 1024,
+  "receiver_centres": "(index + 1/2)/1024",
+  "array_order": "Z,Y,X; packed bits little order along X",
+  "window": "half-open voxel box [origin, origin+L), world box [origin/1024, (origin+L)/1024]"
+ },
+ "profiles": {
+  "rind3d-csg-single-binary-v0.2": {
+   "short": "SB",
+   "task": "single-source binary inverse localization",
+   "sources": 1,
+   "strength": 1.0,
+   "observation": "lit_1(x) in {0,1} at FREE receivers; SOLID receivers carry 0 and are identified by the SOLID mask",
+   "mismatch": "FREE-receiver mismatch count / FREE count (the current Teacher objective); unchanged by any receiver-sampling design",
+   "compatible_with": "RIND3D v0.1 binary semantics (unit strength, closed segments)"
+  },
+  "rind3d-csg-multi-additive-v0.2": {
+   "short": "MA",
+   "task": "multi-source additive inverse localization",
+   "sources": "K in {2,3,4} (private by default; the derived variant 'known-K' exposes K explicitly)",
+   "strengths": "independent binary64 uniform in [0.1, 1.0], private",
+   "observation": "R(x) = sum_k a_k lit_k(x) at FREE receivers, binary64, summed left to right in channel order (generation order), 0 at SOLID, no clipping/attenuation",
+   "permutation": "sources form an unordered set for evaluation; channel order is a storage convention only",
+   "per_source_channels": "private (Teacher) only"
+  },
+  "derived_variants": {
+   "policy": "a derived variant is a separately named profile, never mixed into a base profile without its name",
+   "declared": [
+    "known-K (MA with K exposed)",
+    "sparse-uniform-k (any profile, uniform FREE receivers, inclusion probabilities stored)",
+    "binarized-MA (R > 0) is NOT the SB profile and must carry its own name"
+   ]
+  }
+ },
+ "observation_policy": {
+  "id": "obs-policy-v0.2",
+  "storage": "windows are index records into the stored complete fields; responses are not duplicated, except the MA public observations (below)",
+  "sides": [
+   64,
+   128,
+   256
+  ],
+  "subsets": {
+   "natural": {
+    "per_side": 16,
+    "rule": "origins i.i.d. uniform on {0..1024-L}^3; no acceptance filter: all-lit, all-shadow, SOLID-only and source-containing windows are kept and flagged"
+   },
+   "informative": {
+    "per_side": 8,
+    "rule": "uniform proposals accepted iff the response is non-constant over FREE receivers and no source lies in the closed window box",
+    "proposal_cap": 2048
+   },
+   "extreme": {
+    "per_side": 4,
+    "rule": "informative and minority fraction min(lit, shadow)/FREE <= 0.01 for the most imbalanced mixed source",
+    "proposal_cap": 4096
+   },
+   "rare": {
+    "per_side": 2,
+    "rule": "informative and minority class <= 64 receivers (thin / rare shadow boundaries)",
+    "proposal_cap": 4096
+   },
+   "nonlocal": {
+    "per_side": 4,
+    "rule": "informative and >= 90% of up to 32 sampled shadow-FREE receivers of source 0 have their first blocker (receiver towards source) outside the window box",
+    "proposal_cap": 96
+   }
+  },
+  "shortfalls": "recorded per scene/side/subset with proposal counts; never filled with non-qualifying windows",
+  "inclusion": "every record stores its subset and proposal index; subset streams are seeded per (seed, slot, subset, side) so inclusion designs are reproducible",
+  "sparse_variants": "generated deterministically by the loader from the full local response with declared designs (uniform-k: probability k/FREE per FREE receiver, Horvitz-Thompson weight FREE/k; stratified designs are Teacher-only because they depend on the response); receiver coordinates, probabilities and weights are returned with every sparse sample"
+ },
+ "data_access": {
+  "student_local": [
+   "scene_id",
+   "window_id",
+   "profile",
+   "window_origin",
+   "window_size",
+   "observed_response",
+   "observed_solid"
+  ],
+  "student_geometry": "student_local + canonical geometry arrays (explicit opt-in view)",
+  "teacher": "student_geometry + sources, strengths, K, per-source window channels, window subset tags and counts, physics() (TeacherPhysics) -- requires research_access=True",
+  "never_in_student_inputs": [
+   "source positions",
+   "source strengths",
+   "source count (except known-K)",
+   "per-source channels",
+   "global/scene-level response palette",
+   "other windows of the scene",
+   "window subset tags / counts / nonlocal estimates",
+   "equivalent-source candidate lists",
+   "generator recipes and seeds"
+  ],
+  "files": {
+   "public": "public/{geometry.npz, solid.rindb, windows.npy, scene.json} + SB public/response.rindb + MA public/observations.bin with a LOCAL palette per window",
+   "private": "private/{sources.json, recipe.json, geometry_acceptance.json, window_records.npy, window_report.json, src<k>/...}",
+   "note": "public files of SB scenes include the complete field (full-field training policy, as v0.1); a strictly local release must export windows only"
+  }
+ },
+ "storage": {
+  "unit": "shard of shard_size consecutive slots",
+  "scene": "scenes/<scene_id>/ sealed by SEAL.json (SHA256 of every file)",
+  "shard_index": "index/{scenes.jsonl, windows.npy, slots.json}",
+  "manifest": "MANIFEST.json with size + SHA256 of every shard file",
+  "publication": "atomic directory rename staging -> shards; published shards are immutable",
+  "fields": "RINDPack v1 (64^3 bricks, CRC per brick, SHA sidecar), CountIndex (exact 16^3 leaf counts)",
+  "splits": "geometry-group split train/val/test = geometry_split(geometry_id, 0) (80/10/10 hash), identical to v0.1"
+ },
+ "verification": {
+  "generation": "per source: two independent physical replays (primary parametric clipping and independent projection) of every 64^3 brick covering a frozen subset of windows (one natural + one informative per side), bitwise equal to the stored response and SOLID bricks",
+  "validation": "separate process after generation: manifests, RINDPack CRC of every brick, identities, SOLID equality across sources, exact recount of every window record, subset rules, legality of every source, MA public observations re-derived from private channels, independent projection re-render of 4 random bricks per source, public/private separation, split isolation, determinism re-run, loader/leakage tests",
+  "limits": "the complete field is certified by the primary renderer; the independent replay covers the verification bricks and the validation sample, not every brick of every field (stated, not hidden)"
+ },
+ "canary_gates": {
+  "C1_yield": ">= 95% of attempted slots published; every unpublished slot has a recorded reason; no replacement of failed slots",
+  "C2_validation": "every validation check V1-V10 passes for 100% of published scenes",
+  "C3_physics": "0 mismatches in generation-time replays and validation-time independent re-renders; 0 UNKNOWN labels",
+  "C4_windows": "natural subset 100% filled; informative shortfall <= 5% of its quota over the canary; across the canary, for every side: >= 1 natural all-lit, >= 1 natural mixed, >= 1 extreme, >= 1 rare and >= 1 nonlocal window; and >= 1 natural all-shadow SB window of any side (all-shadow large windows may be physically rare)",
+  "C5_leakage": "student views return exactly the declared keys; no private field in public files; MA public observations carry only values present in their window; privileged view refused without research_access",
+  "C6_recovery": "a SIGKILL of runner and worker during a scene, followed by resume, publishes no partial scene and no duplicate; all sealed scenes re-verify by SHA; deterministic re-runs of two slots reproduce every scientific file byte for byte",
+  "C7_resources": "every published scene within the 600 s per-scene cap; worker peak RSS <= 6 GiB; GPU memory in use <= 4 GiB; canary wall <= 3 h",
+  "C8_usability": "student-local random access >= 100 windows/s for L = 64 SB (one process); a 2-worker PyTorch-style DataLoader pass completes; TeacherPhysics answers batched queries that equal the stored fields for the true sources",
+  "acceptance": "the canary is accepted only if C1-C8 all pass; thresholds are not changed after observing results"
+ },
+ "teacher_interface": "DATASET_TEACHER_INTERFACE_PROPOSAL.md (rind3d_production.teacher.TeacherPhysics)"
+}

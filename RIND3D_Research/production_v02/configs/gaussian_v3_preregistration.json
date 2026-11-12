@@ -1,0 +1,20 @@
+{
+ "schema": "rind3d-gaussian-preregistration-v3",
+ "status": "PREREGISTERED, NOT EXECUTED (written 2026-11-09, before any v3 data exists)",
+ "history_preserved": "devcal-v1 is final and unchanged: its frozen rule selected the pilot generator (additive failed E5: global surface-PCA aspect 0.52x < 0.7x), and the held-out gate H4 failed (11/28). Nothing here re-scores that study.",
+ "question": "Is global surface-PCA anisotropy a necessary diversity requirement, or does it penalise legitimate multi-component layouts that fill the box at 8-15% occupancy?",
+ "rationale_from_observed_development_data": "On devcal development data the additive policy kept per-component anisotropy (0.94x), lowered sphericity, raised component count (5 vs 2), produced the first non-zero genus and 1.5x shadow-boundary density, while the global aspect fell because many components fill the box. Because this rationale comes from data already seen, any replacement metric may be judged only on FRESH development and held-out seeds.",
+ "replacement_metric_E5prime": {
+  "a": "median volume-weighted per-component PCA aspect >= 0.8 x reference (kept from E4)",
+  "b": "two-sample Kolmogorov-Smirnov distance between the per-component PCA-aspect distributions of candidate and reference <= 0.25",
+  "c": "global surface-PCA aspect compared ONLY within density targets 0.01 and 0.03, where the reference policy meets occupancy: median ratio >= 0.7",
+  "d": "coarse shadow-boundary fraction >= 0.8 x reference (kept from E7)"
+ },
+ "unchanged_conditions": ["E1 acceptance", "E2 components", "E3 sphericity", "E6 thin styles", "E8 lost features"],
+ "seeds": {"development": 20261210, "thin_supplement": 20261212, "heldout": 20261211},
+ "policies": ["pilot (reference)", "additive + feature-scale control (devcal-v1 parameters, unchanged)", "additive + anisotropic separated-anchor placement (to be frozen before data)"],
+ "heldout_gates": "devcal H1-H5 unchanged (H4: >= 60% occupancy successes)",
+ "resource_cap": {"stage1_hours": 4, "heldout_hours": 2, "per_slot_seconds": 1500, "peak_RSS_GiB": 12},
+ "production_role_if_successful": "bounded supplementary / difficult-evaluation family (proposed <= 5% of scenes); never a prerequisite for the CSG core",
+ "implementation_prerequisites": ["exact local-support kernel culling with a bound below binary64 resolution of tau (measured: 11-55% of kernel evaluations needed)", "versioned mesher fix for the Lewiner interior-vertex exception"]
+}

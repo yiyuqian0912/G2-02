@@ -1,0 +1,53 @@
+{
+ "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+ "results": [
+  {
+   "name": "bdd0eb2e_18",
+   "side": 64,
+   "evaluations": 15327,
+   "cpu64_seconds": 0.0009719170000002109,
+   "gpu64_seconds": 0.0001966080069541931,
+   "gpu32_seconds": 3.481600061058998e-05,
+   "cpu64_evals_per_s": 15769865.122224094,
+   "gpu64_evals_per_s": 77957150.56290141,
+   "gpu32_evals_per_s": 440228622.794141,
+   "speedup32_vs_one_core": 27.91581407844366,
+   "speedup32_vs_gpu64": 5.647058924234705,
+   "ambiguous_fraction": 0.0,
+   "mismatches_after_fallback": 0,
+   "nund_mismatches_after_fallback": 0,
+   "status_counts": [
+    0,
+    0,
+    15327,
+    0
+   ]
+  },
+  {
+   "name": "2f308fe3_109",
+   "side": 128,
+   "evaluations": 1414717,
+   "cpu64_seconds": 0.08529306500000011,
+   "gpu64_seconds": 0.01506611156463623,
+   "gpu32_seconds": 0.002057215929031372,
+   "cpu64_evals_per_s": 16586541.942184843,
+   "gpu64_evals_per_s": 93900605.6028869,
+   "gpu32_evals_per_s": 687685225.4717429,
+   "speedup32_vs_one_core": 41.46043387879067,
+   "speedup32_vs_gpu64": 7.323544092782725,
+   "ambiguous_fraction": 1.272339273508412e-05,
+   "mismatches_after_fallback": 0,
+   "nund_mismatches_after_fallback": 0,
+   "status_counts": [
+    1002,
+    443133,
+    970564,
+    18
+   ]
+  },
+  {
+   "name": "a636b0aa_130",
+   "pairs": 0
+  }
+ ]
+}

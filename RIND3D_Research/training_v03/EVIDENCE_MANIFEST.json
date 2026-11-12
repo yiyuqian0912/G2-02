@@ -1,0 +1,453 @@
+{
+ "schema": "rind3d-evidence-manifest-v1",
+ "candidate": "rind3d-training-contract-v0.3",
+ "files": [
+  {
+   "path": "README.md",
+   "bytes": 2089,
+   "SHA256": "35e4fd9c5504b30d5c1f88ed8abf09e98847d684beee51b38cf9bf33a975abaa"
+  },
+  {
+   "path": "RIND3D_TRAINING_READY_DECISION.md",
+   "bytes": 18343,
+   "SHA256": "f76e7cd173dbb6c19bad1567e06d60fb2905a49ffa0c7492a9717f20e24da118"
+  },
+  {
+   "path": "RIND3D_TRAINING_CONTRACT.json",
+   "bytes": 11590,
+   "SHA256": "0f2ee7f2819f487240a009a6a88e32308c2d4482bcc5e66c175c00bb2a49dd10"
+  },
+  {
+   "path": "RIND3D_STUDENT_TARGET_SCHEMA.md",
+   "bytes": 7246,
+   "SHA256": "809d884c8a5efc62ef12bc2cab096b4beccae45e9630c7483289420b4a6a74ba"
+  },
+  {
+   "path": "RIND3D_DATASET_TEACHER_INTEROP.md",
+   "bytes": 10423,
+   "SHA256": "05795c677ee3f5f76e842f57a30dec56ab78b46073cfbd0ccd8c610f4497e694"
+  },
+  {
+   "path": "RIND3D_LOADER_BENCHMARKS.json",
+   "bytes": 30325,
+   "SHA256": "bb54799e691ab7f911130e413c0c086ddb777a4d1447ae0723a770b7d8374f58"
+  },
+  {
+   "path": "RIND3D_102_VS_256_WINDOW_STUDY.md",
+   "bytes": 10735,
+   "SHA256": "4d070953cf8bb3bcfa49338093e671fd19cda81acfb1b18d3c4a208d44c2d017"
+  },
+  {
+   "path": "RIND3D_TRAINING_SCALE_COST.json",
+   "bytes": 16845,
+   "SHA256": "ac7fd743d459c3973de42e7293649f153aee90322d8569ebdcdbc7a9d1f8d790"
+  },
+  {
+   "path": "run.sh",
+   "bytes": 669,
+   "SHA256": "385bbfd6c16c1821d8570b143b9ad42db7537e44c1aed8ece91e8b1b9a2b24fc"
+  },
+  {
+   "path": "run_gpu.sh",
+   "bytes": 488,
+   "SHA256": "8a66ae119a4e0f20f66a2b8eea6fa7d0bd62b7b127dcd82dac15027ab343965b"
+  },
+  {
+   "path": "rind3d_training/__init__.py",
+   "bytes": 0,
+   "SHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "rind3d_training/bench_fields.py",
+   "bytes": 8448,
+   "SHA256": "d16c48abeef9c0c31ddd53104e32fb173411d14d257a455fd2ad9fd98f62f21d"
+  },
+  {
+   "path": "rind3d_training/bench_student.py",
+   "bytes": 16642,
+   "SHA256": "8c26a8bed732f8a5104b76ae7942dd3a55cfc616861de0d38a1ced3c8c6ac7d8"
+  },
+  {
+   "path": "rind3d_training/blocksparse.py",
+   "bytes": 7180,
+   "SHA256": "7b14005d5fe6249e71418faafbe4872ae0af216ac44a0186a224cd5e1bc59141"
+  },
+  {
+   "path": "rind3d_training/env.py",
+   "bytes": 2782,
+   "SHA256": "f8a42c6b996da10012c374b7169bc5edb3c87a08943df8f0d3b694688b809f62"
+  },
+  {
+   "path": "rind3d_training/evidence.py",
+   "bytes": 3165,
+   "SHA256": "79cfcbaf29f48092dedb20bdfb33c75cecb377a1acdcb8176182bbd27fcdbf8a"
+  },
+  {
+   "path": "rind3d_training/export.py",
+   "bytes": 13255,
+   "SHA256": "2b5d5109ad00bd60c14ecae2120c5c78cd62a8dda479a04f6388024821359e25"
+  },
+  {
+   "path": "rind3d_training/index.py",
+   "bytes": 13346,
+   "SHA256": "d503b2363bfc1b4660227f2b7959725cb8da3f017ffb335b0a8ab8b8ea3a8f05"
+  },
+  {
+   "path": "rind3d_training/interop_audit.py",
+   "bytes": 11156,
+   "SHA256": "a869fbdfc83dcc5418139f32ccb7bbbdb60d7a34fb6ede61bcd84ccae8346212"
+  },
+  {
+   "path": "rind3d_training/leakage.py",
+   "bytes": 10875,
+   "SHA256": "3feae520fd474c3b4f1376a2f65590c5f02e1d00a2e84878e83af0abc6f13aca"
+  },
+  {
+   "path": "rind3d_training/phase3_adapter.py",
+   "bytes": 4017,
+   "SHA256": "46d62fb85ae5a314451fced1938b3d4ceb62d43f94934dfd8b477f18dc801390"
+  },
+  {
+   "path": "rind3d_training/preservation.py",
+   "bytes": 3237,
+   "SHA256": "652db21f1f2bb663ffd7cb501d5deb04498608ec581b75a8ff0fc641330ddaae"
+  },
+  {
+   "path": "rind3d_training/report.py",
+   "bytes": 2749,
+   "SHA256": "52fcdd1aa03cc3d115e91969bb455115961ccdb5defcbb17a8c3338ea66a6ae0"
+  },
+  {
+   "path": "rind3d_training/scale_cost.py",
+   "bytes": 8849,
+   "SHA256": "15bacd57e11169dc208a6e1b3ddc1b5789d4821842659565632748a590c82040"
+  },
+  {
+   "path": "rind3d_training/scenes.py",
+   "bytes": 3727,
+   "SHA256": "29fa48a7e99fa874c86d583319580bd048c59c7c4565a92da3cb2f700defa512"
+  },
+  {
+   "path": "rind3d_training/selection.py",
+   "bytes": 7333,
+   "SHA256": "2e1b2ab37cbf97ddc3e61c63b9fb27ce6679de2d163c146aab230dae9e3f4c33"
+  },
+  {
+   "path": "rind3d_training/student.py",
+   "bytes": 8915,
+   "SHA256": "e691b192d6c5bd9c967bdc288638ad605a6abeb9ca4614208c65a538d0a1c7b9"
+  },
+  {
+   "path": "rind3d_training/study.py",
+   "bytes": 12821,
+   "SHA256": "0aac1396dbe22fd3441e4477a3e9930d9682465c22501980061ce257a219e66b"
+  },
+  {
+   "path": "rind3d_training/teacher.py",
+   "bytes": 16446,
+   "SHA256": "e4562c359b68208df21193479defdde05c4a4e27d258665889dfe67352ae18f6"
+  },
+  {
+   "path": "tests/test_training_ready.py",
+   "bytes": 15775,
+   "SHA256": "09f1af9848513b533417a9bcf894b78461fd1f583a7b33df9212fbc59c17761c"
+  },
+  {
+   "path": "configs/next-campaign-sb-10k-v0.3.json",
+   "bytes": 1371,
+   "SHA256": "29d220bfd29c121493442734f0ebfc0080a7076529fdfb3bb864c5e0e8b1520e"
+  },
+  {
+   "path": "configs/training-sb-1k-from-v01-v0.3.json",
+   "bytes": 987,
+   "SHA256": "3b17830451ece80da7eb2db956f7882327c2478690a36a80deac1eac81514d3b"
+  },
+  {
+   "path": "docs/NEXT_CAMPAIGN_PROPOSAL.md",
+   "bytes": 3198,
+   "SHA256": "ff8e8d83d88e90be7f4a0b1951b7f4c835f1ebf624a99f4bac5df3ec3e2784c3"
+  },
+  {
+   "path": "docs/REPRODUCE.md",
+   "bytes": 3154,
+   "SHA256": "76923b12980dbae17449937015f680bfc360a2eca4c6d50628d6306f54beedd2"
+  },
+  {
+   "path": "docs/SELECTION_LAW.md",
+   "bytes": 4526,
+   "SHA256": "56d75abbc1db3d75c6b739686be79efb7c98837724f90087f8a262dfaba89f96"
+  },
+  {
+   "path": "docs/SOURCE_DOMAINS.md",
+   "bytes": 3734,
+   "SHA256": "911ecfa68e092cdb3f0a365d270fc61948367ef9f6366bcbf2e9db59ff291f19"
+  },
+  {
+   "path": "outputs/bench/blocksparse_canary-v03.json",
+   "bytes": 2944,
+   "SHA256": "aa479f539b44d433f303d13a1913b42b661a7e07bfcf4bb65f5f86b618ec270d"
+  },
+  {
+   "path": "outputs/bench/field_bench.json",
+   "bytes": 6509,
+   "SHA256": "30e6e7bf800a78e8d3710d5a030c4e73bdf7d691cffcbd30b1df9b9f6c385353"
+  },
+  {
+   "path": "outputs/bench/student_bench_canary-v03.full-epoch-pickled.json",
+   "bytes": 10071,
+   "SHA256": "ea750b5b6f71f018c4d20e9dd4b603d1e00ca30d6daa2e0461862297762fdebb"
+  },
+  {
+   "path": "outputs/bench/student_bench_canary-v03.json",
+   "bytes": 10502,
+   "SHA256": "ea8bc25e87c6477487e2da6eb74ca3b8a829c061e33293bcf1f2dbab668cbf41"
+  },
+  {
+   "path": "outputs/bench/student_bench_canary-v03.quick.json",
+   "bytes": 9056,
+   "SHA256": "f9c26bd76dc0ebf49dc4106f680aeaf2578c452ea32f1e9166ceefc766b39d24"
+  },
+  {
+   "path": "outputs/bench/student_bench_v01-sb-v03.json",
+   "bytes": 7176,
+   "SHA256": "f8f2056956e43cf13bed6d5161dc9c747089691f7185ebd818341675c152a624"
+  },
+  {
+   "path": "outputs/study/selection_weights_check_canary.json",
+   "bytes": 10701,
+   "SHA256": "7ba03a175f927cd39116f7e971ac2ca85a01941a244988efe337f55008f21b90"
+  },
+  {
+   "path": "outputs/study/v01_index_check.json",
+   "bytes": 11949,
+   "SHA256": "f5d09f07a802fd4eea5495c4df7232c8a22f18334224446cb6acccd7ef34e7d8"
+  },
+  {
+   "path": "outputs/study/window_study_canary-v0.2.json",
+   "bytes": 41221,
+   "SHA256": "f8665c8208b05ddfe3da5e5f2818dd4825169ae3c6d3b941f0b81caf59d37174"
+  },
+  {
+   "path": "outputs/tests/interop_audit.json",
+   "bytes": 3122,
+   "SHA256": "231d95fc79b18cbe67ca006cf202d8dcf1e623f764c9c649fb40dd0a764a7896"
+  },
+  {
+   "path": "outputs/tests/leakage_canary-v03.json",
+   "bytes": 1009,
+   "SHA256": "df7bd47fc87486c81cf98350ea10abb4eba340da3c3843609009826c6e49e841"
+  },
+  {
+   "path": "outputs/tests/leakage_v01-sb-v03.json",
+   "bytes": 1015,
+   "SHA256": "1fa2358fccff6759745555c12f0a963c4fec240cb05b4fea4b379617c0f7cde9"
+  },
+  {
+   "path": "outputs/tests/pytest.txt",
+   "bytes": 2201,
+   "SHA256": "64342fc8fee214ab7c95779a0469f8fe91ba1b156a9f57b3f795d9e8a44f0a1d"
+  },
+  {
+   "path": "outputs/public_summaries/export_summary_canary-v03.json",
+   "bytes": 296,
+   "SHA256": "7cf576af184e94ccb1b5381fcf5bf1e954e11d35c4430e566059a15acbed6d59"
+  },
+  {
+   "path": "outputs/public_summaries/export_summary_v01-sb-v03.json",
+   "bytes": 300,
+   "SHA256": "02e09aa5c844a9bbb23f8febc6c2b49b15f77c5237b7b8c6b4e4e3f797c29cdf"
+  },
+  {
+   "path": "outputs/public_summaries/index_summary_canary-v0.2.json",
+   "bytes": 282,
+   "SHA256": "43e245a3cdfeaea49836603d6287949e6752530e3473e71c727d7dcbb8a03f05"
+  },
+  {
+   "path": "outputs/public_summaries/index_summary_v0.1-1k.json",
+   "bytes": 277,
+   "SHA256": "9d1179dd2485e326ce25c9ae3d94e5fb4bfd2d73b1345f085318c134f8ecef7d"
+  },
+  {
+   "path": "outputs/preservation/compare.json",
+   "bytes": 2038,
+   "SHA256": "7bcf17f02721e294bdbed36d6862f5eb791511988c1e78055d318a0eb2907f09"
+  },
+  {
+   "path": "outputs/student/canary-v03/test/STUDENT_MANIFEST.json",
+   "bytes": 2695,
+   "SHA256": "c66c438552664d6cdd42a867991deb5d8bf7e7bb2ecdd6ea01ab48e82a5a7839"
+  },
+  {
+   "path": "outputs/student/canary-v03/train/STUDENT_MANIFEST.json",
+   "bytes": 11045,
+   "SHA256": "8e6a0f55b890106da6a40e47bf11daea02787ab6a99b27062b7a571e97f22961"
+  },
+  {
+   "path": "outputs/student/canary-v03/val/STUDENT_MANIFEST.json",
+   "bytes": 2697,
+   "SHA256": "0886cd15f9d134a40898874829fb24f617038176b82a4fbcc95b0830cc470e0d"
+  },
+  {
+   "path": "outputs/student/v01-sb-v03/test/STUDENT_MANIFEST.json",
+   "bytes": 6814,
+   "SHA256": "29f775269bae496e998ba5ff560c9765a4bf9a1eed5d7281d631237b5e85f993"
+  },
+  {
+   "path": "outputs/student/v01-sb-v03/train/STUDENT_MANIFEST.json",
+   "bytes": 41846,
+   "SHA256": "f7afd4f90e2e1b48a8254b4839dde70b430e9c0d9bfe34082304b1e2859f39c7"
+  },
+  {
+   "path": "outputs/student/v01-sb-v03/val/STUDENT_MANIFEST.json",
+   "bytes": 7645,
+   "SHA256": "5f38411e9ea6ff2da99aff0da142e5392ed9066cadbb8de0d35bffd445130e85"
+  },
+  {
+   "path": "outputs/logs/bench_fields.log",
+   "bytes": 5001,
+   "SHA256": "3dfbac3652d9ff21891fb4e2196063b14f3731d09c6c72fb82c3bd7fea9b1ae5"
+  },
+  {
+   "path": "outputs/logs/bench_student.log",
+   "bytes": 6001,
+   "SHA256": "6f530058b1f5e0e931d197001b6ab182b04e72d629246159df28379160eda1de"
+  },
+  {
+   "path": "outputs/logs/bench_student_canary_final.log",
+   "bytes": 6001,
+   "SHA256": "bac9f1750968e853253e7c38edad633040b4c85c7bcfd014fdec7fc9070d66a2"
+  },
+  {
+   "path": "outputs/logs/bench_student_quick.log",
+   "bytes": 6001,
+   "SHA256": "e1dfa66e04c5fa49c25b980b6233de96ea5f9782f51a7ad396720fae86a2d1c1"
+  },
+  {
+   "path": "outputs/logs/bench_student_v01.log",
+   "bytes": 6001,
+   "SHA256": "66eb7dd345af1d587db7a059c0706e374492f2ca2f632e8bb341d25d91c93dfb"
+  },
+  {
+   "path": "outputs/logs/blocksparse.log",
+   "bytes": 2945,
+   "SHA256": "71a5d9bca0ce638ad25e6057316262ccff7afd1249f8b444708dc632462c5fa4"
+  },
+  {
+   "path": "outputs/logs/export_canary.log",
+   "bytes": 297,
+   "SHA256": "3760974278fbd00738b833a8a2df40aee2b094e2a6123497333b03d342611667"
+  },
+  {
+   "path": "outputs/logs/export_v01.log",
+   "bytes": 301,
+   "SHA256": "d1157d77c412b6c2e6c4a7a05b5070e6aa17312627bfddf593ffa22864abf0bc"
+  },
+  {
+   "path": "outputs/logs/index_canary.log",
+   "bytes": 449,
+   "SHA256": "b6fe2c5587a8e0646db444ba2d1794431245c248a7e9073db66cd248ea2b899e"
+  },
+  {
+   "path": "outputs/logs/index_v01.log",
+   "bytes": 957,
+   "SHA256": "fd65e2da89da228a49018941f2549a27fca752de0a02519aeb0028a789c6914e"
+  },
+  {
+   "path": "outputs/logs/interop_audit.log",
+   "bytes": 3349,
+   "SHA256": "5853ce724766e6e270eaeab18eca7a9721ad99925145046abe0c8f8b3ba117fb"
+  },
+  {
+   "path": "outputs/logs/leakage_canary.log",
+   "bytes": 1011,
+   "SHA256": "f8cc8f3f632f4ec0e265d444272408babe89b606331d43eaf37acca3b1d909eb"
+  },
+  {
+   "path": "outputs/logs/leakage_v01.log",
+   "bytes": 1016,
+   "SHA256": "c050e139abc56cf8577ab9f8bb66f0fb22c6a7afad9447d2c2e731a359f2b10b"
+  },
+  {
+   "path": "outputs/logs/scale_cost.log",
+   "bytes": 2896,
+   "SHA256": "76030607c5e3f936006db4a64c49bd54fb9b03053955b16a581fd8048f73e50a"
+  },
+  {
+   "path": "outputs/logs/study_canary.log",
+   "bytes": 120,
+   "SHA256": "1ef6ecba257b6f0a5ae692140fa865bac044d526391238e5805fe8d12960baf6"
+  }
+ ],
+ "student_exports": {
+  "student/canary-v03/test": {
+   "MANIFEST_SHA256": "c66c438552664d6cdd42a867991deb5d8bf7e7bb2ecdd6ea01ab48e82a5a7839",
+   "files": 12,
+   "bytes": 61253709,
+   "samples": {
+    "MA-L064": 859,
+    "MA-L128": 850,
+    "MA-L256": 850,
+    "SB-L064": 774,
+    "SB-L128": 765,
+    "SB-L256": 765
+   }
+  },
+  "student/canary-v03/train": {
+   "MANIFEST_SHA256": "8e6a0f55b890106da6a40e47bf11daea02787ab6a99b27062b7a571e97f22961",
+   "files": 72,
+   "bytes": 658023434,
+   "samples": {
+    "MA-L064": 7814,
+    "MA-L128": 7730,
+    "MA-L256": 7705,
+    "SB-L064": 7374,
+    "SB-L128": 7296,
+    "SB-L256": 7288
+   }
+  },
+  "student/canary-v03/val": {
+   "MANIFEST_SHA256": "0886cd15f9d134a40898874829fb24f617038176b82a4fbcc95b0830cc470e0d",
+   "files": 12,
+   "bytes": 78575217,
+   "samples": {
+    "MA-L064": 602,
+    "MA-L128": 595,
+    "MA-L256": 595,
+    "SB-L064": 1118,
+    "SB-L128": 1103,
+    "SB-L256": 1101
+   }
+  },
+  "student/v01-sb-v03/test": {
+   "MANIFEST_SHA256": "29f775269bae496e998ba5ff560c9765a4bf9a1eed5d7281d631237b5e85f993",
+   "files": 42,
+   "bytes": 216039597,
+   "samples": {
+    "SB-L064": 9280,
+    "SB-L128": 9170,
+    "SB-L256": 9166
+   }
+  },
+  "student/v01-sb-v03/train": {
+   "MANIFEST_SHA256": "f7afd4f90e2e1b48a8254b4839dde70b430e9c0d9bfe34082304b1e2859f39c7",
+   "files": 294,
+   "bytes": 1553696294,
+   "samples": {
+    "SB-L064": 66627,
+    "SB-L128": 65907,
+    "SB-L256": 65878
+   }
+  },
+  "student/v01-sb-v03/val": {
+   "MANIFEST_SHA256": "5f38411e9ea6ff2da99aff0da142e5392ed9066cadbb8de0d35bffd445130e85",
+   "files": 48,
+   "bytes": 243027881,
+   "samples": {
+    "SB-L064": 9970,
+    "SB-L128": 9860,
+    "SB-L256": 9854
+   }
+  }
+ },
+ "note": "student payload shards are covered by their STUDENT_MANIFEST.json SHA256 lists; privileged views and private keys are deliberately excluded"
+}

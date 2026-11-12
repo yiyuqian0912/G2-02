@@ -1,0 +1,74 @@
+[
+ {
+  "name": "bdd0eb2e_18",
+  "side": 64,
+  "N": 1024,
+  "identical_cpu_na": true,
+  "identical_gpu_records": true,
+  "identical_gpu_decision_stats": true,
+  "tv_bound": 3.4150132489494424e-15,
+  "ref_cpu": 4.3884324119999985,
+  "ref_wall": 4.378818232999947,
+  "na_cpu": 4.3884324119999985,
+  "na_wall": 4.378818232999947,
+  "gpu_cpu": 2.0776498550000007,
+  "gpu_wall": 2.331550908000281,
+  "speedup_na": 1.0,
+  "speedup_gpu_wall": 1.8780710375976999,
+  "entry_evals_ref": 30136481,
+  "entry_evals_gpu": 30136481,
+  "gpu": {
+   "segments": 4806,
+   "entries": 32204780,
+   "tt": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fallbacks": 0,
+   "guards": 0,
+   "n32": 0,
+   "n64": 31372509
+  },
+  "nodes": 3791
+ },
+ {
+  "name": "f97c87e3_L256_037",
+  "side": 256,
+  "N": 1024,
+  "identical_cpu_na": true,
+  "identical_gpu_records": true,
+  "identical_gpu_decision_stats": true,
+  "tv_bound": 1.7874037867839622e-23,
+  "ref_cpu": 174.390749158,
+  "ref_wall": 174.16165670200007,
+  "na_cpu": 174.390749158,
+  "na_wall": 174.16165670200007,
+  "gpu_cpu": 12.954910488999985,
+  "gpu_wall": 22.994124664999617,
+  "speedup_na": 1.0,
+  "speedup_gpu_wall": 7.574180763101598,
+  "entry_evals_ref": 1434706551,
+  "entry_evals_gpu": 1434706551,
+  "gpu": {
+   "segments": 3950,
+   "entries": 1437021877,
+   "tt": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fallbacks": 0,
+   "guards": 7007498,
+   "n32": 0,
+   "n64": 1461368066
+  },
+  "nodes": 2969
+ }
+]

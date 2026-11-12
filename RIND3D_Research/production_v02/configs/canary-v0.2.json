@@ -1,0 +1,4 @@
+{"campaign": "rind3d-production-canary-v0.2", "seed": 20261204, "slots": 216, "shard_size": 24,
+ "profile_schedule": ["SB", "MA"], "multi_K": [2, 3, 4], "renderer_backend": "cuda_certified", "max_attempts": 2,
+ "caps": {"scene_seconds": 600, "field_seconds": 300, "verification_seconds": 300, "canary_wall_seconds": 10800},
+ "notes": "slot s: family FAMILIES[s mod 9]; profile SB for (s div 9) even, MA otherwise; MA K = [2,3,4][(s div 18) mod 3]; seed distinct from all benchmark/smoke seeds"}

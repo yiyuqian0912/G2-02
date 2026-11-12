@@ -1,0 +1,125 @@
+{
+ "rule": "Export a self-contained benchmark bundle (geometry rows + window class grids) so Colab needs only numpy/numba/scipy.\nDeclared selection: from Phase-1's random validation sample (engine b3 records), per side the windows at the 10/40/70/95%\nquantiles of measured CPU-seconds (comparable with Phase-1 numbers).  Validation split only.",
+ "windows": [
+  {
+   "name": "1c79650a_23",
+   "scene": "1c79650a65a90f219e2281a6cbbc89c4b94eda68428a3e2c52c1bebb738c8d1e",
+   "window": 23,
+   "side": 64,
+   "quantile": 0.1,
+   "phase1_cpu_seconds": 2.1162921239999997,
+   "phase1_cells": 9944,
+   "phase1_volume": 1.6033338751811335e-06
+  },
+  {
+   "name": "bdd0eb2e_18",
+   "scene": "bdd0eb2e7be2d50870cc7ea1ec15ef8fc709491a9637c0e6571e09976e07f395",
+   "window": 18,
+   "side": 64,
+   "quantile": 0.4,
+   "phase1_cpu_seconds": 6.547892772,
+   "phase1_cells": 189089,
+   "phase1_volume": 0.08389644114415265
+  },
+  {
+   "name": "bdb46e76_33",
+   "scene": "bdb46e769ebe311ad276b05f68f3f6ce83af54e607a5211c6882392eadc74674",
+   "window": 33,
+   "side": 64,
+   "quantile": 0.7,
+   "phase1_cpu_seconds": 12.817185883,
+   "phase1_cells": 1,
+   "phase1_volume": 4.1985936113029095e-16
+  },
+  {
+   "name": "23584efd_55",
+   "scene": "23584efdbfe6a10b7a5a23bc88dfb4822439c8cd04bcbc6275dc7ef97f9a42b9",
+   "window": 55,
+   "side": 64,
+   "quantile": 0.95,
+   "phase1_cpu_seconds": 59.004717367,
+   "phase1_cells": 5383,
+   "phase1_volume": 1.5999602293900577e-07
+  },
+  {
+   "name": "a636b0aa_130",
+   "scene": "a636b0aa3a3540f7c409937a6b08d2ed58ba4800acb8f8c9797f490fd2741252",
+   "window": 130,
+   "side": 128,
+   "quantile": 0.1,
+   "phase1_cpu_seconds": 6.6721596000000005,
+   "phase1_cells": 264,
+   "phase1_volume": 7.612841818460677e-07
+  },
+  {
+   "name": "2f308fe3_109",
+   "scene": "2f308fe306f2e2c6d44e5358e40945426638d221fc5953f0f4cb57f76a3ad2aa",
+   "window": 109,
+   "side": 128,
+   "quantile": 0.4,
+   "phase1_cpu_seconds": 32.823258720000005,
+   "phase1_cells": 1,
+   "phase1_volume": 2.1071382854181685e-16
+  },
+  {
+   "name": "82b22342_130",
+   "scene": "82b223429ebeb2d79a04d0a50442058dde37d786f605d5823505e9e45834d3ca",
+   "window": 130,
+   "side": 128,
+   "quantile": 0.7,
+   "phase1_cpu_seconds": 66.037349036,
+   "phase1_cells": 158,
+   "phase1_volume": 2.703568865763568e-12
+  },
+  {
+   "name": "acaf483e_106",
+   "scene": "acaf483ea2d535bcd21f49c3ce7c8ea9eef9defd81b61b960da5006cdc19fe20",
+   "window": 106,
+   "side": 128,
+   "quantile": 0.95,
+   "phase1_cpu_seconds": 160.544978823,
+   "phase1_cells": 2,
+   "phase1_volume": 6.186679651388707e-14
+  },
+  {
+   "name": "bdd0eb2e_179",
+   "scene": "bdd0eb2e7be2d50870cc7ea1ec15ef8fc709491a9637c0e6571e09976e07f395",
+   "window": 179,
+   "side": 256,
+   "quantile": 0.1,
+   "phase1_cpu_seconds": 3.849048067,
+   "phase1_cells": 1,
+   "phase1_volume": 4.395422524388874e-19
+  },
+  {
+   "name": "5200796c_231",
+   "scene": "5200796cc716556a345a66b995be67642cfb9beefa5f26bea74eda2ba8f6ff39",
+   "window": 231,
+   "side": 256,
+   "quantile": 0.4,
+   "phase1_cpu_seconds": 14.648035332,
+   "phase1_cells": 166,
+   "phase1_volume": 7.137973839673208e-07
+  },
+  {
+   "name": "66a6ee76_173",
+   "scene": "66a6ee76fbc8b3ca711ad94044a0c890982ea3c88050315d9010644036262089",
+   "window": 173,
+   "side": 256,
+   "quantile": 0.7,
+   "phase1_cpu_seconds": 79.25870645100001,
+   "phase1_cells": 1,
+   "phase1_volume": 8.213948013047378e-21
+  },
+  {
+   "name": "ae6f5493_252",
+   "scene": "ae6f54935d565f8633d075c8a9d8a1a6de9857b4acba3fddfd83f0bf90d931a7",
+   "window": 252,
+   "side": 256,
+   "quantile": 0.95,
+   "phase1_cpu_seconds": 414.83776295,
+   "phase1_cells": 74,
+   "phase1_volume": 5.561125987950883e-15
+  }
+ ]
+}

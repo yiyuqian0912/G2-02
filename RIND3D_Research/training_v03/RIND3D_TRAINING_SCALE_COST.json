@@ -1,0 +1,462 @@
+{
+ "schema": "rind3d-training-scale-cost-v0.3",
+ "inputs": {
+  "canary": {
+   "SB": {
+    "generation_wall_s_mean": 9.477352903472205,
+    "generation_wall_s_median": 8.770265770500373,
+    "scene_bytes_mean": 1128786.1203703703,
+    "validation_s_mean": 1.0480266821017958
+   },
+   "MA": {
+    "generation_wall_s_mean": 33.76611168100001,
+    "generation_wall_s_median": 31.309043672999906,
+    "scene_bytes_mean": 6143038.277777778,
+    "validation_s_mean": 14.596749524120275
+   }
+  },
+  "index_canary": {
+   "wall_seconds": 682.9724434159998,
+   "workers": 12,
+   "scenes": 216,
+   "scenes_per_hour_12_workers": 1138.5525250633902,
+   "SB_scene_cpu_s_mean": 32.81236800159255,
+   "MA_scene_cpu_s_mean": 41.925904288564716,
+   "SB_index_bytes_mean": 159042.4814814815,
+   "MA_index_bytes_mean": 159052.36111111112
+  },
+  "index_v01": {
+   "wall_seconds": 2992.8444913599997,
+   "workers": 12,
+   "scenes": 1000,
+   "scenes_per_hour_12_workers": 1202.8690466186229,
+   "SB_scene_cpu_s_mean": 35.763451548380985,
+   "SB_index_bytes_mean": 159043.732
+  },
+  "export_canary": {
+   "wall_seconds": 1040.317398182,
+   "workers": 12,
+   "scenes": 216,
+   "scenes_per_hour": 747.4641886782725,
+   "student_bytes_per_window": {
+    "MA/L256": 58311.031475409836,
+    "SB/L128": 2326.448057616761,
+    "MA/L128": 5771.050136239782,
+    "SB/L64": 456.2065616231383,
+    "SB/L256": 19457.279112956086,
+    "MA/L64": 828.0207008086253
+   },
+   "privileged_join_bytes_per_window": 189
+  },
+  "export_v01": {
+   "wall_seconds": 1270.6545108980026,
+   "workers": 12,
+   "scenes": 1000,
+   "scenes_per_hour": 2833.1855505363073,
+   "student_bytes_per_window": {
+    "SB/L64": 462.2251941730615,
+    "SB/L256": 20774.486619237203,
+    "SB/L128": 2463.981138961819
+   },
+   "privileged_join_bytes_per_window": 189
+  },
+  "training": {
+   "64": {
+    "loader_fed_windows_per_s": 276.98808334190085,
+    "gpu_resident_windows_per_s": 286.4155757007025,
+    "batch": 32
+   },
+   "128": {
+    "loader_fed_windows_per_s": 213.7388500149086,
+    "gpu_resident_windows_per_s": 252.91094331055965,
+    "batch": 8
+   },
+   "256": {
+    "loader_fed_windows_per_s": 48.63675106395863,
+    "gpu_resident_windows_per_s": 64.32429641224574,
+    "batch": 2
+   }
+  }
+ },
+ "definitions": {
+  "SB-only": "N single-source binary scenes (one release).",
+  "combined": "N scenes of one release mixing SB and MA 50/50 (the canary schedule; MA K = 2/3/4 cycled).",
+  "separate": "two independently versioned releases of N scenes each: SB-N and MA-N (2N scenes in total).",
+  "availability_vs_consumption": "available unique windows = scenes x windows/scene in the fixed index; consumed windows = epochs x windows drawn per epoch. With the hybrid profile the dynamic part adds unique windows per epoch without storage; it does not add scenes (independent geometry/source draws)."
+ },
+ "scenarios": {
+  "SB-only/1000/P102": {
+   "scenes": 1000,
+   "windows_per_scene": 102,
+   "windows_available": 102000,
+   "physics_generation_gpu_hours_1_laptop": 2.6325980287422794,
+   "validation_cpu_hours": 0.2911185228060544,
+   "index_cpu_hours": 4.470431443547624,
+   "storage_GB": {
+    "fields_and_scene_files": 1.1287861203703704,
+    "student_export": 0.7561577468946635,
+    "privileged_join": 0.019278,
+    "index": 0.06336848871527778,
+    "total": 1.9675903559803116
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 0.27246706675278876,
+   "steps_per_epoch": 22312,
+   "mean_step_seconds": 0.0439610729550718,
+   "epoch_hours_gpu_compute_bound": 0.2171430441613535
+  },
+  "SB-only/1000/P256": {
+   "scenes": 1000,
+   "windows_per_scene": 256,
+   "windows_available": 256000,
+   "physics_generation_gpu_hours_1_laptop": 2.6325980287422794,
+   "validation_cpu_hours": 0.2911185228060544,
+   "index_cpu_hours": 9.934292096772497,
+   "storage_GB": {
+    "fields_and_scene_files": 1.1287861203703704,
+    "student_export": 1.8908505737982821,
+    "privileged_join": 0.048384,
+    "index": 0.15904248148148148,
+    "total": 3.2270631756501342
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 0.6821705178870635,
+   "steps_per_epoch": 55812,
+   "mean_step_seconds": 0.04400114426684754,
+   "epoch_hours_gpu_compute_bound": 0.5438274521345753
+  },
+  "SB-only/10000/P102": {
+   "scenes": 10000,
+   "windows_per_scene": 102,
+   "windows_available": 1020000,
+   "physics_generation_gpu_hours_1_laptop": 26.325980287422794,
+   "validation_cpu_hours": 2.911185228060544,
+   "index_cpu_hours": 44.704314435476235,
+   "storage_GB": {
+    "fields_and_scene_files": 11.287861203703702,
+    "student_export": 7.561577468946635,
+    "privileged_join": 0.19278,
+    "index": 0.6336848871527778,
+    "total": 19.675903559803118
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 2.724670667527888,
+   "steps_per_epoch": 223125,
+   "mean_step_seconds": 0.0439610729550718,
+   "epoch_hours_gpu_compute_bound": 2.171430441613535
+  },
+  "SB-only/10000/P256": {
+   "scenes": 10000,
+   "windows_per_scene": 256,
+   "windows_available": 2560000,
+   "physics_generation_gpu_hours_1_laptop": 26.325980287422794,
+   "validation_cpu_hours": 2.911185228060544,
+   "index_cpu_hours": 99.34292096772496,
+   "storage_GB": {
+    "fields_and_scene_files": 11.287861203703702,
+    "student_export": 18.90850573798282,
+    "privileged_join": 0.48384,
+    "index": 1.5904248148148148,
+    "total": 32.27063175650134
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 6.8217051788706335,
+   "steps_per_epoch": 558125,
+   "mean_step_seconds": 0.044001144266847536,
+   "epoch_hours_gpu_compute_bound": 5.438274521345752
+  },
+  "SB-only/100000/P102": {
+   "scenes": 100000,
+   "windows_per_scene": 102,
+   "windows_available": 10200000,
+   "physics_generation_gpu_hours_1_laptop": 263.25980287422794,
+   "validation_cpu_hours": 29.11185228060544,
+   "index_cpu_hours": 447.0431443547624,
+   "storage_GB": {
+    "fields_and_scene_files": 112.87861203703703,
+    "student_export": 75.61577468946635,
+    "privileged_join": 1.9278,
+    "index": 6.336848871527779,
+    "total": 196.75903559803115
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 27.24670667527888,
+   "steps_per_epoch": 2231250,
+   "mean_step_seconds": 0.0439610729550718,
+   "epoch_hours_gpu_compute_bound": 21.71430441613535
+  },
+  "SB-only/100000/P256": {
+   "scenes": 100000,
+   "windows_per_scene": 256,
+   "windows_available": 25600000,
+   "physics_generation_gpu_hours_1_laptop": 263.25980287422794,
+   "validation_cpu_hours": 29.11185228060544,
+   "index_cpu_hours": 993.4292096772497,
+   "storage_GB": {
+    "fields_and_scene_files": 112.87861203703703,
+    "student_export": 189.0850573798282,
+    "privileged_join": 4.8384,
+    "index": 15.904248148148149,
+    "total": 322.70631756501336
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 68.21705178870634,
+   "steps_per_epoch": 5581250,
+   "mean_step_seconds": 0.044001144266847536,
+   "epoch_hours_gpu_compute_bound": 54.38274521345752
+  },
+  "combined/1000/P102": {
+   "scenes": 1000,
+   "windows_per_scene": 102,
+   "windows_available": 102000,
+   "physics_generation_gpu_hours_1_laptop": 6.006036747843364,
+   "validation_cpu_hours": 2.17288558419751,
+   "index_cpu_hours": 4.855584739809106,
+   "storage_GB": {
+    "fields_and_scene_files": 3.635912199074074,
+    "student_export": 1.4815506127591218,
+    "privileged_join": 0.019278,
+    "index": 0.06337045692274307,
+    "total": 5.200111268755938
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 0.27246706675278876,
+   "steps_per_epoch": 22312,
+   "mean_step_seconds": 0.0439610729550718,
+   "epoch_hours_gpu_compute_bound": 0.2171430441613535
+  },
+  "combined/1000/P256": {
+   "scenes": 1000,
+   "windows_per_scene": 256,
+   "windows_available": 256000,
+   "physics_generation_gpu_hours_1_laptop": 6.006036747843364,
+   "validation_cpu_hours": 2.17288558419751,
+   "index_cpu_hours": 10.790188310686903,
+   "storage_GB": {
+    "fields_and_scene_files": 3.635912199074074,
+    "student_export": 3.70451864552902,
+    "privileged_join": 0.048384,
+    "index": 0.1590474212962963,
+    "total": 7.54786226589939
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 0.6821705178870635,
+   "steps_per_epoch": 55812,
+   "mean_step_seconds": 0.04400114426684754,
+   "epoch_hours_gpu_compute_bound": 0.5438274521345753
+  },
+  "combined/10000/P102": {
+   "scenes": 10000,
+   "windows_per_scene": 102,
+   "windows_available": 1020000,
+   "physics_generation_gpu_hours_1_laptop": 60.06036747843364,
+   "validation_cpu_hours": 21.7288558419751,
+   "index_cpu_hours": 48.55584739809107,
+   "storage_GB": {
+    "fields_and_scene_files": 36.35912199074074,
+    "student_export": 14.815506127591219,
+    "privileged_join": 0.19278,
+    "index": 0.6337045692274306,
+    "total": 52.001112687559385
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 2.724670667527888,
+   "steps_per_epoch": 223125,
+   "mean_step_seconds": 0.0439610729550718,
+   "epoch_hours_gpu_compute_bound": 2.171430441613535
+  },
+  "combined/10000/P256": {
+   "scenes": 10000,
+   "windows_per_scene": 256,
+   "windows_available": 2560000,
+   "physics_generation_gpu_hours_1_laptop": 60.06036747843364,
+   "validation_cpu_hours": 21.7288558419751,
+   "index_cpu_hours": 107.90188310686904,
+   "storage_GB": {
+    "fields_and_scene_files": 36.35912199074074,
+    "student_export": 37.04518645529021,
+    "privileged_join": 0.48384,
+    "index": 1.5904742129629632,
+    "total": 75.47862265899391
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 6.8217051788706335,
+   "steps_per_epoch": 558125,
+   "mean_step_seconds": 0.044001144266847536,
+   "epoch_hours_gpu_compute_bound": 5.438274521345752
+  },
+  "combined/100000/P102": {
+   "scenes": 100000,
+   "windows_per_scene": 102,
+   "windows_available": 10200000,
+   "physics_generation_gpu_hours_1_laptop": 600.6036747843364,
+   "validation_cpu_hours": 217.28855841975096,
+   "index_cpu_hours": 485.55847398091055,
+   "storage_GB": {
+    "fields_and_scene_files": 363.59121990740744,
+    "student_export": 148.1550612759122,
+    "privileged_join": 1.9278,
+    "index": 6.337045692274306,
+    "total": 520.0111268755938
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 27.24670667527888,
+   "steps_per_epoch": 2231250,
+   "mean_step_seconds": 0.0439610729550718,
+   "epoch_hours_gpu_compute_bound": 21.71430441613535
+  },
+  "combined/100000/P256": {
+   "scenes": 100000,
+   "windows_per_scene": 256,
+   "windows_available": 25600000,
+   "physics_generation_gpu_hours_1_laptop": 600.6036747843364,
+   "validation_cpu_hours": 217.28855841975096,
+   "index_cpu_hours": 1079.0188310686901,
+   "storage_GB": {
+    "fields_and_scene_files": 363.59121990740744,
+    "student_export": 370.4518645529021,
+    "privileged_join": 4.8384,
+    "index": 15.90474212962963,
+    "total": 754.7862265899392
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 68.21705178870634,
+   "steps_per_epoch": 5581250,
+   "mean_step_seconds": 0.044001144266847536,
+   "epoch_hours_gpu_compute_bound": 54.38274521345752
+  },
+  "separate/1000/P102": {
+   "scenes": 2000,
+   "windows_per_scene": 102,
+   "windows_available": 204000,
+   "physics_generation_gpu_hours_1_laptop": 12.012073495686728,
+   "validation_cpu_hours": 4.34577116839502,
+   "index_cpu_hours": 9.711169479618212,
+   "storage_GB": {
+    "fields_and_scene_files": 7.271824398148148,
+    "student_export": 2.9631012255182436,
+    "privileged_join": 0.038556,
+    "index": 0.12674091384548614,
+    "total": 10.400222537511876
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 0.5449341335055775,
+   "steps_per_epoch": 44625,
+   "mean_step_seconds": 0.0439610729550718,
+   "epoch_hours_gpu_compute_bound": 0.434286088322707
+  },
+  "separate/1000/P256": {
+   "scenes": 2000,
+   "windows_per_scene": 256,
+   "windows_available": 512000,
+   "physics_generation_gpu_hours_1_laptop": 12.012073495686728,
+   "validation_cpu_hours": 4.34577116839502,
+   "index_cpu_hours": 21.580376621373805,
+   "storage_GB": {
+    "fields_and_scene_files": 7.271824398148148,
+    "student_export": 7.40903729105804,
+    "privileged_join": 0.096768,
+    "index": 0.3180948425925926,
+    "total": 15.09572453179878
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 1.364341035774127,
+   "steps_per_epoch": 111625,
+   "mean_step_seconds": 0.04400114426684754,
+   "epoch_hours_gpu_compute_bound": 1.0876549042691506
+  },
+  "separate/10000/P102": {
+   "scenes": 20000,
+   "windows_per_scene": 102,
+   "windows_available": 2040000,
+   "physics_generation_gpu_hours_1_laptop": 120.12073495686728,
+   "validation_cpu_hours": 43.4577116839502,
+   "index_cpu_hours": 97.11169479618214,
+   "storage_GB": {
+    "fields_and_scene_files": 72.71824398148148,
+    "student_export": 29.631012255182437,
+    "privileged_join": 0.38556,
+    "index": 1.2674091384548611,
+    "total": 104.00222537511877
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 5.449341335055776,
+   "steps_per_epoch": 446250,
+   "mean_step_seconds": 0.0439610729550718,
+   "epoch_hours_gpu_compute_bound": 4.34286088322707
+  },
+  "separate/10000/P256": {
+   "scenes": 20000,
+   "windows_per_scene": 256,
+   "windows_available": 5120000,
+   "physics_generation_gpu_hours_1_laptop": 120.12073495686728,
+   "validation_cpu_hours": 43.4577116839502,
+   "index_cpu_hours": 215.80376621373807,
+   "storage_GB": {
+    "fields_and_scene_files": 72.71824398148148,
+    "student_export": 74.09037291058041,
+    "privileged_join": 0.96768,
+    "index": 3.1809484259259264,
+    "total": 150.95724531798783
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 13.643410357741267,
+   "steps_per_epoch": 1116250,
+   "mean_step_seconds": 0.044001144266847536,
+   "epoch_hours_gpu_compute_bound": 10.876549042691504
+  },
+  "separate/100000/P102": {
+   "scenes": 200000,
+   "windows_per_scene": 102,
+   "windows_available": 20400000,
+   "physics_generation_gpu_hours_1_laptop": 1201.2073495686727,
+   "validation_cpu_hours": 434.5771168395019,
+   "index_cpu_hours": 971.1169479618211,
+   "storage_GB": {
+    "fields_and_scene_files": 727.1824398148149,
+    "student_export": 296.3101225518244,
+    "privileged_join": 3.8556,
+    "index": 12.674091384548612,
+    "total": 1040.0222537511877
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 54.49341335055776,
+   "steps_per_epoch": 4462500,
+   "mean_step_seconds": 0.0439610729550718,
+   "epoch_hours_gpu_compute_bound": 43.4286088322707
+  },
+  "separate/100000/P256": {
+   "scenes": 200000,
+   "windows_per_scene": 256,
+   "windows_available": 51200000,
+   "physics_generation_gpu_hours_1_laptop": 1201.2073495686727,
+   "validation_cpu_hours": 434.5771168395019,
+   "index_cpu_hours": 2158.0376621373803,
+   "storage_GB": {
+    "fields_and_scene_files": 727.1824398148149,
+    "student_export": 740.9037291058042,
+    "privileged_join": 9.6768,
+    "index": 31.80948425925926,
+    "total": 1509.5724531798785
+   },
+   "epoch_hours_one_RTX3060_end_to_end": 136.43410357741269,
+   "steps_per_epoch": 11162500,
+   "mean_step_seconds": 0.044001144266847536,
+   "epoch_hours_gpu_compute_bound": 108.76549042691504
+  }
+ },
+ "v01_reuse_1k_SB": {
+  "physics_generation_gpu_hours": 0.0,
+  "note": "the 1000 v0.1 SB scenes already have certified complete fields; v0.3 adds only the index and the two-view export",
+  "index": {
+   "wall_seconds": 2992.8444913599997,
+   "workers": 12,
+   "scenes": 1000,
+   "scenes_per_hour_12_workers": 1202.8690466186229,
+   "SB_scene_cpu_s_mean": 35.763451548380985,
+   "SB_index_bytes_mean": 159043.732
+  },
+  "export": {
+   "wall_seconds": 1270.6545108980026,
+   "workers": 12,
+   "scenes": 1000,
+   "scenes_per_hour": 2833.1855505363073,
+   "student_bytes_per_window": {
+    "SB/L64": 462.2251941730615,
+    "SB/L256": 20774.486619237203,
+    "SB/L128": 2463.981138961819
+   },
+   "privileged_join_bytes_per_window": 189
+  }
+ },
+ "notes": {
+  "index_cpu_hours": "P256 measured (v0.1 1K: 2993 s wall on 12 workers = 35.9 s per scene per worker; canary SB 32.8 s, MA 41.9 s). P102 is a rough [X] 0.45 x P256 (40% of records and caps); the v0.2 runner's own window stage took ~2 s/scene for P102 without the rate stream and per-record nonlocal diagnostics.",
+  "epoch_hours": "end-to-end loader-fed SB training throughput of the benchmark CNN (0.86 M parameters, AMP) on one RTX 3060 Laptop: 277 / 214 / 49 windows/s at L64/128/256 (v01-sb-v03, 4 shared-memory workers); compute-bound: 286 / 253 / 64. MA windows have the same input tensor shape and are costed at the SB rate (their extra GPU palette decode is < 1 ms per batch, B3).",
+  "epoch_definition": "one pass over every available window of the fixed index; a scene-balanced epoch with m windows per scene per side costs 3m/256 of it (P256)",
+  "generation": "v0.2 runner on one RTX 3060 Laptop at the canary per-profile mean scene wall (SB 9.5 s, MA 33.8 s); linear",
+  "storage": "fields = mean canary scene directory (SB 1.13 MB, MA 6.14 MB); student = measured bytes per window by side/profile (canary export) x windows; index = measured privileged index bytes per scene; privileged join = 189 B per window"
+ }
+}

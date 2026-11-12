@@ -1,0 +1,463 @@
+{
+ "scene": "769d65088a2c6d40127cbee5ea52229877e40b0e609a2ec4d60ea0d7de512da7",
+ "N": 128,
+ "M_per_side": 64,
+ "engine": "cpu",
+ "workers": 16,
+ "seed": 20261111,
+ "selection": {
+  "proposals": 192,
+  "contains_source": 1,
+  "undecided": 0,
+  "uninformative": 153,
+  "accepted": 38,
+  "by_side": {
+   "64": {
+    "proposals": 64,
+    "accepted": 6
+   },
+   "128": {
+    "proposals": 64,
+    "accepted": 8
+   },
+   "256": {
+    "proposals": 64,
+    "accepted": 24
+   }
+  }
+ },
+ "timing": {
+  "preprocess_wall": 0.3758780719999777,
+  "selection_wall": 1.4466905039998892,
+  "main_cpu_pre_sel": 3.560221243,
+  "label_wall": 0.6930992690004132,
+  "label_cpu_sum": 6.2157743960000005,
+  "label_task_wall_sum": 6.7354794030006815,
+  "storage_bytes": 3302006
+ },
+ "n_labels": 38,
+ "tv_max": 2.1832842145979155e-15,
+ "tv_mean": 9.258073666360094e-17,
+ "n_tv_le_005": 38,
+ "per_window": [
+  {
+   "window": "769d6508_L128_003",
+   "cpu": 0.2338128479999999,
+   "wall": 0.2828523940006562,
+   "store_s": 0.0009927989995048847,
+   "bytes": 4714,
+   "tv": 2.995414115128029e-22,
+   "nrec": 209,
+   "evals": 763584,
+   "digest": "821383c2f7ecad72"
+  },
+  {
+   "window": "769d6508_L128_005",
+   "cpu": 0.11884667899999979,
+   "wall": 0.11950286200044502,
+   "store_s": 0.000829859000077704,
+   "bytes": 2071,
+   "tv": 0.0,
+   "nrec": 59,
+   "evals": 263501,
+   "digest": "fa123b02ec910019"
+  },
+  {
+   "window": "769d6508_L128_010",
+   "cpu": 0.329511283,
+   "wall": 0.36129499199978454,
+   "store_s": 0.036405386999831535,
+   "bytes": 555076,
+   "tv": 0.0,
+   "nrec": 43322,
+   "evals": 395054,
+   "digest": "14ba662bf7311fed"
+  },
+  {
+   "window": "769d6508_L128_016",
+   "cpu": 0.036815638999999845,
+   "wall": 0.036864805999357486,
+   "store_s": 0.004314190000513918,
+   "bytes": 65670,
+   "tv": 0.0,
+   "nrec": 3881,
+   "evals": 48029,
+   "digest": "3bcbabb345e20978"
+  },
+  {
+   "window": "769d6508_L128_020",
+   "cpu": 0.038552189999999875,
+   "wall": 0.03973906999999599,
+   "store_s": 0.0007112670000424259,
+   "bytes": 1067,
+   "tv": 0.0,
+   "nrec": 7,
+   "evals": 66486,
+   "digest": "d729e2f6b58a670c"
+  },
+  {
+   "window": "769d6508_L128_032",
+   "cpu": 0.32068576700000007,
+   "wall": 0.32687932299995737,
+   "store_s": 0.0008248300000559539,
+   "bytes": 4145,
+   "tv": 2.9422821675872504e-22,
+   "nrec": 176,
+   "evals": 857765,
+   "digest": "9d8d9605008a12ca"
+  },
+  {
+   "window": "769d6508_L128_047",
+   "cpu": 0.18718925599999992,
+   "wall": 0.20776603700051055,
+   "store_s": 0.0008906910006771795,
+   "bytes": 3448,
+   "tv": 0.0,
+   "nrec": 137,
+   "evals": 543216,
+   "digest": "5d4a7f1edebd8101"
+  },
+  {
+   "window": "769d6508_L128_057",
+   "cpu": 0.20546189000000004,
+   "wall": 0.2164704040005745,
+   "store_s": 0.0013490620003722142,
+   "bytes": 2279,
+   "tv": 0.0,
+   "nrec": 69,
+   "evals": 499730,
+   "digest": "3a00bbafc1d11ab9"
+  },
+  {
+   "window": "769d6508_L256_000",
+   "cpu": 0.2317946179999999,
+   "wall": 0.2565491839995957,
+   "store_s": 0.0009108750000450527,
+   "bytes": 4025,
+   "tv": 2.306446476748203e-22,
+   "nrec": 172,
+   "evals": 913418,
+   "digest": "86adf19faf042715"
+  },
+  {
+   "window": "769d6508_L256_002",
+   "cpu": 0.5215933930000003,
+   "wall": 0.5818788599999607,
+   "store_s": 0.004495359000429744,
+   "bytes": 88273,
+   "tv": 5.327933083006298e-16,
+   "nrec": 5086,
+   "evals": 2516659,
+   "digest": "8ad7ba183f5097c2"
+  },
+  {
+   "window": "769d6508_L256_003",
+   "cpu": 0.025899964999999803,
+   "wall": 0.02593661099945166,
+   "store_s": 0.0007286580002983101,
+   "bytes": 1817,
+   "tv": 0.0,
+   "nrec": 46,
+   "evals": 50152,
+   "digest": "abaae2e32cd5cf2b"
+  },
+  {
+   "window": "769d6508_L256_004",
+   "cpu": 0.04311286599999997,
+   "wall": 0.04473973299991485,
+   "store_s": 0.0006829120002294076,
+   "bytes": 1008,
+   "tv": 0.0,
+   "nrec": 4,
+   "evals": 96304,
+   "digest": "220434d85b0976c8"
+  },
+  {
+   "window": "769d6508_L256_007",
+   "cpu": 0.030743060999999905,
+   "wall": 0.031435593999958655,
+   "store_s": 0.0020622850006475346,
+   "bytes": 22736,
+   "tv": 0.0,
+   "nrec": 1429,
+   "evals": 82901,
+   "digest": "952e124d61280715"
+  },
+  {
+   "window": "769d6508_L256_008",
+   "cpu": 0.04042550499999997,
+   "wall": 0.04042596300041623,
+   "store_s": 0.000732847999643127,
+   "bytes": 1028,
+   "tv": 0.0,
+   "nrec": 5,
+   "evals": 88058,
+   "digest": "573be5c991e64c5d"
+  },
+  {
+   "window": "769d6508_L256_010",
+   "cpu": 0.050370732999999834,
+   "wall": 0.05900000500059832,
+   "store_s": 0.0007291469992196653,
+   "bytes": 1089,
+   "tv": 0.0,
+   "nrec": 8,
+   "evals": 110624,
+   "digest": "d29c5800c2d8a66a"
+  },
+  {
+   "window": "769d6508_L256_014",
+   "cpu": 0.31649279500000027,
+   "wall": 0.4267295790004937,
+   "store_s": 0.0318512229996486,
+   "bytes": 334703,
+   "tv": 0.0,
+   "nrec": 50959,
+   "evals": 452542,
+   "digest": "5569bc8a05df55ab"
+  },
+  {
+   "window": "769d6508_L256_015",
+   "cpu": 0.27649243599999984,
+   "wall": 0.2767777750004825,
+   "store_s": 0.03521870800068427,
+   "bytes": 302988,
+   "tv": 0.0,
+   "nrec": 46750,
+   "evals": 219284,
+   "digest": "6e7c90a7bd1f98cf"
+  },
+  {
+   "window": "769d6508_L256_016",
+   "cpu": 0.035690691999999746,
+   "wall": 0.03663209399928746,
+   "store_s": 0.0007466070001100888,
+   "bytes": 1403,
+   "tv": 0.0,
+   "nrec": 24,
+   "evals": 89113,
+   "digest": "333c11f358752b54"
+  },
+  {
+   "window": "769d6508_L256_017",
+   "cpu": 0.6138542400000002,
+   "wall": 0.6274170930000764,
+   "store_s": 0.0006134200002634316,
+   "bytes": 1009,
+   "tv": 0.0,
+   "nrec": 4,
+   "evals": 2738187,
+   "digest": "a2ba2d3259b91e00"
+  },
+  {
+   "window": "769d6508_L256_019",
+   "cpu": 0.3645546369999999,
+   "wall": 0.3993223819998093,
+   "store_s": 0.0010430160000396427,
+   "bytes": 6201,
+   "tv": 4.252052945714667e-22,
+   "nrec": 295,
+   "evals": 1695013,
+   "digest": "2408ec2aade23f98"
+  },
+  {
+   "window": "769d6508_L256_020",
+   "cpu": 0.03066228399999993,
+   "wall": 0.041996981999545824,
+   "store_s": 0.0017197110000779503,
+   "bytes": 19208,
+   "tv": 0.0,
+   "nrec": 1140,
+   "evals": 90670,
+   "digest": "143c635e761eae33"
+  },
+  {
+   "window": "769d6508_L256_022",
+   "cpu": 0.10287679600000033,
+   "wall": 0.10407141700034117,
+   "store_s": 0.0014304269998319796,
+   "bytes": 16232,
+   "tv": 0.0,
+   "nrec": 890,
+   "evals": 384477,
+   "digest": "000048ebcfdf1e3a"
+  },
+  {
+   "window": "769d6508_L256_025",
+   "cpu": 0.01642992100000029,
+   "wall": 0.01676674899954378,
+   "store_s": 0.001266788000066299,
+   "bytes": 9548,
+   "tv": 0.0,
+   "nrec": 497,
+   "evals": 20144,
+   "digest": "ff1efc12d3d728c0"
+  },
+  {
+   "window": "769d6508_L256_028",
+   "cpu": 0.027521601999999756,
+   "wall": 0.02811497199945734,
+   "store_s": 0.0006896869999764021,
+   "bytes": 1089,
+   "tv": 0.0,
+   "nrec": 8,
+   "evals": 46016,
+   "digest": "f90f6b16281968aa"
+  },
+  {
+   "window": "769d6508_L256_032",
+   "cpu": 0.02268185700000025,
+   "wall": 0.024789252000118722,
+   "store_s": 0.0006658700003754348,
+   "bytes": 1086,
+   "tv": 0.0,
+   "nrec": 8,
+   "evals": 24820,
+   "digest": "ea2434a82fc566c6"
+  },
+  {
+   "window": "769d6508_L256_039",
+   "cpu": 0.5750392959999999,
+   "wall": 0.6342031889998907,
+   "store_s": 0.0007202769993455149,
+   "bytes": 3193,
+   "tv": 0.0,
+   "nrec": 123,
+   "evals": 2703077,
+   "digest": "c5ef93894c247d8f"
+  },
+  {
+   "window": "769d6508_L256_041",
+   "cpu": 0.06338305100000019,
+   "wall": 0.07765296799971111,
+   "store_s": 0.0006854260000181966,
+   "bytes": 1028,
+   "tv": 0.0,
+   "nrec": 5,
+   "evals": 193607,
+   "digest": "0219c753d25f4a82"
+  },
+  {
+   "window": "769d6508_L256_044",
+   "cpu": 0.2126658800000003,
+   "wall": 0.21708780400058458,
+   "store_s": 0.0014183449993652175,
+   "bytes": 17128,
+   "tv": 0.0,
+   "nrec": 956,
+   "evals": 976899,
+   "digest": "cb6f25d18d03a153"
+  },
+  {
+   "window": "769d6508_L256_048",
+   "cpu": 0.014931622999999838,
+   "wall": 0.016350144000170985,
+   "store_s": 0.001367500000014843,
+   "bytes": 10657,
+   "tv": 0.0,
+   "nrec": 611,
+   "evals": 17929,
+   "digest": "d8c2455049db475c"
+  },
+  {
+   "window": "769d6508_L256_049",
+   "cpu": 0.017063219000000185,
+   "wall": 0.0173562830004812,
+   "store_s": 0.0011836069998025778,
+   "bytes": 9723,
+   "tv": 0.0,
+   "nrec": 504,
+   "evals": 26658,
+   "digest": "cfefdb3e5470d7b9"
+  },
+  {
+   "window": "769d6508_L256_059",
+   "cpu": 0.41988489399999995,
+   "wall": 0.45398417199976393,
+   "store_s": 0.02932812200015178,
+   "bytes": 551429,
+   "tv": 1.3259959098236304e-16,
+   "nrec": 34869,
+   "evals": 1368303,
+   "digest": "14319d3e9eff759f"
+  },
+  {
+   "window": "769d6508_L256_062",
+   "cpu": 0.027380415000000102,
+   "wall": 0.02754534399991826,
+   "store_s": 0.0016870949993972317,
+   "bytes": 23096,
+   "tv": 0.0,
+   "nrec": 1298,
+   "evals": 35992,
+   "digest": "f768e35ca566b4ce"
+  },
+  {
+   "window": "769d6508_L64_002",
+   "cpu": 0.14514258700000005,
+   "wall": 0.151713700000073,
+   "store_s": 0.02310474099977,
+   "bytes": 411960,
+   "tv": 2.376409449325513e-16,
+   "nrec": 24640,
+   "evals": 81934,
+   "digest": "e44ed8b5fc01bdbc"
+  },
+  {
+   "window": "769d6508_L64_012",
+   "cpu": 0.04379703299999971,
+   "wall": 0.04634364799949253,
+   "store_s": 0.0013976019999972777,
+   "bytes": 3659,
+   "tv": 0.0,
+   "nrec": 150,
+   "evals": 35443,
+   "digest": "a833232bccfde621"
+  },
+  {
+   "window": "769d6508_L64_019",
+   "cpu": 0.12374086099999992,
+   "wall": 0.12820457500038174,
+   "store_s": 0.012846466999690165,
+   "bytes": 200835,
+   "tv": 2.0496819640453414e-16,
+   "nrec": 11665,
+   "evals": 117106,
+   "digest": "197deb0cac4eb2b1"
+  },
+  {
+   "window": "769d6508_L64_029",
+   "cpu": 0.08322795300000019,
+   "wall": 0.08326439699976618,
+   "store_s": 0.0012389209996399586,
+   "bytes": 12126,
+   "tv": 7.702987961810311e-20,
+   "nrec": 645,
+   "evals": 146941,
+   "digest": "03dc30bd1cd0d1f8"
+  },
+  {
+   "window": "769d6508_L64_054",
+   "cpu": 0.12525350800000012,
+   "wall": 0.12562720899950364,
+   "store_s": 0.017053798999768333,
+   "bytes": 265771,
+   "tv": 2.267034584996531e-16,
+   "nrec": 15400,
+   "evals": 98030,
+   "digest": "af9391bb8c5b575c"
+  },
+  {
+   "window": "769d6508_L64_057",
+   "cpu": 0.14219112299999992,
+   "wall": 0.14219183700060967,
+   "store_s": 0.021806804000334523,
+   "bytes": 339488,
+   "tv": 2.1832842145979155e-15,
+   "nrec": 19799,
+   "evals": 24632,
+   "digest": "586774790d671150"
+  }
+ ],
+ "design": "P64 scene-level batch: one scene, a fixed proposal budget of informative source-excluded windows, all labels.\n\nDeclared design (docs/TARGET_V03_SOURCE_EXCLUDED.md):\n* scene: validation-split v0.1 geometry and its stored single source (the v0.3 source prior is the v0.1 driver rule);\n* proposals: per physical side Lp in {64, 128, 256} (side L = Lp*N/1024 on the N^3 receiver grid), M uniform origins\n  on the 128^3 lattice (o_N = o_128 * N/128), from a stream keyed by (seed, scene, Lp) only, so independent of the\n  source;\n* acceptance A_inf: the window has lit-FREE and dark-FREE receivers and the source lies outside the closed box\n  (N = 128: the float renderer of Phase-1 Stage A, windows with an undecided receiver are skipped and counted;\n  N = 1024: stored exact fields).  All accepted windows are kept (no quota), so lambda_W(s) does not depend on s and\n  the label is exactly Uniform(F_W) on this declared informative population (not the natural distribution);\n* labels: the exact engine (cpu: reference engine_p2; gpu: engine_g2 + GPU pass); records are cached per window.\nTiming is reported per stage: scene preprocessing, selection (proposal rendering), labelling, certification\n(TV bound, inside the engine), storage.\nUsage: p64_scene.py out_dir scene_id N M engine workers [seed]"
+}

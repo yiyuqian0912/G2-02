@@ -1,0 +1,902 @@
+{
+ "schema": "rind3d-loader-benchmarks-v0.3",
+ "machine": "RTX 3060 Laptop (6 GB), 16 CPU threads, NVMe; one process unless stated; cold = page cache dropped with posix_fadvise(DONTNEED)",
+ "field_side_producer_venv": {
+  "F1_v02_reader": {
+   "SB/L64": {
+    "cold": {
+     "windows_per_s": 133.5114288266049,
+     "scene_open_ms": 3.729221066593406,
+     "read_decode_ms": 3.76077442509389,
+     "returned_bytes_per_window": 524288.0
+    },
+    "warm": {
+     "windows_per_s": 164.09756319341008,
+     "scene_open_ms": 2.6001426083288,
+     "read_decode_ms": 3.4937931000361764,
+     "returned_bytes_per_window": 524288.0
+    },
+    "scene_local_windows_per_s": 280.4626637379364
+   },
+   "SB/L128": {
+    "cold": {
+     "windows_per_s": 55.79542193429037,
+     "scene_open_ms": 3.8478344917014815,
+     "read_decode_ms": 14.074782908301131,
+     "returned_bytes_per_window": 4194304.0
+    },
+    "warm": {
+     "windows_per_s": 59.62235913220746,
+     "scene_open_ms": 2.7156806915627385,
+     "read_decode_ms": 14.056550641695745,
+     "returned_bytes_per_window": 4194304.0
+    },
+    "scene_local_windows_per_s": 67.30307281999221
+   },
+   "SB/L256": {
+    "cold": {
+     "windows_per_s": 13.290853662136735,
+     "scene_open_ms": 3.954365458321263,
+     "read_decode_ms": 71.28534640825517,
+     "returned_bytes_per_window": 33554432.0
+    },
+    "warm": {
+     "windows_per_s": 13.5254464406931,
+     "scene_open_ms": 2.806852791657851,
+     "read_decode_ms": 71.12786014996952,
+     "returned_bytes_per_window": 33554432.0
+    },
+    "scene_local_windows_per_s": 13.87057543008384
+   },
+   "MA/L64": {
+    "cold": {
+     "windows_per_s": 227.430379173167,
+     "scene_open_ms": 2.0709497082407324,
+     "read_decode_ms": 2.32600026667266,
+     "returned_bytes_per_window": 2359296.0
+    },
+    "warm": {
+     "windows_per_s": 280.2865068151901,
+     "scene_open_ms": 1.4936753916723926,
+     "read_decode_ms": 2.0741024916181536,
+     "returned_bytes_per_window": 2359296.0
+    },
+    "scene_local_windows_per_s": 482.1614197141126
+   },
+   "MA/L128": {
+    "cold": {
+     "windows_per_s": 81.14639960112554,
+     "scene_open_ms": 2.276562191597501,
+     "read_decode_ms": 10.046843466761857,
+     "returned_bytes_per_window": 18874368.0
+    },
+    "warm": {
+     "windows_per_s": 88.69141410432344,
+     "scene_open_ms": 1.5575259498443,
+     "read_decode_ms": 9.717522600218823,
+     "returned_bytes_per_window": 18874368.0
+    },
+    "scene_local_windows_per_s": 103.73223543448252
+   },
+   "MA/L256": {
+    "cold": {
+     "windows_per_s": 14.7585724696915,
+     "scene_open_ms": 2.3826093500095644,
+     "read_decode_ms": 65.3746213749552,
+     "returned_bytes_per_window": 150994944.0
+    },
+    "warm": {
+     "windows_per_s": 15.127096123902,
+     "scene_open_ms": 1.7069150999456422,
+     "read_decode_ms": 64.39962589174684,
+     "returned_bytes_per_window": 150994944.0
+    },
+    "scene_local_windows_per_s": 15.52537898595892
+   }
+  },
+  "F2_reproduce_v02_C8": {
+   "composition": {
+    "single/L256": 46,
+    "single/L128": 55,
+    "multi/L128": 41,
+    "single/L64": 49,
+    "multi/L64": 33,
+    "multi/L256": 32
+   },
+   "workers0_cold": {
+    "windows": 256,
+    "seconds": 7.690231295000558,
+    "payload_bytes_through_IPC": 0,
+    "returned_bytes": 7483424768
+   },
+   "workers2_cold": {
+    "windows": 256,
+    "seconds": 9.806077342000208,
+    "payload_bytes_through_IPC": 7483424768,
+    "returned_bytes": 7483424768
+   },
+   "per_class_single_process": {
+    "single/L256": {
+     "n": 46,
+     "ms_mean": 74.00515330415224,
+     "bytes_mean": 33554432.0,
+     "seconds_total": 3.4042370519910037
+    },
+    "single/L128": {
+     "n": 55,
+     "ms_mean": 16.16747947274152,
+     "bytes_mean": 4194304.0,
+     "seconds_total": 0.8892113710007834
+    },
+    "multi/L128": {
+     "n": 41,
+     "ms_mean": 11.528671194998712,
+     "bytes_mean": 18874368.0,
+     "seconds_total": 0.4726755189949472
+    },
+    "single/L64": {
+     "n": 49,
+     "ms_mean": 6.154807285699407,
+     "bytes_mean": 524288.0,
+     "seconds_total": 0.3015855569992709
+    },
+    "multi/L64": {
+     "n": 33,
+     "ms_mean": 3.835547878803812,
+     "bytes_mean": 2359296.0,
+     "seconds_total": 0.1265730800005258
+    },
+    "multi/L256": {
+     "n": 32,
+     "ms_mean": 66.36365834378921,
+     "bytes_mean": 150994944.0,
+     "seconds_total": 2.1236370670012548
+    }
+   },
+   "torch": "2.15.0+cpu"
+  },
+  "F3_dynamic": {
+   "SB/L64/cold": {
+    "windows_per_s": 37.547784389871794,
+    "scene_open_ms": 23.186805300138076,
+    "counts_flags_ms": 0.16926646983847604,
+    "read_ms": 3.276658130052965,
+    "scenes_open": 66
+   },
+   "SB/L64/warm": {
+    "windows_per_s": 581.898647171355,
+    "scene_open_ms": 0.0024528599533368833,
+    "counts_flags_ms": 0.06875360006233677,
+    "read_ms": 1.6473058700285037,
+    "scenes_open": 66
+   },
+   "SB/L128/cold": {
+    "windows_per_s": 30.180837985534335,
+    "scene_open_ms": 20.455881159996352,
+    "counts_flags_ms": 0.3189890800786088,
+    "read_ms": 12.358735940088081,
+    "scenes_open": 61
+   },
+   "SB/L128/warm": {
+    "windows_per_s": 120.17188222887744,
+    "scene_open_ms": 0.0025743299738678616,
+    "counts_flags_ms": 0.0993953799479641,
+    "read_ms": 8.219444429996656,
+    "scenes_open": 61
+   },
+   "SB/L256/cold": {
+    "windows_per_s": 11.357002531978639,
+    "scene_open_ms": 20.918151489986485,
+    "counts_flags_ms": 1.1193515299237333,
+    "read_ms": 66.01389937999556,
+    "scenes_open": 63
+   },
+   "SB/L256/warm": {
+    "windows_per_s": 15.141090980657028,
+    "scene_open_ms": 0.002804889918479603,
+    "counts_flags_ms": 0.2293366301091737,
+    "read_ms": 65.81329743001334,
+    "scenes_open": 63
+   },
+   "MA/L64/cold": {
+    "windows_per_s": 13.7948805904321,
+    "scene_open_ms": 63.38106240998968,
+    "counts_flags_ms": 0.3933223999229085,
+    "read_ms": 8.716275290007616,
+    "scenes_open": 66
+   },
+   "MA/L64/warm": {
+    "windows_per_s": 186.86552252513715,
+    "scene_open_ms": 0.002629669997986639,
+    "counts_flags_ms": 0.1505187599650526,
+    "read_ms": 5.198293540106533,
+    "scenes_open": 66
+   },
+   "MA/L128/cold": {
+    "windows_per_s": 10.241345143164885,
+    "scene_open_ms": 57.44248194996544,
+    "counts_flags_ms": 1.0056190300201706,
+    "read_ms": 39.19532242005516,
+    "scenes_open": 61
+   },
+   "MA/L128/warm": {
+    "windows_per_s": 32.21608488938237,
+    "scene_open_ms": 0.0029125001128704753,
+    "counts_flags_ms": 0.2598016099000233,
+    "read_ms": 30.777680880055414,
+    "scenes_open": 61
+   },
+   "MA/L256/cold": {
+    "windows_per_s": 2.9563556051527398,
+    "scene_open_ms": 66.8984870400891,
+    "counts_flags_ms": 4.059055960042315,
+    "read_ms": 267.2967584300022,
+    "scenes_open": 63
+   },
+   "MA/L256/warm": {
+    "windows_per_s": 3.6089111900162414,
+    "scene_open_ms": 0.0027972298994427547,
+    "counts_flags_ms": 0.7915840100395144,
+    "read_ms": 276.29750252999656,
+    "scenes_open": 63
+   }
+  },
+  "seconds": 196.50227392399938
+ },
+ "student_canary": {
+  "export": "canary-v03",
+  "split": "train",
+  "samples": 45207,
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "cpu_count": 16,
+  "student_bytes": 655523225,
+  "B1_read_paths": {
+   "SB/L64": {
+    "cold": {
+     "windows": 150,
+     "read_ms": 0.11788305346271954,
+     "zstd_ms": 0.01237962004476382,
+     "cpu_unpack_ms": 0.05094161994444827,
+     "packed_path_windows_per_s": 7676.796223152534,
+     "unpacked_path_windows_per_s": 5518.633035399195,
+     "stored_bytes_per_window": 357.8666666666667,
+     "decoded_packed_bytes_per_window": 65536.0
+    },
+    "warm": {
+     "windows": 150,
+     "read_ms": 0.006082726540626027,
+     "zstd_ms": 0.012023480085190386,
+     "cpu_unpack_ms": 0.04280410663341172,
+     "packed_path_windows_per_s": 55229.680112794464,
+     "unpacked_path_windows_per_s": 16417.58097260313,
+     "stored_bytes_per_window": 357.8666666666667,
+     "decoded_packed_bytes_per_window": 65536.0
+    },
+    "cold_sequential_packed_windows_per_s": 54848.81838320886
+   },
+   "SB/L128": {
+    "cold": {
+     "windows": 150,
+     "read_ms": 0.17340706018633986,
+     "zstd_ms": 0.07779756665210395,
+     "cpu_unpack_ms": 3.369182126625674,
+     "packed_path_windows_per_s": 3980.818397278669,
+     "unpacked_path_windows_per_s": 276.21358382309944,
+     "stored_bytes_per_window": 2366.0266666666666,
+     "decoded_packed_bytes_per_window": 524288.0
+    },
+    "warm": {
+     "windows": 150,
+     "read_ms": 0.010647139885501625,
+     "zstd_ms": 0.07857376665924676,
+     "cpu_unpack_ms": 3.449630786878212,
+     "packed_path_windows_per_s": 11208.135388071338,
+     "unpacked_path_windows_per_s": 282.57753831801534,
+     "stored_bytes_per_window": 2366.0266666666666,
+     "decoded_packed_bytes_per_window": 524288.0
+    },
+    "cold_sequential_packed_windows_per_s": 18543.077795393096
+   },
+   "SB/L256": {
+    "cold": {
+     "windows": 150,
+     "read_ms": 0.357299199871098,
+     "zstd_ms": 1.0743627999909222,
+     "cpu_unpack_ms": 10.514549046638422,
+     "packed_path_windows_per_s": 698.488889204559,
+     "unpacked_path_windows_per_s": 83.7085496068599,
+     "stored_bytes_per_window": 16475.926666666666,
+     "decoded_packed_bytes_per_window": 4194304.0
+    },
+    "warm": {
+     "windows": 150,
+     "read_ms": 0.018754746755197022,
+     "zstd_ms": 1.0648051931881735,
+     "cpu_unpack_ms": 10.550446726629161,
+     "packed_path_windows_per_s": 922.8838785349176,
+     "unpacked_path_windows_per_s": 85.95491034685884,
+     "stored_bytes_per_window": 16475.926666666666,
+     "decoded_packed_bytes_per_window": 4194304.0
+    },
+    "cold_sequential_packed_windows_per_s": 3260.6795243324505
+   },
+   "MA/L64": {
+    "cold": {
+     "windows": 150,
+     "read_ms": 0.12323380018642638,
+     "zstd_ms": 0.013641933328472078,
+     "cpu_unpack_ms": 0.4600754799321294,
+     "packed_path_windows_per_s": 7305.896920663102,
+     "unpacked_path_windows_per_s": 1675.1787708506565,
+     "stored_bytes_per_window": 567.7466666666667,
+     "decoded_packed_bytes_per_window": 59871.62666666666
+    },
+    "warm": {
+     "windows": 150,
+     "read_ms": 0.006762973256021117,
+     "zstd_ms": 0.012691626640541168,
+     "cpu_unpack_ms": 0.45786432693906437,
+     "packed_path_windows_per_s": 51401.725315189055,
+     "unpacked_path_windows_per_s": 2095.03529773997,
+     "stored_bytes_per_window": 567.7466666666667,
+     "decoded_packed_bytes_per_window": 59871.62666666666
+    },
+    "cold_sequential_packed_windows_per_s": 48255.67010442482
+   },
+   "MA/L128": {
+    "cold": {
+     "windows": 150,
+     "read_ms": 0.22521752000708753,
+     "zstd_ms": 0.10050630667440903,
+     "cpu_unpack_ms": 4.117790313369672,
+     "packed_path_windows_per_s": 3070.0855082911476,
+     "unpacked_path_windows_per_s": 225.0471065201752,
+     "stored_bytes_per_window": 6314.08,
+     "decoded_packed_bytes_per_window": 618683.0933333334
+    },
+    "warm": {
+     "windows": 150,
+     "read_ms": 0.012164973280353783,
+     "zstd_ms": 0.09767776663162901,
+     "cpu_unpack_ms": 4.077534006816374,
+     "packed_path_windows_per_s": 9103.924399567073,
+     "unpacked_path_windows_per_s": 238.81299927963514,
+     "stored_bytes_per_window": 6314.08,
+     "decoded_packed_bytes_per_window": 618683.0933333334
+    },
+    "cold_sequential_packed_windows_per_s": 10366.520780400875
+   },
+   "MA/L256": {
+    "cold": {
+     "windows": 150,
+     "read_ms": 0.6311418667367737,
+     "zstd_ms": 1.4560614467336563,
+     "cpu_unpack_ms": 57.94660613331265,
+     "packed_path_windows_per_s": 479.1100098136977,
+     "unpacked_path_windows_per_s": 16.657280442722016,
+     "stored_bytes_per_window": 63158.45333333333,
+     "decoded_packed_bytes_per_window": 6557132.32
+    },
+    "warm": {
+     "windows": 150,
+     "read_ms": 0.029298580023654115,
+     "zstd_ms": 1.4350908066747554,
+     "cpu_unpack_ms": 57.960716633218304,
+     "packed_path_windows_per_s": 682.8784810128849,
+     "unpacked_path_windows_per_s": 16.827904348455743,
+     "stored_bytes_per_window": 63158.45333333333,
+     "decoded_packed_bytes_per_window": 6557132.32
+    },
+    "cold_sequential_packed_windows_per_s": 1364.8200845033757
+   }
+  },
+  "B2_dataloader": {
+   "bucketed_packed/workers0/cold": {
+    "windows": 13487,
+    "seconds": 12.126979551998375,
+    "windows_per_s": 1112.1483253245456,
+    "MB_per_s": 2579.488257968178
+   },
+   "bucketed_packed/workers0/warm": {
+    "windows": 13487,
+    "seconds": 9.574735781003255,
+    "windows_per_s": 1408.602838603533,
+    "MB_per_s": 3267.0772410309046
+   },
+   "bucketed_packed/workers4/cold": {
+    "windows": 13487,
+    "seconds": 31.92230764699707,
+    "windows_per_s": 422.49451853988137,
+    "MB_per_s": 979.9229336712016
+   },
+   "bucketed_packed/workers4/warm": {
+    "windows": 13487,
+    "seconds": 33.4019180389987,
+    "windows_per_s": 403.77920765667216,
+    "MB_per_s": 936.515122349475
+   },
+   "bucketed_packed/workers8/cold": {
+    "windows": 13487,
+    "seconds": 34.09109142700254,
+    "windows_per_s": 395.6165507014935,
+    "MB_per_s": 917.5828654820635
+   },
+   "bucketed_packed/workers8/warm": {
+    "windows": 13487,
+    "seconds": 34.07238161699934,
+    "windows_per_s": 395.83379147382783,
+    "MB_per_s": 918.0867281491451
+   },
+   "bucketed_packed_shm_tensors/workers2/cold": {
+    "windows": 13487,
+    "seconds": 16.80266648000179,
+    "windows_per_s": 802.6702199946639,
+    "MB_per_s": 1861.6926900400317
+   },
+   "bucketed_packed_shm_tensors/workers2/warm": {
+    "windows": 13487,
+    "seconds": 16.85121970399996,
+    "windows_per_s": 800.3574955941381,
+    "MB_per_s": 1856.3286164724777
+   },
+   "bucketed_packed_shm_tensors/workers4/cold": {
+    "windows": 13487,
+    "seconds": 14.937421747999906,
+    "windows_per_s": 902.9001274470867,
+    "MB_per_s": 2094.1633627763454
+   },
+   "bucketed_packed_shm_tensors/workers4/warm": {
+    "windows": 13487,
+    "seconds": 14.774988015000417,
+    "windows_per_s": 912.8264595752784,
+    "MB_per_s": 2117.1862425364625
+   },
+   "bucketed_packed_shm_tensors/workers8/cold": {
+    "windows": 13487,
+    "seconds": 14.224227242997586,
+    "windows_per_s": 948.1710162244129,
+    "MB_per_s": 2199.1634993317093
+   },
+   "bucketed_packed_shm_tensors/workers8/warm": {
+    "windows": 13487,
+    "seconds": 13.995229079002456,
+    "windows_per_s": 963.6855476867491,
+    "MB_per_s": 2235.147505083186
+   },
+   "mixed_unpacked/workers0/cold": {
+    "windows": 2000,
+    "seconds": 22.607139400999586,
+    "windows_per_s": 88.4676280587525,
+    "MB_per_s": 3337.233605976002
+   },
+   "mixed_unpacked/workers4/cold": {
+    "windows": 2000,
+    "seconds": 94.61407003600107,
+    "windows_per_s": 21.138505078990804,
+    "MB_per_s": 797.400485100078
+   },
+   "plan_windows": 13487
+  },
+  "B3_transfer": {
+   "SB/L64": {
+    "packed_to_gpu_input_ms": 4.1439159995206865,
+    "packed_to_gpu_input_ms_pinned": 1.6370771669850608,
+    "unpacked_fp16_cpu_convert_and_copy_ms": 54.574319333066036,
+    "packed_host_bytes": 2097152,
+    "unpacked_fp16_host_bytes": 33554432,
+    "lossless_roundtrip": true,
+    "batch": 32
+   },
+   "SB/L128": {
+    "packed_to_gpu_input_ms": 3.3636100003301785,
+    "packed_to_gpu_input_ms_pinned": 3.6198940003184057,
+    "unpacked_fp16_cpu_convert_and_copy_ms": 111.6123503337197,
+    "packed_host_bytes": 4194304,
+    "unpacked_fp16_host_bytes": 67108864,
+    "lossless_roundtrip": true,
+    "batch": 8
+   },
+   "SB/L256": {
+    "packed_to_gpu_input_ms": 6.901532999715225,
+    "packed_to_gpu_input_ms_pinned": 7.410073666809088,
+    "unpacked_fp16_cpu_convert_and_copy_ms": 222.79991183374173,
+    "packed_host_bytes": 8388608,
+    "unpacked_fp16_host_bytes": 134217728,
+    "lossless_roundtrip": true,
+    "batch": 2
+   },
+   "MA/L64": {
+    "packed_to_gpu_input_ms": 5.399587833380792,
+    "packed_to_gpu_input_ms_pinned": 4.31732133377712,
+    "unpacked_fp16_cpu_convert_and_copy_ms": 49.66495016681923,
+    "packed_host_bytes": 3149824,
+    "unpacked_fp16_host_bytes": 33554432,
+    "lossless_roundtrip": true,
+    "batch": 32
+   },
+   "MA/L128": {
+    "packed_to_gpu_input_ms": 9.076368000023649,
+    "packed_to_gpu_input_ms_pinned": 9.195622499949726,
+    "unpacked_fp16_cpu_convert_and_copy_ms": 103.00321166687354,
+    "packed_host_bytes": 6292480,
+    "unpacked_fp16_host_bytes": 67108864,
+    "lossless_roundtrip": true,
+    "batch": 8
+   },
+   "MA/L256": {
+    "packed_to_gpu_input_ms": 18.254332166785996,
+    "packed_to_gpu_input_ms_pinned": 18.223939499875996,
+    "unpacked_fp16_cpu_convert_and_copy_ms": 211.29461366702648,
+    "packed_host_bytes": 12583168,
+    "unpacked_fp16_host_bytes": 134217728,
+    "lossless_roundtrip": true,
+    "batch": 2
+   }
+  },
+  "B4_training": {
+   "SB/L64/gpu_resident": {
+    "batch": 32,
+    "step_ms": 111.51895350000511,
+    "windows_per_s": 286.9467386097605,
+    "peak_GPU_MiB": 2366.4052734375
+   },
+   "SB/L64/loader_fed_workers4_cold": {
+    "windows": 2848,
+    "seconds": 10.28303573499943,
+    "windows_per_s": 276.9610135950926
+   },
+   "SB/L128/gpu_resident": {
+    "batch": 8,
+    "step_ms": 31.545649933347402,
+    "windows_per_s": 253.60073470995678,
+    "peak_GPU_MiB": 669.64111328125
+   },
+   "SB/L128/loader_fed_workers4_cold": {
+    "windows": 712,
+    "seconds": 3.3152177250012755,
+    "windows_per_s": 214.76719149712136
+   },
+   "SB/L256/gpu_resident": {
+    "batch": 2,
+    "step_ms": 30.93981066667766,
+    "windows_per_s": 64.64163667795196,
+    "peak_GPU_MiB": 350.529296875
+   },
+   "SB/L256/loader_fed_workers4_cold": {
+    "windows": 178,
+    "seconds": 3.6292630530006136,
+    "windows_per_s": 49.045769733564114
+   },
+   "model_parameters": 863587,
+   "model": "stem conv3d(2 f^3 -> 32) on lossless space-to-depth 64^3 grid, 3 strided conv3d blocks (64,128,128) + GN + GELU, global mean, MLP(133->128->3); AdamW, AMP fp16, MSE on the true source (SB)"
+  },
+  "seconds": 420.6803482400028
+ },
+ "student_v01_1k": {
+  "export": "v01-sb-v03",
+  "split": "train",
+  "samples": 198412,
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+  "cpu_count": 16,
+  "student_bytes": 1542727186,
+  "B1_read_paths": {
+   "SB/L64": {
+    "cold": {
+     "windows": 150,
+     "read_ms": 0.13272344001355427,
+     "zstd_ms": 0.011926146520030064,
+     "cpu_unpack_ms": 0.049045626874431036,
+     "packed_path_windows_per_s": 6913.25861320608,
+     "unpacked_path_windows_per_s": 5162.750190906982,
+     "stored_bytes_per_window": 382.5466666666667,
+     "decoded_packed_bytes_per_window": 65536.0
+    },
+    "warm": {
+     "windows": 150,
+     "read_ms": 0.006866406814272826,
+     "zstd_ms": 0.011138286693797758,
+     "cpu_unpack_ms": 0.047581793332938105,
+     "packed_path_windows_per_s": 55541.07319581703,
+     "unpacked_path_windows_per_s": 15247.043227428043,
+     "stored_bytes_per_window": 382.5466666666667,
+     "decoded_packed_bytes_per_window": 65536.0
+    },
+    "cold_sequential_packed_windows_per_s": 53184.94498788702
+   },
+   "SB/L128": {
+    "cold": {
+     "windows": 150,
+     "read_ms": 0.19083771342896702,
+     "zstd_ms": 0.060492700091951214,
+     "cpu_unpack_ms": 3.5819340934055313,
+     "packed_path_windows_per_s": 3978.8260640281405,
+     "unpacked_path_windows_per_s": 260.8742491401435,
+     "stored_bytes_per_window": 2512.193333333333,
+     "decoded_packed_bytes_per_window": 524288.0
+    },
+    "warm": {
+     "windows": 150,
+     "read_ms": 0.010387346701463684,
+     "zstd_ms": 0.05583427320137465,
+     "cpu_unpack_ms": 3.4737949933575387,
+     "packed_path_windows_per_s": 15100.808489239915,
+     "unpacked_path_windows_per_s": 282.4845500029995,
+     "stored_bytes_per_window": 2512.193333333333,
+     "decoded_packed_bytes_per_window": 524288.0
+    },
+    "cold_sequential_packed_windows_per_s": 15387.863407312545
+   },
+   "SB/L256": {
+    "cold": {
+     "windows": 150,
+     "read_ms": 0.3539013201225316,
+     "zstd_ms": 1.0792526333534624,
+     "cpu_unpack_ms": 10.732300140031535,
+     "packed_path_windows_per_s": 697.7617426059387,
+     "unpacked_path_windows_per_s": 82.19997316283334,
+     "stored_bytes_per_window": 14224.753333333334,
+     "decoded_packed_bytes_per_window": 4194304.0
+    },
+    "warm": {
+     "windows": 150,
+     "read_ms": 0.019230219841119833,
+     "zstd_ms": 1.0623044668561004,
+     "cpu_unpack_ms": 10.546214913435202,
+     "packed_path_windows_per_s": 924.6120464742468,
+     "unpacked_path_windows_per_s": 86.00116397317427,
+     "stored_bytes_per_window": 14224.753333333334,
+     "decoded_packed_bytes_per_window": 4194304.0
+    },
+    "cold_sequential_packed_windows_per_s": 2885.8290975890045
+   }
+  },
+  "B2_dataloader": {
+   "bucketed_packed/workers0/cold": {
+    "windows": 13008,
+    "seconds": 6.894018297000002,
+    "windows_per_s": 1886.853129713995,
+    "MB_per_s": 3191.10753645277
+   },
+   "bucketed_packed/workers0/warm": {
+    "windows": 13008,
+    "seconds": 4.081697850997443,
+    "windows_per_s": 3186.909093925519,
+    "MB_per_s": 5389.804573266974
+   },
+   "bucketed_packed/workers4/cold": {
+    "windows": 13008,
+    "seconds": 22.601566710000043,
+    "windows_per_s": 575.5353231439758,
+    "MB_per_s": 973.3641046337871
+   },
+   "bucketed_packed/workers4/warm": {
+    "windows": 13008,
+    "seconds": 21.815148077999766,
+    "windows_per_s": 596.2829110070705,
+    "MB_per_s": 1008.4531017319201
+   },
+   "bucketed_packed/workers8/cold": {
+    "windows": 13008,
+    "seconds": 22.965253334001318,
+    "windows_per_s": 566.4209234191613,
+    "MB_per_s": 957.9495346314535
+   },
+   "bucketed_packed/workers8/warm": {
+    "windows": 13008,
+    "seconds": 23.67831006400229,
+    "windows_per_s": 549.3635299495393,
+    "MB_per_s": 929.1015146155015
+   },
+   "bucketed_packed_shm_tensors/workers2/cold": {
+    "windows": 13008,
+    "seconds": 11.531523042001936,
+    "windows_per_s": 1128.038330463392,
+    "MB_per_s": 1907.775205744267
+   },
+   "bucketed_packed_shm_tensors/workers2/warm": {
+    "windows": 13008,
+    "seconds": 11.425218838998262,
+    "windows_per_s": 1138.5339907537834,
+    "MB_per_s": 1925.5258086530334
+   },
+   "bucketed_packed_shm_tensors/workers4/cold": {
+    "windows": 13008,
+    "seconds": 10.15456167800221,
+    "windows_per_s": 1281.0006391688164,
+    "MB_per_s": 2166.470049776501
+   },
+   "bucketed_packed_shm_tensors/workers4/warm": {
+    "windows": 13008,
+    "seconds": 10.194907578999846,
+    "windows_per_s": 1275.931135147782,
+    "MB_per_s": 2157.896339277872
+   },
+   "bucketed_packed_shm_tensors/workers8/cold": {
+    "windows": 13008,
+    "seconds": 9.262471402998926,
+    "windows_per_s": 1404.3768055022958,
+    "MB_per_s": 2375.127845131826
+   },
+   "bucketed_packed_shm_tensors/workers8/warm": {
+    "windows": 13008,
+    "seconds": 9.343602871998883,
+    "windows_per_s": 1392.1824566177427,
+    "MB_per_s": 2354.5043646845
+   },
+   "mixed_unpacked/workers0/cold": {
+    "windows": 2000,
+    "seconds": 6.234236041997065,
+    "windows_per_s": 320.809155528754,
+    "MB_per_s": 4054.121699232879
+   },
+   "mixed_unpacked/workers4/cold": {
+    "windows": 2000,
+    "seconds": 32.46786552199774,
+    "windows_per_s": 61.59936810890612,
+    "MB_per_s": 778.4420444539552
+   },
+   "plan_windows": 13008
+  },
+  "B3_transfer": {
+   "SB/L64": {
+    "packed_to_gpu_input_ms": 5.866285333468113,
+    "packed_to_gpu_input_ms_pinned": 1.6463766666371764,
+    "unpacked_fp16_cpu_convert_and_copy_ms": 58.29625833333315,
+    "packed_host_bytes": 2097152,
+    "unpacked_fp16_host_bytes": 33554432,
+    "lossless_roundtrip": true,
+    "batch": 32
+   },
+   "SB/L128": {
+    "packed_to_gpu_input_ms": 3.3704070004508444,
+    "packed_to_gpu_input_ms_pinned": 3.6506758333416656,
+    "unpacked_fp16_cpu_convert_and_copy_ms": 115.71216533290378,
+    "packed_host_bytes": 4194304,
+    "unpacked_fp16_host_bytes": 67108864,
+    "lossless_roundtrip": true,
+    "batch": 8
+   },
+   "SB/L256": {
+    "packed_to_gpu_input_ms": 6.912045833208443,
+    "packed_to_gpu_input_ms_pinned": 7.618450666389738,
+    "unpacked_fp16_cpu_convert_and_copy_ms": 232.05996416678923,
+    "packed_host_bytes": 8388608,
+    "unpacked_fp16_host_bytes": 134217728,
+    "lossless_roundtrip": true,
+    "batch": 2
+   }
+  },
+  "B4_training": {
+   "SB/L64/gpu_resident": {
+    "batch": 32,
+    "step_ms": 111.72576743326015,
+    "windows_per_s": 286.4155757007025,
+    "peak_GPU_MiB": 2366.4052734375
+   },
+   "SB/L64/loader_fed_workers4_cold": {
+    "windows": 2848,
+    "seconds": 10.282030785001552,
+    "windows_per_s": 276.98808334190085
+   },
+   "SB/L128/gpu_resident": {
+    "batch": 8,
+    "step_ms": 31.63168779998766,
+    "windows_per_s": 252.91094331055965,
+    "peak_GPU_MiB": 670.5341796875
+   },
+   "SB/L128/loader_fed_workers4_cold": {
+    "windows": 712,
+    "seconds": 3.331167918000574,
+    "windows_per_s": 213.7388500149086
+   },
+   "SB/L256/gpu_resident": {
+    "batch": 2,
+    "step_ms": 31.09245046665213,
+    "windows_per_s": 64.32429641224574,
+    "peak_GPU_MiB": 350.529296875
+   },
+   "SB/L256/loader_fed_workers4_cold": {
+    "windows": 178,
+    "seconds": 3.6597839310015843,
+    "windows_per_s": 48.63675106395863
+   },
+   "model_parameters": 863587,
+   "model": "stem conv3d(2 f^3 -> 32) on lossless space-to-depth 64^3 grid, 3 strided conv3d blocks (64,128,128) + GN + GELU, global mean, MLP(133->128->3); AdamW, AMP fp16, MSE on the true source (SB)"
+  },
+  "seconds": 238.28306900900134
+ },
+ "blocksparse_canary": {
+  "SB/L128": {
+   "windows": 120,
+   "roundtrip_exact": true,
+   "dense_packed_zstd_bytes_median": 581.0,
+   "B8_mixed_block_fraction_median": 0.0086669921875,
+   "B8_mixed_block_fraction_p95": 0.12036132812499999,
+   "B8_zstd_bytes_median": 537.0,
+   "B8_zstd_bytes_p95": 3812.349999999999,
+   "B8_encode_ms_median": 13.073165000605513,
+   "B8_encode_ms_p95": 19.736020148775424,
+   "B8_decode_ms_median": 10.639987000104156,
+   "B8_decode_ms_p95": 15.756363952095853,
+   "B8_gpu_sparse_fp16_MiB_median": 0.0732421875,
+   "B8_gpu_sparse_fp16_MiB_p95": 0.9667968749999999,
+   "B8_gpu_dense_fp16_MiB": 8.0,
+   "B16_mixed_block_fraction_median": 0.0185546875,
+   "B16_mixed_block_fraction_p95": 0.25390625,
+   "B16_zstd_bytes_median": 519.5,
+   "B16_zstd_bytes_p95": 4366.049999999999,
+   "B16_encode_ms_median": 9.75729399942793,
+   "B16_encode_ms_p95": 15.946678999353024,
+   "B16_decode_ms_median": 6.313613001111662,
+   "B16_decode_ms_p95": 11.482220399011567,
+   "B16_gpu_sparse_fp16_MiB_median": 0.14892578125,
+   "B16_gpu_sparse_fp16_MiB_p95": 2.03173828125,
+   "B16_gpu_dense_fp16_MiB": 8.0,
+   "pool2_windows_losing_minority_receivers": 76,
+   "pool2_windows_losing_solid_voxels": 31,
+   "pool2_windows_all_minority_lost": 2,
+   "pool2_nonuniform_block_fraction_median": 0.001373291015625,
+   "pool4_windows_losing_minority_receivers": 76,
+   "pool4_windows_losing_solid_voxels": 31,
+   "pool4_windows_all_minority_lost": 10,
+   "pool4_nonuniform_block_fraction_median": 0.0039825439453125
+  },
+  "SB/L256": {
+   "windows": 120,
+   "roundtrip_exact": true,
+   "dense_packed_zstd_bytes_median": 9453.0,
+   "B8_mixed_block_fraction_median": 0.01763916015625,
+   "B8_mixed_block_fraction_p95": 0.10461273193359372,
+   "B8_zstd_bytes_median": 5513.0,
+   "B8_zstd_bytes_p95": 33507.44999999999,
+   "B8_encode_ms_median": 108.8577915015776,
+   "B8_encode_ms_p95": 145.38116269868624,
+   "B8_decode_ms_median": 86.26286400067329,
+   "B8_decode_ms_p95": 111.04973145083932,
+   "B8_gpu_sparse_fp16_MiB_median": 1.16015625,
+   "B8_gpu_sparse_fp16_MiB_p95": 6.726464843749998,
+   "B8_gpu_dense_fp16_MiB": 64.0,
+   "B16_mixed_block_fraction_median": 0.03759765625,
+   "B16_mixed_block_fraction_p95": 0.20938720703124997,
+   "B16_zstd_bytes_median": 6650.0,
+   "B16_zstd_bytes_p95": 34774.95,
+   "B16_encode_ms_median": 81.97173950065917,
+   "B16_encode_ms_p95": 113.35716729863633,
+   "B16_decode_ms_median": 58.76528800035885,
+   "B16_decode_ms_p95": 89.10215059986511,
+   "B16_gpu_sparse_fp16_MiB_median": 2.41015625,
+   "B16_gpu_sparse_fp16_MiB_p95": 13.404687499999998,
+   "B16_gpu_dense_fp16_MiB": 64.0,
+   "pool2_windows_losing_minority_receivers": 96,
+   "pool2_windows_losing_solid_voxels": 73,
+   "pool2_windows_all_minority_lost": 2,
+   "pool2_nonuniform_block_fraction_median": 0.002637147903442383,
+   "pool4_windows_losing_minority_receivers": 97,
+   "pool4_windows_losing_solid_voxels": 73,
+   "pool4_windows_all_minority_lost": 8,
+   "pool4_nonuniform_block_fraction_median": 0.007740020751953125
+  }
+ },
+ "teacher_call_costs": {
+  "legality_ms_per_candidate": 0.07508418752877333,
+  "point_pairs_per_s_16_threads": 3127461.224589867,
+  "full_mismatch_L64_cpu_native_certified_s_per_candidate": 0.0010968633335626994,
+  "full_mismatch_L64_cuda_certified_s_per_candidate": 0.012903131667068616,
+  "sampled_mismatch_k256_L64_ms_per_candidate": 0.662736375034001,
+  "full_mismatch_L128_cpu_native_certified_s_per_candidate": 0.1364573963340566,
+  "full_mismatch_L128_cuda_certified_s_per_candidate": 0.01779758933359214,
+  "sampled_mismatch_k256_L128_ms_per_candidate": 0.7506233123422135,
+  "full_mismatch_L256_cpu_native_certified_s_per_candidate": 1.3519938013329618,
+  "full_mismatch_L256_cuda_certified_s_per_candidate": 0.08202843399946384,
+  "sampled_mismatch_k256_L256_ms_per_candidate": 0.7935191874821612,
+  "phase3_full_cost_L128_cpu_s": 0.07389632600097684,
+  "phase3_sparse_cost_k256_ms_per_candidate": 0.8825454999623616
+ },
+ "explanation_of_v02_numbers": {
+  "156_SB_L64_per_s": "v0.2 ProductionDataset, one process, random cross-scene SB L64 windows: ~4 ms per window of which ~3.7 ms is opening the scene (RINDPack headers + windows.npy; LRU 8 of 216 scenes always misses) and ~3.8 ms read+unpack. Re-measured: 134/s cold, 164/s warm, 281/s when consecutive windows share a scene (F1).",
+  "10.64_s_for_256_windows": "the 2-worker DataLoader pass draws 256 NATURAL windows of all sides and BOTH profiles (composition in F2). One third are L256; an SB L256 window returns 33.5 MB of unpacked bool (response + SOLID) and an MA L256 window 151 MB (float64 response + SOLID). The pass returns 7.5 GB, which 2 workers must pickle through IPC: 9.8 s with 2 workers vs 7.7 s single-process (F2). It is dominated by L256 decode and IPC volume, not by the small-window rate: the two numbers measure different things and are consistent.",
+  "fix": "v0.3 student shards keep payloads packed and compressed in sharded files (one pread per payload, no per-scene opens), ship packed bits through the DataLoader and unpack on the GPU"
+ }
+}
