@@ -108,9 +108,15 @@ def run_task(t, engine, **kw):
     return meta
 
 
-def scene_label_summary(scene_dir, include_uninformative=False):
-    """Collect task metadata into labels/LABELS.json; returns coverage counts."""
+def scene_label_summary(scene_dir, include_uninformative=False, failures=None):
+    """Collect task metadata into labels/LABELS.json; returns coverage counts.
+
+    `failures` maps (scene, window, source) to the supervisor's failure records (scripts/run_labels.py). A task without
+    a label file but with a failure record reports status "engine_failure" (worker crash) or "timeout"; otherwise it
+    reports "unavailable". No label is ever synthesised for a failed task."""
     S = SceneObs(scene_dir)
+    failures = failures or {}
+    name = Path(scene_dir).name
     rows, missing = [], []
     for r in S.W:
         for j in range(int(r["k"])):
@@ -120,8 +126,14 @@ def scene_label_summary(scene_dir, include_uninformative=False):
                 with np.load(p) as z:
                     rows.append(json.loads(str(z["meta"])))
             else:
-                rows.append(dict(window=int(r["window"]), source=j, L=int(r["L"]), informative=inf,
-                                 status="unavailable"))
+                fr = failures.get((name, int(r["window"]), j))
+                row = dict(window=int(r["window"]), source=j, L=int(r["L"]), informative=inf,
+                           status="unavailable" if inf else "not_computed")
+                if fr:
+                    row.update(status="timeout" if fr[-1]["kind"] == "timeout" else "engine_failure",
+                               failures=[dict((kk, f.get(kk)) for kk in ("kind", "exitcode", "wall", "limit", "engine",
+                                                                         "time")) for f in fr])
+                rows.append(row)
                 if inf or include_uninformative:
                     missing.append((int(r["window"]), j))
     cov = {}
@@ -133,3 +145,72 @@ def scene_label_summary(scene_dir, include_uninformative=False):
     tmp.write_text(json.dumps(dict(coverage=cov, labels=rows), indent=0))
     os.replace(tmp, Path(scene_dir) / "labels" / "LABELS.json")
     return cov, missing
+
+
+def supervised_task(t, engine, kw):
+    """Worker entry for rind3d_1k.supervise (scripts/run_labels.py). kw = {"all": {...}, "gpu": {...}}.
+    Python exceptions are returned as an error record; native faults are handled by the supervisor."""
+    fi = os.environ.get("RIND3D_FAULT_INJECT")          # test hook only: "<scene>:<window>:<source>:abort|hang"
+    if fi and fi.rsplit(":", 1)[0] == f"{Path(t[0]).name}:{t[1]}:{t[2]}":
+        if fi.endswith(":abort"):
+            os.abort()
+        time.sleep(1e9)
+    try:
+        a = dict(kw.get("all", {}))
+        if engine == "gpu":
+            m = run_task(t, engine, gpu_min=1024, gpu_prefix=64, **a, **kw.get("gpu", {}))
+        else:
+            m = run_task(t, engine, **a)
+        m["scene"] = Path(t[0]).name
+        return m
+    except Exception as e:
+        import traceback
+        return dict(scene=Path(t[0]).name, window=t[1], source=t[2], error=repr(e)[:400],
+                    trace=traceback.format_exc()[-1200:])
+
+
+def load_failures(root):
+    """{(scene, window, source): [failure records]} from <root>/labels_failures.jsonl (written by the supervisor)."""
+    out = {}
+    p = Path(root) / "labels_failures.jsonl"
+    if p.exists():
+        for line in open(p):
+            r = json.loads(line)
+            out.setdefault((r["scene"], int(r["window"]), int(r["source"])), []).append(r)
+    return out
+
+
+def retry_task(p, engine="cpu", kw=None):
+    """Tier-2 recomputation of one stored label (scripts/retry_uncertified.py); keeps the better certificate."""
+    from rind3d_posterior import label_window, ENGINE_VERSION
+    p = Path(p)
+    with np.load(p) as z:
+        old = json.loads(str(z["meta"])); old_tv = float(z["tv_bound"])
+    scene_dir = p.parent.parent.parent
+    S = SceneObs(scene_dir)
+    w, s = old["window"], old["source"]
+    t0 = time.perf_counter(); c0 = time.process_time()
+    r = label_window(S.P, S.K, S.cls(w, s), S.origin(w), int(S.scene["resolution"]), engine="cpu",
+                     nq_cap=1 << 26, ne_cap=1 << 27)
+    tv = float(r["tv_bound"])
+    rec = dict(tier=2, tv_bound=tv, wall=time.perf_counter() - t0, cpu=time.process_time() - c0,
+               overflow=int(r["stats"]["overflow"]), undet=int(r["stats"]["undet"]))
+    if tv < old_tv:
+        meta = dict(old, tv_bound=tv, status=STATUS_CERT if tv <= 0.05 else (STATUS_LOOSE if tv <= 0.10 else STATUS_UNCERT),
+                    tier=2, tier1=dict(tv_bound=old_tv, status=old["status"]), engine="cpu", engine_version=ENGINE_VERSION,
+                    params=dict(nq_cap=1 << 26, ne_cap=1 << 27), n_records=int(len(r["cell"])))
+        tmp = p.with_name(p.stem + f".tmp{os.getpid()}.npz")
+        np.savez_compressed(tmp, cell=np.asarray(r["cell"], np.int32), lo=r["lo"], hi=r["hi"],
+                            kind=np.asarray(r["kind"], np.int8), tv_bound=tv, meta=json.dumps(meta))
+        os.replace(tmp, p)
+        rec["replaced"] = True
+    else:
+        meta = dict(old, tier2_attempt=rec)
+        tmp = p.with_name(p.stem + f".tmp{os.getpid()}.npz")
+        with np.load(p) as z:
+            np.savez_compressed(tmp, cell=z["cell"], lo=z["lo"], hi=z["hi"], kind=z["kind"], tv_bound=z["tv_bound"],
+                                meta=json.dumps(meta))
+        os.replace(tmp, p)
+        rec["replaced"] = False
+    rec.update(scene=scene_dir.name, window=w, source=s, old_tv=old_tv)
+    return rec
