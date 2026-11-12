@@ -63,6 +63,7 @@ def main():
     ap.add_argument("--retry-failed", action="store_true"); ap.add_argument("--max-hours", type=float)
     ap.add_argument("--stop-grace", type=float); ap.add_argument("--phys-timeout", type=float)
     ap.add_argument("--prior-manifest"); ap.add_argument("--epoch-scenes", type=int); ap.add_argument("--progress-s", type=float)
+    ap.add_argument("--label-sample", help="benchmark only: n64,n128,n256,seed stratified sample of label tasks")
     a = ap.parse_args()
     conf = json.loads(Path(a.config).read_text()) if a.config else {}
     contract = json.loads(Path(conf.get("contract", a.contract)).read_text())
@@ -80,7 +81,8 @@ def main():
              retry_failed=a.retry_failed or conf.get("retry_failed", False), max_hours=a.max_hours or conf.get("max_hours", 1e9),
              stop_grace=a.stop_grace or conf.get("stop_grace", 600), phys_timeout=a.phys_timeout or conf.get("phys_timeout", 1800),
              prior_manifest=a.prior_manifest or conf.get("prior_manifest"), progress_s=a.progress_s or conf.get("progress_s", 30),
-             label_slots=parse_range(a.label_slots or conf.get("label_slots"), None))
+             label_slots=parse_range(a.label_slots or conf.get("label_slots"), None),
+             label_sample=[int(x) for x in a.label_sample.split(",")] if a.label_sample else None)
     default_env(a.root)
     from rind3d_100k.coordinator import Coordinator
     sys.exit(Coordinator(a.root, contract, o).run())

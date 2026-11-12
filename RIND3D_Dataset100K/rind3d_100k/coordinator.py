@@ -269,6 +269,18 @@ class Coordinator:
                 r = self.accepted(slot)
                 if r is not None:
                     self.enqueue_labels(r)
+        if o.get("label_sample"):
+            # benchmarking only: a stratified random sample of the queued tasks (n per side), seeded
+            n64, n128, n256, seed = o["label_sample"]
+            rng = np.random.default_rng(seed); keep = []
+            allt = list(self.lq_heavy) + list(self.lq_light)
+            for L, n in ((64, n64), (128, n128), (256, n256)):
+                pool_L = [t for t in allt if t[4] == L]
+                keep += [pool_L[i] for i in sorted(rng.choice(len(pool_L), size=min(n, len(pool_L)), replace=False))]
+            self.lq_heavy = deque(t for t in keep if t[4] >= 256); self.lq_light = deque(t for t in keep if t[4] < 256)
+            ks = {task_key(t[1], t[2], t[3]) for t in keep}
+            self.queued = ks; self.scene_tasks = {}
+            self.log(dict(event="label_sample", n=len(keep)))
         inflight_phys = set(); last_prog = 0.0; deadline = time.time() + float(o.get("max_hours", 1e9)) * 3600
         phys_lim = float(o.get("phys_timeout", 1800)); lim = {int(k): float(v) for k, v in cfg["labels"]["timeouts_s"].items()}
         try:
