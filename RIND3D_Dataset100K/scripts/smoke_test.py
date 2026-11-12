@@ -90,7 +90,7 @@ def s_physical():
             z = np.load(io.BytesIO(payload)); blob = z["obs"].tobytes(); dz = zstandard.ZstdDecompressor()
             crops = {f"{int(a)}:{int(b)}": hashlib.sha256(dz.decompress(blob[int(c):int(c) + int(n)])).hexdigest()[:16]
                      for a, b, c, n in z["obs_index"]}
-            d.update(windows=z["windows"].tolist() == ref["windows"], crops=crops == ref["crops"],
+            d.update(windows=[list(x) for x in z["windows"].tolist()] == [list(x) for x in ref["windows"]], crops=crops == ref["crops"],
                      lam=rec["Lambda_hat"] == ref["Lambda_hat"], seconds=rec["timing"]["total"])
         d["ok"] = all(v for k, v in d.items() if k not in ("slot", "seconds"))
         res.append(d)
