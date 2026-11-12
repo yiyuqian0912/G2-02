@@ -97,15 +97,20 @@ python RIND3D_Dataset100K/scripts/report.py /data/r3d_canary
 python RIND3D_Dataset100K/scripts/verify_root.py /data/r3d_canary --labels
 
 # 7. projection (go / no-go input)
-python - <<'EOF'   # export the canary's label metas for the estimator
+python - <<'EOF'   # export the canary's WARM label metas (each worker's first task includes the one-time JIT compile)
 import sys, json; sys.path[:0]=["RIND3D_Dataset100K"]
 from rind3d_100k.storage import journal_index, read_record, decode_payload
-with open("canary_label_costs.jsonl","w") as f:
-    for k, loc in journal_index("/data/r3d_canary").items():
-        m = decode_payload(read_record(loc)[1])["meta"]; f.write(json.dumps(dict(L=m["L"], cpu=m["cpu"], wall=m["wall"], status=m["status"]))+"\n")
+ms = [decode_payload(read_record(loc)[1])["meta"] for k, loc in sorted(journal_index("/data/r3d_canary").items(), key=lambda kv: kv[1][1])]
+first = {}
+for m in ms: first.setdefault(m["pid"], m["key"])
+with open("canary_label_costs.jsonl", "w") as f:
+    for m in ms:
+        if m["key"] not in first.values():
+            f.write(json.dumps(dict(L=m["L"], cpu=m["cpu"], wall=m["wall"], status=m["status"])) + "\n")
 EOF
+# N = label workers in the canary label run (see its "start" event in logs/progress.jsonl)
 python RIND3D_Dataset100K/scripts/estimate.py --report /data/r3d_canary/REPORT.json --cost-samples canary_label_costs.jsonl \
-       --label-bench /local_scratch/r3d_scaling/labels_G16.json --scaling /local_scratch/r3d_scaling/SCALING.json --out ESTIMATE.json
+       --workers N --scaling /local_scratch/r3d_scaling/SCALING.json --out ESTIMATE.json
 ```
 
 **Do not start production until** `docs/GO_NO_GO_100K.md` has been updated with ESTIMATE.json and the decision has been

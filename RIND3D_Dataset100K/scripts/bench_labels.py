@@ -70,13 +70,15 @@ def main():
     # heavy first, so tails overlap with the rest
     tasks = sorted([n for n in names for _ in range(a.repeat)], key=lambda n: -idx[n]["ref_cpu_s"])
     heavy = deque(t for t in tasks if idx[t]["L"] >= 256); light = deque(t for t in tasks if idx[t]["L"] < 256)
-    # warm the numba / cupy caches once (single process) so concurrent first-compiles do not pollute the timing
-    wp = WorkerPool(mp.get_context("spawn"), [dict(specs[0], name="warm")] if specs else [], sys_path=sys.path[:3])
-    if specs:
+    # warm the numba / cupy on-disk caches once per engine (one process each, sequentially) so that concurrent
+    # first-compiles in fresh workers do not pollute the timing (each engine compiles in ~40-60 s)
+    for eng in sorted({sp["engine"] for sp in specs}):
+        sp0 = next(sp for sp in specs if sp["engine"] == eng)
+        wp = WorkerPool(mp.get_context("spawn"), [dict(sp0, name=f"warm-{eng}")], sys_path=sys.path[:3])
         wp.submit(wp.slots[0], SMOKE[0], 3600)
         while not wp.poll(1.0):
             pass
-    wp.shutdown(grace=5)
+        wp.shutdown(grace=5)
     pool = WorkerPool(mp.get_context("spawn"), specs, sys_path=sys.path[:3], rss_limit_bytes=a.rss_gb * 2 ** 30)
     stop = threading.Event(); samples = []
     th = threading.Thread(target=sampler, args=(stop, samples), daemon=True); th.start()

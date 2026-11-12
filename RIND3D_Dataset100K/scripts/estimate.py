@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """100K production projection from measurements (never from hardware ratios alone).
 
-  estimate.py --report REPORT.json [--label-bench bench_labels.json] [--scaling SCALING.json] \
-              [--n-scenes 100000] [--labels-per-scene auto] [--machine-labels-per-s X] [--machine-scenes-per-h Y]
+  estimate.py --report REPORT.json --cost-samples costs.jsonl --workers N [--scaling SCALING.json] [--n-scenes 100000]
+  (preferred on the server: costs.jsonl from the server canary's label sample, N = its label worker count)
 
 **Inputs:**
 * `--report`: a canary root's report.py output. It gives the per-side label costs (CPU-s; the cost distribution of
@@ -35,6 +35,9 @@ def main():
     ap.add_argument("--machine-labels-per-s", type=float); ap.add_argument("--machine-scenes-per-h", type=float)
     ap.add_argument("--cost-samples", help="jsonl of label metas (L, cpu) to use instead of the report's summary")
     ap.add_argument("--gpus", type=int, default=16); ap.add_argument("--cpus", type=int)
+    ap.add_argument("--workers", type=int, help="label workers of the production layout: steady-state throughput = "
+                    "workers x utilisation / mean wall per label (wall from --cost-samples, measured on the target machine)")
+    ap.add_argument("--utilisation", type=float, default=0.9)
     ap.add_argument("--boot", type=int, default=2000); ap.add_argument("--out")
     a = ap.parse_args()
     rep = json.loads(Path(a.report).read_text())
@@ -66,6 +69,15 @@ def main():
                                  p99=float(np.percentile(v, 99)), max=float(v.max())) for L, v in by_side.items()},
                total_label_cost_ref_core_h=n_labels * mean_cost / 3600)
     thr = a.machine_labels_per_s
+    walls = {}
+    for line in Path(a.cost_samples).read_text().splitlines():
+        m = json.loads(line)
+        if "wall" in m:
+            walls.setdefault(str(m["L"]), []).append(m["wall"])
+    if a.workers and walls:
+        mean_wall = sum(share[L] * float(np.mean(walls[L])) for L in walls)
+        thr = a.workers * a.utilisation / mean_wall
+        out["steady_state"] = dict(workers=a.workers, utilisation=a.utilisation, mean_wall_s=mean_wall)
     if a.label_bench:
         b = json.loads(Path(a.label_bench).read_text())
         fx = {d["name"]: d for d in json.loads((HERE / "handoff" / "fixtures" / "labels" / "INDEX.json").read_text())}

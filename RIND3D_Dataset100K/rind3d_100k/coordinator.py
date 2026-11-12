@@ -257,6 +257,18 @@ class Coordinator:
                       slots=[self.a, self.b], options={k: v for k, v in o.items() if k != "prior_manifest"})
         self.log(dict(event="start", **layout))
         sys_path = [str(HERE), str(HERE.parent / "RIND3D_Dataset1K"), str(HERE.parent / "RIND3D_Posterior" / "src")]
+        # compile each label engine once (sequentially, one process) so fresh workers load the on-disk numba cache
+        # instead of all compiling at once
+        for eng in sorted({sp["engine"] for sp in specs if sp["kind"] == "label"}):
+            sp0 = next(sp for sp in specs if sp["kind"] == "label" and sp["engine"] == eng)
+            wp = WorkerPool(mp.get_context("spawn"), [dict(sp0, name=f"warm-{eng}", fn="rind3d_100k.worker:warmup_task")],
+                            sys_path=sys_path)
+            wp.submit(wp.slots[0], {}, 1800)
+            ev = []
+            while not ev:
+                ev = wp.poll(1.0)
+            wp.shutdown(grace=5)
+            self.log(dict(event="warmup", engine=eng, result=ev[0][3] if ev[0][2] == "result" else ev[0][2]))
         pool = WorkerPool(mp.get_context("spawn"), specs, sys_path=sys_path, nice=int(o.get("nice", 0)),
                           rss_limit_bytes=float(o["rss_gb"]) * 2 ** 30 if o.get("rss_gb") else None)
         journal = Journal(self.root, f"{socket.gethostname()}-{os.getpid()}-{int(time.time())}")
