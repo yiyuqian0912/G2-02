@@ -11,7 +11,7 @@ CELLS = 1 << E.CELL_DEPTH
 
 
 def run_window(geom, win: Window, d1=5, max_tests=640, n_boundary=512, n_class=64, n_learn=32, max_nodes_cell=2_000_000, max_nodes_total=5_000_000,
-               max_depth=400, max_pass=24, tau_first=True, dual=True, rho=2.0, use_wmode=True, shell_eps=2.0 ** -26, max_records=1 << 22, max_vertices=1 << 23, sentinel_seed=0):
+               max_depth=400, max_pass=24, tau_first=True, dual=True, rho=2.0, use_wmode=True, shell_eps=2.0 ** -26, max_records=1 << 22, ne_cap=1 << 25, nq_cap=1 << 24, max_vertices=1 << 23, sentinel_seed=0):
     assert 0 <= d1 <= E.CELL_DEPTH
     P, K, clo, chi, adj, aoff = geom.tup()
     o = win.origin
@@ -42,7 +42,7 @@ def run_window(geom, win: Window, d1=5, max_tests=640, n_boundary=512, n_class=6
     face_by_comp = np.zeros(geom.C, np.int64)
     face_surv = np.zeros(geom.C, np.int64)
     nrec = E.stage2(P, K, clo, chi, adj, aoff, o, float(win.N), win.L, codes, kls, roots, ncand,
-                    max_nodes_cell, max_nodes_total, max_depth, max_pass, tau_first, dual, rho, wmode, wfront, shell_eps, rec_cell, rec_lo, rec_hi, rec_kind, rec_voff, rec_vn, vpool, vtop, stats, cell_nodes, cell_evals, face_by_comp, face_surv, dep_evals, dep_nodes)
+                    max_nodes_cell, max_nodes_total, max_depth, max_pass, tau_first, dual, rho, wmode, wfront, shell_eps, rec_cell, rec_lo, rec_hi, rec_kind, rec_voff, rec_vn, vpool, vtop, stats, cell_nodes, cell_evals, face_by_comp, face_surv, dep_evals, dep_nodes, ne_cap, nq_cap)
     t2 = time.perf_counter()
     res = dict(cell=rec_cell[:nrec].copy(), lo=rec_lo[:nrec].copy(), hi=rec_hi[:nrec].copy(),
                kind=rec_kind[:nrec].copy(), voff=rec_voff[:nrec].copy(), vn=rec_vn[:nrec].copy(),

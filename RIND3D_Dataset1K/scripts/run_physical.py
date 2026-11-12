@@ -6,7 +6,8 @@ import sys, json, time, traceback
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from rind3d.rendering.backends import BackendFactory
-from rind3d_1k.physical import run_scene
+from rind3d_1k.physical import run_scene, _rng
+from rind3d_1k.controller import Controller
 
 
 def main():
@@ -21,11 +22,37 @@ def main():
             if r["status"] in ("accepted",) or r.get("final"):
                 done.add(r["slot"])
     fac = BackendFactory()
+    ctl = None
+    if cfg.get("controller"):
+        # deterministic controller state: prior from independent canary manifests, then every accepted release scene in
+        # slot order (only scenes BEFORE the current slot are ever used)
+        ctl = Controller()
+        for pm in cfg.get("controller_prior_manifests", []):
+            for l in Path(pm).read_text().splitlines():
+                r = json.loads(l)
+                if r["status"] == "accepted":
+                    for s_ in r["sides"]:
+                        ctl.nA[int(s_["Lp"])][r["k"]] += __import__("numpy").asarray(s_["rate_m"][:r["k"]], float)
+                        ctl.rate[int(s_["Lp"])][r["k"]][0] += s_["rate_A"]; ctl.rate[int(s_["Lp"])][r["k"]][1] += 1024
+        if man.exists():
+            acc = sorted((json.loads(l) for l in man.read_text().splitlines()), key=lambda r: r["slot"])
+            for r in acc:
+                if r["status"] == "accepted" and r["slot"] < a:
+                    ctl.update(r)
     for slot in range(a, b):
         if slot in done:
+            if ctl is not None:
+                for l in man.read_text().splitlines():
+                    r = json.loads(l)
+                    if r["slot"] == slot and r["status"] == "accepted":
+                        ctl.update(r)
             continue
-        k = cfg["k_cycle"][slot % len(cfg["k_cycle"])] if "k_cycle" in cfg else cfg["k_of_slot"][str(slot)]
-        c_table = cfg["c_table"]
+        if ctl is not None:
+            u = float(_rng(cfg["seed"], slot, 56000, 0).random())
+            k, c_table, plan = ctl.choose(u=u, floor=cfg.get("k_floor", 0.15))
+        else:
+            k = cfg["k_cycle"][slot % len(cfg["k_cycle"])] if "k_cycle" in cfg else cfg["k_of_slot"][str(slot)]
+            c_table = cfg["c_table"]; plan = None
         for attempt in range(cfg.get("max_attempts", 3)):
             t = time.perf_counter()
             try:
@@ -34,11 +61,16 @@ def main():
                 rec = dict(slot=slot, attempt=attempt, status="failed", error=repr(e)[:500],
                            trace=traceback.format_exc()[-1500:])
             rec["wall"] = time.perf_counter() - t
+            if plan is not None:
+                rec["controller_plan"] = plan; rec["c_table"] = c_table; rec["k_chosen"] = k
             rec["final"] = rec["status"] == "accepted" or attempt == cfg.get("max_attempts", 3) - 1
             with open(man, "a") as f:
                 f.write(json.dumps(rec) + "\n")
             print(json.dumps({kk: rec.get(kk) for kk in ("slot", "attempt", "status", "reason", "k", "family", "m_hist", "wall", "error")}), flush=True)
             if rec["status"] == "accepted":
+                if ctl is not None:
+                    ctl.update(rec)
+                    (root / "controller_state.json").write_text(json.dumps(dict(after_slot=slot, **ctl.state())))
                 break
 
 

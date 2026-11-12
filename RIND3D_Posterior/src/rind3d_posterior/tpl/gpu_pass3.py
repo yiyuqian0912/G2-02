@@ -520,6 +520,7 @@ def _pack(nuf, nfrc, nsil, uf, silfi, silbi, mult, tlo, thi, Rlo, Rhi, ci, cd):
 class GpuPass3:
     def __init__(self, P, K, clo, chi, o, N, NQ, block=128, f32=False, cap=1 << 22):
         self.cap_entries = int(cap); self.capfb = 0
+        self.stream = cp.cuda.Stream(non_blocking=True)
         self.f32 = f32
         u = 2.0 ** -24
         Pd = np.ascontiguousarray(P, np.float64)
@@ -587,6 +588,12 @@ class GpuPass3:
     def run(self, i, nq, ns, Wc, Wk, Wm, Wa, Qc, Qk, Qm, Qa, relmask, Xmask, dual, rho, Rlo, Rhi, nuf, nfrc, uf,
             nsil, silfi, silbi, tlo, thi, mult, Unew, Lnew):
         """Returns (i, nq, ns, out, anc, overflow, processed, comp_evals, amb_evals, expansions, guards, fallback)."""
+        with self.stream:
+            return self._run(i, nq, ns, Wc, Wk, Wm, Wa, Qc, Qk, Qm, Qa, relmask, Xmask, dual, rho, Rlo, Rhi, nuf, nfrc, uf,
+                             nsil, silfi, silbi, tlo, thi, mult, Unew, Lnew)
+
+    def _run(self, i, nq, ns, Wc, Wk, Wm, Wa, Qc, Qk, Qm, Qa, relmask, Xmask, dual, rho, Rlo, Rhi, nuf, nfrc, uf,
+             nsil, silfi, silbi, tlo, thi, mult, Unew, Lnew):
         pr = self.profile
         T0 = time.perf_counter()
         C, kmax = self.C, self.kmax

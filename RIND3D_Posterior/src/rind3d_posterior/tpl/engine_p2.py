@@ -573,7 +573,7 @@ def emit_region(p, kind, SV, SFc, SFn, Snv, Snf, scr0, Vr, rec_cell, rec_lo, rec
 @njit(cache=True)
 def stage2(P, K, clo, chi, adj, aoff, o, N, L, items_code, items_cls, roots, nroots,
            max_nodes_cell, max_nodes_total, max_depth, max_pass, tau_first, dual, rho, wmode, wfront, shell_eps,
-           rec_cell, rec_lo, rec_hi, rec_kind, rec_voff, rec_vn, vpool, vtop, stats, cell_nodes, cell_evals, face_by_comp, face_surv, dep_evals, dep_nodes):
+           rec_cell, rec_lo, rec_hi, rec_kind, rec_voff, rec_vn, vpool, vtop, stats, cell_nodes, cell_evals, face_by_comp, face_surv, dep_evals, dep_nodes, ne_cap=1 << 25, nq_cap=1 << 24):
     C = P.shape[0]
     kmax = P.shape[1]
     emax = 1
@@ -591,9 +591,9 @@ def stage2(P, K, clo, chi, adj, aoff, o, N, L, items_code, items_cls, roots, nro
     SLb = np.empty((S, max(etot, 1))); SUb = np.empty((S, max(etot, 1)))
     Sdep = np.zeros(S, np.int64)
     Soff = np.zeros(S, np.int64); Slen = np.zeros(S, np.int64)
-    NE = 1 << 25
+    NE = ne_cap
     Pc = np.empty(NE, np.int64); Pk = np.empty(NE, np.int8); Pm = np.empty(NE, np.int64); Pa = np.empty(NE, np.int64)
-    NQ = 1 << 24
+    NQ = nq_cap
     Wc = np.empty(NQ, np.int64); Wk = np.empty(NQ, np.int8); Wm = np.empty(NQ, np.int64); Wa = np.empty(NQ, np.int64)
     Qc = np.empty(NQ, np.int64); Qk = np.empty(NQ, np.int8); Qm = np.empty(NQ, np.int64); Qa = np.empty(NQ, np.int64)
     RING = 64

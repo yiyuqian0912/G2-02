@@ -11,7 +11,7 @@ CELLS = 1 << E.CELL_DEPTH
 
 
 def run_window(geom, win: Window, d1=5, max_tests=640, n_boundary=512, n_class=64, n_learn=32, max_nodes_cell=2_000_000, max_nodes_total=5_000_000,
-               max_depth=400, max_pass=24, tau_first=True, dual=True, rho=2.0, use_wmode=True, shell_eps=2.0 ** -26, no_alloc_hull=False, use_gpu=False, gpu_min=1024, gpu_prefix=64, gpu_profile=False, gpu_version=2, gpu_f32=False, gpu_cap=1 << 22, max_records=1 << 22, max_vertices=1 << 23, sentinel_seed=0):
+               max_depth=400, max_pass=24, tau_first=True, dual=True, rho=2.0, use_wmode=True, shell_eps=2.0 ** -26, no_alloc_hull=False, use_gpu=False, gpu_min=1024, gpu_prefix=64, gpu_profile=False, gpu_version=2, gpu_f32=False, gpu_cap=1 << 22, gpu_free_pool=True, max_records=1 << 22, ne_cap=1 << 25, nq_cap=1 << 24, max_vertices=1 << 23, sentinel_seed=0):
     assert 0 <= d1 <= E.CELL_DEPTH
     P, K, clo, chi, adj, aoff = geom.tup()
     o = win.origin
@@ -49,18 +49,19 @@ def run_window(geom, win: Window, d1=5, max_tests=640, n_boundary=512, n_class=6
             from .gpu_pass2 import GpuPass2 as GP
         else:
             from .gpu_pass3 import GpuPass3 as GP
-        gctx = (GP(P, K, clo, chi, o, float(win.N), 1 << 24, f32=gpu_f32, cap=gpu_cap) if gpu_version == 3 else GP(P, K, clo, chi, o, float(win.N), 1 << 24, f32=gpu_f32)) if gpu_version != 1 else GP(P, K, clo, chi, o, float(win.N), 1 << 24)
+        gctx = (GP(P, K, clo, chi, o, float(win.N), nq_cap, f32=gpu_f32, cap=gpu_cap) if gpu_version == 3 else GP(P, K, clo, chi, o, float(win.N), 1 << 24, f32=gpu_f32)) if gpu_version != 1 else GP(P, K, clo, chi, o, float(win.N), 1 << 24)
         gctx.profile = gpu_profile
-        E.GPU_CTX[0] = gctx
+        E.GPU_CTX.ctx = gctx
     nrec = E.stage2(P, K, clo, chi, adj, aoff, o, float(win.N), win.L, codes, kls, roots, ncand,
-                    max_nodes_cell, max_nodes_total, max_depth, max_pass, tau_first, dual, rho, wmode, wfront, shell_eps, rec_cell, rec_lo, rec_hi, rec_kind, rec_voff, rec_vn, vpool, vtop, stats, cell_nodes, cell_evals, face_by_comp, face_surv, dep_evals, dep_nodes, no_alloc_hull, use_gpu, gpu_min, gpu_prefix)
+                    max_nodes_cell, max_nodes_total, max_depth, max_pass, tau_first, dual, rho, wmode, wfront, shell_eps, rec_cell, rec_lo, rec_hi, rec_kind, rec_voff, rec_vn, vpool, vtop, stats, cell_nodes, cell_evals, face_by_comp, face_surv, dep_evals, dep_nodes, no_alloc_hull, use_gpu, gpu_min, gpu_prefix, ne_cap, nq_cap)
     if gctx is not None:
         import cupy as _cp
-        E.GPU_CTX[0] = None
+        E.GPU_CTX.ctx = None
         gstats = dict(segments=gctx.segments, entries=gctx.gpu_entries, tt=gctx.tt.tolist(), fallbacks=getattr(gctx, 'fallbacks', 0), guards=getattr(gctx, 'guards', 0), capfb=getattr(gctx, 'capfb', 0), peak_bytes=int(__import__('cupy').get_default_memory_pool().total_bytes()), n32=getattr(gctx, 'n32', 0), n64=getattr(gctx, 'n64', 0), ne64=getattr(gctx, 'ne64', 0), nrl64=getattr(gctx, 'nrl64', 0))
         del gctx
         gctx = None
-        _cp.get_default_memory_pool().free_all_blocks()
+        if gpu_free_pool:
+            _cp.get_default_memory_pool().free_all_blocks()
     else:
         gstats = None
     t2 = time.perf_counter()

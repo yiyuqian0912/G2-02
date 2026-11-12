@@ -31,8 +31,10 @@ import zstandard
 
 from rind3d.counts import CountIndex
 from rind3d.geometry import keyed_rng, save_geometry
-from rind3d.lite_acceptance import DRIVER_RADIUS, geometry_acceptance, verify_clearance
-from rind3d.lite_generators import FAMILIES, generate
+from rind3d.lite_acceptance import DRIVER_RADIUS, verify_clearance
+from rind3d.lite_generators import FAMILIES
+
+from .families import generate, acceptance as geometry_acceptance
 from rind3d.pack import RINDPack
 from rind3d.rendering.stream import render_stream
 
@@ -132,9 +134,9 @@ def evaluate(F, sources, o, L, N):
     return 1, m, mask, cnt, "A"
 
 
-def select_side(F, sources, seed, slot, attempt, Lp, N, c_table, cap, rate_n):
+def select_side(F, sources, seed, slot, attempt, Lp, N, c_table, cap, rate_n, quota=None):
     L = Lp * N // 1024
-    n_quota = QUOTA[Lp]
+    n_quota = (quota or QUOTA)[Lp]
     rq = _rng(seed, slot, STREAM["quota"] + Lp, attempt)
     ru = _rng(seed, slot, STREAM["thin"] + Lp, attempt)
     acc, seen, log = [], set(), []
@@ -221,9 +223,11 @@ def run_scene(cfg, slot, k, c_table, root, factory, attempt=0):
     seed, N = cfg["seed"], cfg["resolution"]
     T = {}
     t0 = time.perf_counter()
-    family = FAMILIES[slot % len(FAMILIES)]
+    fams = cfg.get("families", FAMILIES)
+    family = fams[slot % len(fams)]
+    quota = {int(a): int(b) for a, b in cfg["quota"].items()} if "quota" in cfg else QUOTA
     bundle, recipe = generate(seed, slot, family, attempt)
-    if recipe["proposal_failures"]:
+    if bundle is None or recipe["proposal_failures"]:
         return dict(slot=slot, attempt=attempt, status="rejected", reason="geometry_proposal_failure")
     context = factory.context(bundle, POLICY)
     acceptance = geometry_acceptance(context, family, seed, slot, attempt)
@@ -268,7 +272,7 @@ def run_scene(cfg, slot, k, c_table, root, factory, attempt=0):
     windows, sides, logs = [], [], {}
     for Lp in SIDES_PHYS:
         acc, rep, log = select_side(F, sources, seed, slot, attempt, Lp, N, c_table, cfg["cap"][str(Lp)],
-                                    cfg["rate_n"])
+                                    cfg["rate_n"], quota)
         windows += acc; sides.append(rep); logs[f"L{Lp}"] = log
     T["selection"] = time.perf_counter() - t
     np.savez_compressed(stage / "privileged" / "selection_log.npz", **logs)
@@ -294,7 +298,7 @@ def run_scene(cfg, slot, k, c_table, root, factory, attempt=0):
     scene = dict(contract=CONTRACT, scene_id=sid, slot=slot, attempt=attempt, seed=seed, resolution=N,
                  family=family, n_bodies=len(context.bodies), faces=[len(b) for b in context.bodies],
                  geometry_id=context.geometry_id, k=k, c_table=c_table, sides=sides, Lambda_hat=lam,
-                 quota=QUOTA, n_windows=len(windows), timing=T, recipe_keys=sorted(recipe.keys()))
+                 quota=quota, n_windows=len(windows), timing=T, recipe_keys=sorted(recipe.keys()))
     (stage / "scene.json").write_text(json.dumps(scene, indent=1))
     (stage / "privileged" / "geometry_acceptance.json").write_text(json.dumps(acceptance, default=str)[:200000])
     seal = {str(p.relative_to(stage)): sha256(p) for p in sorted(stage.rglob("*")) if p.is_file()}

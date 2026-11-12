@@ -33,11 +33,12 @@ from numba import njit, objmode
 from ..rpl.engine2 import receiver_status, MAXROWS
 from ..rpl.predicates import plane_box_range, hull_misses_component, AMARG, MARG
 
-GPU_CTX = [None]
+import threading
+GPU_CTX = threading.local()     # per-thread GPU pass context (single-process multi-threaded GPU server)
 
 
 def _GPU_RUN(*a):
-    return GPU_CTX[0].run(*a)
+    return GPU_CTX.ctx.run(*a)
 
 
 @njit(cache=True, inline='always')
@@ -71,7 +72,7 @@ S_NODES, S_OUT, S_IN, S_UNDET, S_FACE, S_TAU, S_WIN, S_GEO, S_EVALS, S_MAXE, S_P
 
 
 # ---------------------------------------------------------------------------------------------------- stage 1
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def stage1(P, K, clo, chi, adj, aoff, wlo, whi, SX, SL, depth, n_learn, max_tests, cand, stats):
     """Coarse octree to `depth`; returns the number of candidate cells written to cand[:, :3]."""
     kmax = P.shape[1]
@@ -594,7 +595,7 @@ def emit_region(p, kind, SV, SFc, SFn, Snv, Snf, scr0, Vr, rec_cell, rec_lo, rec
 
 
 # ---------------------------------------------------------------------------------------------------- stage 2
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def cpu_seg(i, nq, ns, Wc, Wk, Wm, Wa, Qc, Qk, Qm, Qa, relmask, Xmask, o, N, P, K, C, Rlo, Rhi, clo, chi, nuf, nfrc, uf,
             nsil, silfi, silbi, tlo, thi, tmn, tmx, fbuf, mult, dual, rho, Unew, Lnew, NQ, stats, dep_evals, dslot, qlo,
             qhi, no_alloc_hull, hand, gpu_min, gpu_prefix):
@@ -722,10 +723,10 @@ def cpu_seg(i, nq, ns, Wc, Wk, Wm, Wa, Qc, Qk, Qm, Qa, relmask, Xmask, o, N, P, 
     return i, nq, ns, out, overflow, anc
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def stage2(P, K, clo, chi, adj, aoff, o, N, L, items_code, items_cls, roots, nroots,
            max_nodes_cell, max_nodes_total, max_depth, max_pass, tau_first, dual, rho, wmode, wfront, shell_eps,
-           rec_cell, rec_lo, rec_hi, rec_kind, rec_voff, rec_vn, vpool, vtop, stats, cell_nodes, cell_evals, face_by_comp, face_surv, dep_evals, dep_nodes, no_alloc_hull, use_gpu, gpu_min, gpu_prefix):
+           rec_cell, rec_lo, rec_hi, rec_kind, rec_voff, rec_vn, vpool, vtop, stats, cell_nodes, cell_evals, face_by_comp, face_surv, dep_evals, dep_nodes, no_alloc_hull, use_gpu, gpu_min, gpu_prefix, ne_cap=1 << 25, nq_cap=1 << 24):
     C = P.shape[0]
     kmax = P.shape[1]
     emax = 1
@@ -743,9 +744,9 @@ def stage2(P, K, clo, chi, adj, aoff, o, N, L, items_code, items_cls, roots, nro
     SLb = np.empty((S, max(etot, 1))); SUb = np.empty((S, max(etot, 1)))
     Sdep = np.zeros(S, np.int64)
     Soff = np.zeros(S, np.int64); Slen = np.zeros(S, np.int64)
-    NE = 1 << 25
+    NE = ne_cap
     Pc = np.empty(NE, np.int64); Pk = np.empty(NE, np.int8); Pm = np.empty(NE, np.int64); Pa = np.empty(NE, np.int64)
-    NQ = 1 << 24
+    NQ = nq_cap
     Wc = np.empty(NQ, np.int64); Wk = np.empty(NQ, np.int8); Wm = np.empty(NQ, np.int64); Wa = np.empty(NQ, np.int64)
     Qc = np.empty(NQ, np.int64); Qk = np.empty(NQ, np.int8); Qm = np.empty(NQ, np.int64); Qa = np.empty(NQ, np.int64)
     RING = 64

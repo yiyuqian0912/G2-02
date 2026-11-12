@@ -94,6 +94,11 @@ def run_task(t, engine, **kw):
                 engine_version=ENGINE_VERSION, cpu=cpu, wall=wall, n_records=int(len(r["cell"])),
                 vol_lo=float(np.sum(r["lo"])), vol_hi=float(np.sum(r["hi"])),
                 entry_evals=int(r["stats"]["entry_evals"]), nodes=int(r["stats"]["nodes"]),
+                engine_stats={kk: int(r["stats"][kk]) for kk in ("overflow", "budget_undet", "max_entries", "cells_out",
+                                                                  "passes") if kk in r["stats"]},
+                n_undet=int(np.sum(np.asarray(r["kind"]) == 2)),
+                vol_undet=float(np.sum(np.asarray(r["hi"])[np.asarray(r["kind"]) == 2])),
+                params={kk: v for kk, v in kw.items() if isinstance(v, (int, float, str))},
                 gpu=(dict((k, v) for k, v in r["gpu"].items() if k != "tt") if r.get("gpu") else None))
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_name(out.stem + f".tmp{os.getpid()}.npz")
