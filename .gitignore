@@ -58,3 +58,7 @@ Phase3_Single_Source_3D/data/
 Phase3_Single_Source_3D/checkpoints/
 Phase3_Single_Source_3D/results/
 Phase3_Single_Source_3D/.rind3d-viewer.local.json
+
+# RIND3D-100K local caches and benchmark scratch
+RIND3D_Dataset100K/.cache*/
+r3d_env.sh

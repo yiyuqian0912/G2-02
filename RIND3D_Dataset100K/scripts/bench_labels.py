@@ -47,7 +47,8 @@ def main():
     ap.add_argument("--rss-gb", type=float, default=8.0); ap.add_argument("--gpu-cap", type=int, default=1 << 22)
     a = ap.parse_args()
     from run_node import parse_gpus, default_env  # noqa
-    default_env(os.environ.get("R3D_CACHE_ROOT", str(HERE / ".cache_bench")))
+    import tempfile
+    default_env(os.environ.get("R3D_CACHE_ROOT", str(Path(tempfile.gettempdir()) / "r3d_bench_cache")))   # never inside the repository
     from rind3d_100k.fixtures import index, SMOKE
     from rind3d_100k.pool import WorkerPool, _rss
     gpus = parse_gpus(a.gpus) if a.gpus not in ("", "none") else []
