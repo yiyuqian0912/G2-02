@@ -13,7 +13,7 @@ measurements (README_H20 §4 → ESTIMATE.json) before any production decision.
 | **Estimated end-to-end time** | ≈ max(physical ≈ 6 h, labels ≈ 3.6–10 days). The stages run concurrently. |
 | **RAM** | label workers: 1–2 GB typical, up to ≈ 5 GB on heavy tasks. Plan for ≈ 2 GB × workers + headroom (e.g. ≥ 512 GB for 256 workers), or cap with `--rss-gb`. |
 | **Storage** | scenes ≈ 36 GB (0.36 MB each) + labels ≈ 140 GB (47 KB each, per-cell format) + journals; **≈ 0.2 TB total** [projection from canary samples] |
-| **Expected coverage** | ≥ 98.6% of informative labels certified in tier 1 (canary: 142 / 144 completed, all 142 certified; 2 heavy-tail tasks quarantined at their limits); the rest stay explicit (`timeout` / `engine_failure`) for a tier-2 pass |
+| **Expected coverage** | ≥ 98.6% of informative labels certified in tier 1 (canary: 142 / 144 completed, all 142 certified; the other 2, an L64 and an L128, hit their 1800 s / 3600 s limits and were quarantined); the rest stay explicit (`timeout` / `engine_failure`) for a tier-2 pass |
 | **Dominant remaining bottleneck** | posterior labelling: CPU-bound TPE with a heavy tail. ≈ 1–2% of tasks take ≥ 30 min, and a few take hours, mostly thin-slab, barrier and cluster scenes. |
 | **Is more algorithmic work needed before full production?** | **Yes, for any timeline under ≈ 1 week.** The exact two-phase labeller is validated exact on 36 windows and gives ≈ 3× on the 100K mix. A broad-posterior statistical tier and GPU-native phase 2 are the next steps. |
 

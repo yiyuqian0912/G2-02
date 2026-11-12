@@ -25,8 +25,8 @@ evaluation, but stage control stays on the CPU.
 
 **Tail:**
 * 070/03/1 (L64, barriers, m = 4): **timed out at its 1800 s limit**; quarantined as kind=timeout.
-* 089/06/0 (L128, occluder_clusters, m = 1): > 30 min; resolved under its 3600 s limit (see §4).
-* Completed labels: 142 / 142 certified (tv_bound ≤ 0.05). No GPU fallbacks, crashes or memory overruns.
+* 089/06/0 (L128, occluder_clusters, m = 1): **timed out at its 3600 s limit**; quarantined as kind=timeout.
+* Completed labels: 142 / 142 certified (tv_bound ≤ 0.05). Tier-1 coverage is 142 / 144 = 98.6%. No GPU fallbacks, crashes or memory overruns. The run ended cleanly: supervision released both workers at their limits.
 
 **Storage:**
 * 47 KB per label (per-cell, delta-encoded; was 234 KB with the raw polytope pieces).
