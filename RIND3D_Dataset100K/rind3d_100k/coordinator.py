@@ -39,6 +39,7 @@ import numpy as np
 from .controller import plan_epoch, epoch_of
 from .pool import WorkerPool, _rss
 from .storage import (Journal, journal_index, read_record, decode_payload, labels_path, task_key, atomic_write)
+from .labels import decode_cells
 
 HERE = Path(__file__).resolve().parent.parent
 
@@ -191,25 +192,25 @@ class Coordinator:
                 key = task_key(slot, w, j)
                 if key in self.jidx:
                     have[key] = read_record(self.jidx[key])[1]
-        cells, los, his, kinds, offs, metas, status = [], [], [], [], [0], [], {}
+        cells, los, his, offs, metas, status = [], [], [], [0], [], {}
         for w, (L, mask, _m) in enumerate(W):
             for j in range(int(rec["k"])):
                 key = task_key(slot, w, j)
                 if not (int(mask) >> j) & 1:
                     status[key] = "not_computed"; continue
                 if key in have:
-                    d = decode_payload(have[key])
-                    cells.append(d["cell"]); los.append(d["lo"]); his.append(d["hi"]); kinds.append(d["kind"])
-                    offs.append(offs[-1] + len(d["cell"])); metas.append(d["meta"]); status[key] = d["meta"]["status"]
+                    d = decode_payload(have[key]); c_, l_, h_ = decode_cells(d)
+                    cells.append(c_.astype(np.int32)); los.append(l_); his.append(h_)
+                    offs.append(offs[-1] + len(c_)); metas.append(d["meta"]); status[key] = d["meta"]["status"]
                 elif key in self.failed:
                     status[key] = {"timeout": "timeout", "memory": "memory_limit"}.get(self.failed[key]["kind"], "engine_failure")
                 else:
                     status[key] = "unavailable"
         import io
         buf = io.BytesIO()
-        np.savez(buf, cell=np.concatenate(cells) if cells else np.zeros(0, np.int32),
+        np.savez_compressed(buf, cell=np.concatenate(cells) if cells else np.zeros(0, np.int32),
                  lo=np.concatenate(los) if los else np.zeros(0), hi=np.concatenate(his) if his else np.zeros(0),
-                 kind=np.concatenate(kinds) if kinds else np.zeros(0, np.int8), offsets=np.array(offs, np.int64),
+                 offsets=np.array(offs, np.int64),
                  metas=np.frombuffer(json.dumps(metas).encode(), np.uint8),
                  status=np.frombuffer(json.dumps(status).encode(), np.uint8))
         atomic_write(labels_path(self.root, slot), buf.getvalue())

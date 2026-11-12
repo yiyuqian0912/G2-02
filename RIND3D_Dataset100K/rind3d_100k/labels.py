@@ -17,6 +17,26 @@ STATUS_CERT, STATUS_LOOSE, STATUS_UNCERT = "certified", "certified_loose", "unce
 _CACHE = {}
 
 
+def cell_arrays(cell, lo, hi):
+    """Per-cell intervals (the label proper): the engine's polytope pieces summed per 128^3 cell. Cell ids are stored
+    delta-encoded (sorted). tv_bound depends only on per-cell sums, so it is recomputed here and must equal the
+    engine's value."""
+    from rind3d_posterior.rpl.bound import tv_bound
+    u, inv = np.unique(np.asarray(cell, np.int64), return_inverse=True)
+    L = np.bincount(inv, weights=np.asarray(lo, np.float64), minlength=len(u))
+    U = np.bincount(inv, weights=np.asarray(hi, np.float64), minlength=len(u))
+    tv = float(tv_bound(L, U)) if L.sum() > 0 else 1.0
+    return dict(dcell=np.diff(u, prepend=0).astype(np.int32), lo=L, hi=U), int(len(u)), tv
+
+
+def decode_cells(d):
+    """(cells, lo, hi) per cell from a journal payload (delta-encoded per-cell format, or the raw piece format)."""
+    if "dcell" in d:
+        return np.cumsum(d["dcell"].astype(np.int64)), d["lo"], d["hi"]
+    u, inv = np.unique(d["cell"].astype(np.int64), return_inverse=True)
+    return u, np.bincount(inv, weights=d["lo"], minlength=len(u)), np.bincount(inv, weights=d["hi"], minlength=len(u))
+
+
 def tasks_for_scene(root, slot, include_uninformative=False):
     S = SceneFile(scene_path(root, slot))
     out = []
@@ -69,8 +89,8 @@ def label_task(t, engine, kw):
                                                                       "passes", "record_reruns") if kk in r["stats"]},
                     params={kk: v for kk, v in a.items() if isinstance(v, (int, float, str))}, pid=os.getpid(),
                     gpu=(dict((kk, v) for kk, v in r["gpu"].items() if kk != "tt") if r.get("gpu") else None))
-        arrays = dict(cell=np.asarray(r["cell"], np.int32), lo=np.asarray(r["lo"], np.float64),
-                      hi=np.asarray(r["hi"], np.float64), kind=np.asarray(r["kind"], np.int8))
+        arrays, n_cells, tv_cells = cell_arrays(r["cell"], r["lo"], r["hi"])
+        meta.update(n_cells=n_cells, tv_bound_cells=tv_cells)
         return dict(key=key, arrays=arrays, meta=meta)
     except Exception as e:
         import traceback

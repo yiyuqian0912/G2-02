@@ -126,7 +126,8 @@ def validate_labels(root, slot, scene_rec):
     for i, m in enumerate(metas):
         if m["status"] == "certified" and m["tv_bound"] > 0.05:
             errs.append(f"{m['key']} certified with tv {m['tv_bound']}")
-        if offs[i + 1] - offs[i] != m["n_records"]:
-            errs.append(f"{m['key']} record count")
+        nseg = offs[i + 1] - offs[i]
+        if ("n_cells" in m and nseg != m["n_cells"]) or ("n_cells" not in m and not 0 < nseg <= m["n_records"]):
+            errs.append(f"{m['key']} cell count")       # legacy piece-format records: at most one cell per piece
     from collections import Counter
     return dict(slot=int(slot), ok=not errs, errors=errs[:20], coverage=dict(Counter(status.values())))

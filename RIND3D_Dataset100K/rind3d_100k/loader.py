@@ -61,9 +61,7 @@ class Scene:
         if i is None:
             return dict(status=st, informative=inf)
         a, b = self.lab["offsets"][i], self.lab["offsets"][i + 1]
-        cell = self.lab["cell"][a:b]; lo = self.lab["lo"][a:b]; hi = self.lab["hi"][a:b]
-        cells, inv = np.unique(cell, return_inverse=True)
-        Lc = np.bincount(inv, weights=lo, minlength=len(cells)); Uc = np.bincount(inv, weights=hi, minlength=len(cells))
+        cells = self.lab["cell"][a:b].astype(np.int64); Lc = self.lab["lo"][a:b]; Uc = self.lab["hi"][a:b]   # per cell
         q = Lc / Lc.sum() if Lc.sum() > 0 else Lc
         m = self.lab["metas"][i]
         return dict(cells=cells, q=q, lo=Lc, hi=Uc, tv_bound=m["tv_bound"], status=m["status"], informative=inf)
