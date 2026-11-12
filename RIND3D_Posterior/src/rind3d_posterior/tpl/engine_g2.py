@@ -470,6 +470,8 @@ def _cell_range(Vr, nr, i0, i1):
 
 @njit(cache=True)
 def _dump(Vsrc, nvs, rec_voff, rec_vn, vpool, vtop, nrec):
+    if nrec >= rec_voff.shape[0]:
+        return
     if vtop[0] + nvs > vpool.shape[0]:
         rec_voff[nrec] = -1; rec_vn[nrec] = 0
         return
@@ -523,8 +525,11 @@ def _shell_volume(q, SV, SFc, SFn, Snv, Snf, P, K, clo, chi, eps):
 def emit_region(p, kind, SV, SFc, SFn, Snv, Snf, scr0, Vr, rec_cell, rec_lo, rec_hi, rec_kind, nrec,
                 rec_voff, rec_vn, vpool, vtop, P, K, clo, chi, eps):
     """Record region p (IN: lower = upper = volume; UNDET: lower 0) split exactly over the 128^3 cells by a
-    recursive BSP on the cell grid (cost ~ number of cells actually met, not of the bounding box)."""
+    recursive BSP on the cell grid (cost ~ number of cells actually met, not of the bounding box).
+    Capacity: records are written only while nrec < len(rec_cell); nrec keeps counting beyond it, so the caller sees
+    the exact number required and reruns with a larger buffer (run_window). Never writes past the arrays."""
     G = 1 << CELL_DEPTH
+    RC = rec_cell.shape[0]
     i0 = np.empty(3, np.int64); i1 = np.empty(3, np.int64)
     copy_poly(SV[p], SFc[p], SFn[p], Snv[p], Snf[p], SV[scr0], SFc[scr0], SFn[scr0])
     Snv[scr0] = Snv[p]; Snf[scr0] = Snf[p]
@@ -546,22 +551,24 @@ def emit_region(p, kind, SV, SFc, SFn, Snv, Snf, scr0, Vr, rec_cell, rec_lo, rec
             if vol <= 0.0:
                 continue
             if ax < 0:
-                rec_cell[nrec] = (i0[0] * G + i0[1]) * G + i0[2]
-                lov = vol
-                if kind == IN_REC and eps > 0:
-                    lov = max(vol - _shell_volume(q, SV, SFc, SFn, Snv, Snf, P, K, clo, chi, eps), 0.0)
-                rec_lo[nrec] = lov if kind == IN_REC else 0.0
-                rec_hi[nrec] = vol; rec_kind[nrec] = kind
-                _dump(Vr, nr, rec_voff, rec_vn, vpool, vtop, nrec)
+                if nrec < RC:
+                    rec_cell[nrec] = (i0[0] * G + i0[1]) * G + i0[2]
+                    lov = vol
+                    if kind == IN_REC and eps > 0:
+                        lov = max(vol - _shell_volume(q, SV, SFc, SFn, Snv, Snf, P, K, clo, chi, eps), 0.0)
+                    rec_lo[nrec] = lov if kind == IN_REC else 0.0
+                    rec_hi[nrec] = vol; rec_kind[nrec] = kind
+                    _dump(Vr, nr, rec_voff, rec_vn, vpool, vtop, nrec)
                 nrec += 1
             else:
                 # scratch exhausted (not expected): every met cell gets the piece volume as an upper bound
                 for ix in range(i0[0], i1[0] + 1):
                     for iy in range(i0[1], i1[1] + 1):
                         for iz in range(i0[2], i1[2] + 1):
-                            rec_cell[nrec] = (ix * G + iy) * G + iz; rec_lo[nrec] = 0.0
-                            rec_hi[nrec] = min(vol, 1.0 / (G * G * G)); rec_kind[nrec] = UNDET_REC
-                            rec_voff[nrec] = -1; rec_vn[nrec] = 0
+                            if nrec < RC:
+                                rec_cell[nrec] = (ix * G + iy) * G + iz; rec_lo[nrec] = 0.0
+                                rec_hi[nrec] = min(vol, 1.0 / (G * G * G)); rec_kind[nrec] = UNDET_REC
+                                rec_voff[nrec] = -1; rec_vn[nrec] = 0
                             nrec += 1
             continue
         lo_ = 1e300; hi_ = -1e300
@@ -585,9 +592,10 @@ def emit_region(p, kind, SV, SFc, SFn, Snv, Snf, scr0, Vr, rec_cell, rec_lo, rec
             for ix in range(i0[0], i1[0] + 1):
                 for iy in range(i0[1], i1[1] + 1):
                     for iz in range(i0[2], i1[2] + 1):
-                        rec_cell[nrec] = (ix * G + iy) * G + iz; rec_lo[nrec] = 0.0
-                        rec_hi[nrec] = min(vol_q, 1.0 / (G * G * G)); rec_kind[nrec] = UNDET_REC
-                        rec_voff[nrec] = -1; rec_vn[nrec] = 0
+                        if nrec < RC:
+                            rec_cell[nrec] = (ix * G + iy) * G + iz; rec_lo[nrec] = 0.0
+                            rec_hi[nrec] = min(vol_q, 1.0 / (G * G * G)); rec_kind[nrec] = UNDET_REC
+                            rec_voff[nrec] = -1; rec_vn[nrec] = 0
                         nrec += 1
             continue
         top += 2

@@ -95,7 +95,7 @@ def run_task(t, engine, **kw):
                 vol_lo=float(np.sum(r["lo"])), vol_hi=float(np.sum(r["hi"])),
                 entry_evals=int(r["stats"]["entry_evals"]), nodes=int(r["stats"]["nodes"]),
                 engine_stats={kk: int(r["stats"][kk]) for kk in ("overflow", "budget_undet", "max_entries", "cells_out",
-                                                                  "passes") if kk in r["stats"]},
+                                                                  "passes", "record_reruns") if kk in r["stats"]},
                 n_undet=int(np.sum(np.asarray(r["kind"]) == 2)),
                 vol_undet=float(np.sum(np.asarray(r["hi"])[np.asarray(r["kind"]) == 2])),
                 params={kk: v for kk, v in kw.items() if isinstance(v, (int, float, str))},

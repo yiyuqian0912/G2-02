@@ -10,7 +10,7 @@ from .window import Window
 CELLS = 1 << E.CELL_DEPTH
 
 
-def run_window(geom, win: Window, d1=5, max_tests=640, n_boundary=512, n_class=64, n_learn=32, max_nodes_cell=2_000_000, max_nodes_total=5_000_000,
+def _run_window_once(geom, win: Window, d1=5, max_tests=640, n_boundary=512, n_class=64, n_learn=32, max_nodes_cell=2_000_000, max_nodes_total=5_000_000,
                max_depth=400, max_pass=24, tau_first=True, dual=True, rho=2.0, use_wmode=True, shell_eps=2.0 ** -26, no_alloc_hull=False, use_gpu=False, gpu_min=1024, gpu_prefix=64, gpu_profile=False, gpu_version=2, gpu_f32=False, gpu_cap=1 << 22, gpu_free_pool=True, max_records=1 << 22, ne_cap=1 << 25, nq_cap=1 << 24, max_vertices=1 << 23, sentinel_seed=0):
     assert 0 <= d1 <= E.CELL_DEPTH
     P, K, clo, chi, adj, aoff = geom.tup()
@@ -64,6 +64,8 @@ def run_window(geom, win: Window, d1=5, max_tests=640, n_boundary=512, n_class=6
             _cp.get_default_memory_pool().free_all_blocks()
     else:
         gstats = None
+    if nrec > max_records:                 # buffer too small: report the exact need, caller reruns
+        return dict(_nrec_required=int(nrec), _seconds=time.perf_counter() - t0)
     t2 = time.perf_counter()
     res = dict(cell=rec_cell[:nrec].copy(), lo=rec_lo[:nrec].copy(), hi=rec_hi[:nrec].copy(),
                kind=rec_kind[:nrec].copy(), voff=rec_voff[:nrec].copy(), vn=rec_vn[:nrec].copy(),
@@ -72,6 +74,30 @@ def run_window(geom, win: Window, d1=5, max_tests=640, n_boundary=512, n_class=6
                stats=dict(zip(E.STAT_NAMES, stats.tolist())), wmode=wmode.tolist(), face_by_comp=face_by_comp.tolist(), dep_evals=dep_evals.tolist(), dep_nodes=dep_nodes.tolist(), gpu=gstats, face_surv=face_surv.tolist(), n_items=int(len(codes)),
                seconds=dict(stage1=t1 - t0, stage2=t2 - t1, total=t2 - t0))
     res.update(summarize(res))
+    return res
+
+
+MAX_RECORDS_LIMIT = 1 << 26
+
+
+def run_window(geom, win: Window, max_records=1 << 22, **kw):
+    """Label one window (see _run_window_once for the parameters).
+
+    Record capacity: the engine never writes past its record buffer; it reports the exact number of records needed.
+    If that exceeds max_records, the window is rerun with the next power of two. The engine is deterministic, so the
+    rerun is exactly the result an unbounded buffer would give. Discarded runs are listed in res["record_reruns"]."""
+    reruns = []
+    while True:
+        res = _run_window_once(geom, win, max_records=max_records, **kw)
+        need = res.get("_nrec_required")
+        if need is None:
+            break
+        reruns.append(dict(max_records=int(max_records), required=int(need), seconds=float(res["_seconds"])))
+        max_records = 1 << int(need - 1).bit_length()
+        if max_records > MAX_RECORDS_LIMIT:
+            raise RuntimeError(f"record capacity: {need} records needed (limit {MAX_RECORDS_LIMIT})")
+    res["stats"]["record_reruns"] = len(reruns)
+    res["record_reruns"] = reruns
     return res
 
 

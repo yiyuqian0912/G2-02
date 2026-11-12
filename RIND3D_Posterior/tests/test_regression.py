@@ -43,3 +43,17 @@ def test_point_estimate_normalised():
     r = RP.label_window(*_window(CASES[0]), engine="cpu")
     cells, q, tv = RP.point_estimate(r)
     assert abs(q.sum() - 1) < 1e-12 and tv <= 0.05
+
+
+@pytest.mark.parametrize("engine", ["cpu", "gpu"])
+def test_record_buffer_overflow_reruns_exactly(engine):
+    """A record buffer far too small must never be overrun: the engine reports the exact need and the driver reruns,
+    giving the bit-identical result (v3.1 guard; v3 wrote past the buffer, as in 1K release scene 000001)."""
+    if engine == "gpu":
+        pytest.importorskip("cupy")
+    case = max(CASES, key=lambda c: c.get("n_records", 0)) if any("n_records" in c for c in CASES) else CASES[1]  # 8678 records
+    kw = dict(gpu_min=64, gpu_prefix=8) if engine == "gpu" else {}
+    r = RP.label_window(*_window(case), engine=engine, max_records=16, **kw)
+    assert _digest(r) == case["digest"]
+    assert r["stats"]["record_reruns"] >= 1
+    assert r["record_reruns"][0]["max_records"] == 16 and r["record_reruns"][-1]["required"] == len(r["cell"])

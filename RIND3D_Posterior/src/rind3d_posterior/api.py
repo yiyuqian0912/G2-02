@@ -5,7 +5,7 @@ from .rpl.bound import tv_bound  # noqa: F401
 from .tpl.geom import Geom
 from .tpl.window import Window
 
-ENGINE_VERSION = "tpe-b4/p2-cpu+g2-gpu-pass-v3"
+ENGINE_VERSION = "tpe-b4/p2-cpu+g2-gpu-pass-v3.1"   # v3.1: record-buffer guard + exact rerun (results identical whenever the v3 buffer sufficed)
 CELL_DEPTH = 7          # 128^3 source-space output cells
 
 
