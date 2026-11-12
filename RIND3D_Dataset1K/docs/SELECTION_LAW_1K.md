@@ -139,3 +139,15 @@ A separation constraint couples the sources. Given s_j, each other source is uni
 * **m(W) = Σ_j I_j** is the effective layer count. It is a per-channel informativeness count, **not** the additive overlap R_sum(x) = Σ_j R_j(x).
 * R_sum is reported separately: an overlap histogram per window, the lit fraction per channel, and the minimum pairwise Hamming distance between informative channels.
 * **Balancing target:** a dataset-wide histogram of m over the 64,000 windows close to (¼, ¼, ¼, ¼). The weighted histogram (under ω) is also reported.
+
+## 7. Relation to the v0.3 selection correction (checked independently)
+
+**v0.3.** The v0.3 weights, `rind3d_training/selection.py`, are w = 1/(n_nat/n + Σ_s (n_s/n) · A_s/P(A_s)). They correct a **mixture of subset quotas**: natural, informative, extreme and rare windows from parallel streams.
+
+**1K v1.** 1K v1 has a single quota stream per side with thinning, so that formula does **not** apply. The 1K correction above is derived from scratch for this law:
+* ω = Λ_L(G, S);
+* the per-channel theorem in §2.
+
+**Common structure.** Both share the same structure: the quota normalisation 1/P(accept | G, S) must be undone by a weight proportional to the scene-level acceptance rate.
+
+**Bias without the weight.** Phase 1 measured TV 0.02–0.11 for the analogous v0.1 factor on extended posteriors. That is why ω is mandatory for training on the 1K labels.
