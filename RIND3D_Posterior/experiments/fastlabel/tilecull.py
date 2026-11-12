@@ -35,3 +35,45 @@ def tiles_to_render(qlo, qhi, boxes, code, P, K, clo, chi):
             if any_blocked(qlo, qhi, boxes[t, :3], boxes[t, 3:], P, K, clo, chi, buf):
                 need[t] = False
     return need
+
+
+from rind3d_posterior.rpl.predicates import classify_component, aabb_disjoint, EXCL, CONTAINS
+
+
+@njit(cache=True)
+def tiles_to_render_point(s, boxes, code, P, K, clo, chi):
+    """Per-point culling with the exact shadow polyhedra of the point source s (rpl.predicates.classify_component,
+    float-filtered with margins):
+    * a tile whose FREE receivers are all observed lit is certified iff every component is EXCL (tile box disjoint
+      from S_C(s));
+    * a tile observed all dark is certified iff some component is CONTAINS (tile box inside S_C(s));
+    * mixed tiles are always rendered."""
+    buf = np.empty((MAXROWS, 4)); cut = np.empty(MAXROWS, np.int64)
+    need = np.ones(boxes.shape[0], np.bool_)
+    ulo = np.empty(3); uhi = np.empty(3)
+    for t in range(boxes.shape[0]):
+        if code[t] == 3:
+            need[t] = False; continue
+        if code[t] == 2:
+            continue
+        lo = boxes[t, :3]; hi = boxes[t, 3:]
+        for k in range(3):
+            ulo[k] = min(lo[k], s[k]); uhi[k] = max(hi[k], s[k])
+        if code[t] == 0:
+            ok = True
+            for c in range(P.shape[0]):
+                if aabb_disjoint(ulo, uhi, clo[c], chi[c]):
+                    continue
+                st, _ = classify_component(lo, hi, s, P, K, c, buf, cut)
+                if st != EXCL:
+                    ok = False; break
+            if ok:
+                need[t] = False
+        else:
+            for c in range(P.shape[0]):
+                if aabb_disjoint(ulo, uhi, clo[c], chi[c]):
+                    continue
+                st, _ = classify_component(lo, hi, s, P, K, c, buf, cut)
+                if st == CONTAINS:
+                    need[t] = False; break
+    return need

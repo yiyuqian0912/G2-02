@@ -58,7 +58,12 @@ def shadow_planes_fast(body, source):
     return tuple(dict.fromkeys(res))
 
 
+_INSTALLED = {}
+
+
 def install(check=20):
+    if "planes" in _INSTALLED:
+        return _INSTALLED["planes"]
     import rind3d.rendering.cuda_backend as cb
     import rind3d.rendering.polyhedra as ph
     orig = ph.shadow_planes
@@ -73,6 +78,7 @@ def install(check=20):
                 raise AssertionError("fast shadow planes differ from the original")
         return fast
     cb.shadow_planes = patched
+    _INSTALLED["planes"] = state
     return state
 
 
@@ -103,6 +109,8 @@ def encode_fast(bodies):
 
 
 def install_encode(check=20):
+    if "encode" in _INSTALLED:
+        return _INSTALLED["encode"]
     import rind3d.rendering.cuda_backend as cb
     orig = cb.encode
     state = dict(n=0)
@@ -116,4 +124,5 @@ def install_encode(check=20):
                 raise AssertionError("fast encode differs from the original")
         return fast
     cb.encode = patched
+    _INSTALLED["encode"] = state
     return state

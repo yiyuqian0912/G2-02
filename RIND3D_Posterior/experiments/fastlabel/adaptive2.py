@@ -37,10 +37,7 @@ def test_samples(tester, res, n, rng, stop_after=None, cull=True):
         return None
     k = 0; new = []; i = -1
     for i, (p, pc) in enumerate(zip(pts, picks)):
-        need = None
-        if cull:
-            V = res["vpool"][res["voff"][pc]:res["voff"][pc] + res["vn"][pc]]
-            need = tester.need_tiles(int(pc), V.min(0) - 1e-12, V.max(0) + 1e-12)
+        need = tester.need_tiles_point(p) if cull else None
         ok, vox = tester.test(p, need)
         if not ok:
             k += 1
@@ -51,15 +48,42 @@ def test_samples(tester, res, n, rng, stop_after=None, cull=True):
     return i + 1, k, new
 
 
+_FAC = None
+_SCENES = {}
+GPU_LOCK = None          # multiprocessing semaphore shared by all workers (set by runner._init); None = no limit
+
+
+def process_factory():
+    """One BackendFactory per process: CUDA context and NVRTC module are created once, not per label."""
+    global _FAC
+    if _FAC is None:
+        from rind3d.rendering.backends import BackendFactory
+        _FAC = BackendFactory(cuda_batch=128, geometry_cache=4)
+    return _FAC
+
+
+def scene_cache(sc):
+    """Per-scene objects shared by all labels of a scene (observations, engine geometry, canonical bundle)."""
+    v = _SCENES.get(sc)
+    if v is None:
+        from rind3d.geometry import load_geometry
+        S = T.SceneObs(T.R / sc)
+        v = dict(S=S, geom=T.Geom(np.asarray(S.P, float), np.asarray(S.K)),
+                 bundle=load_geometry(T.R / sc / "privileged" / "geometry.npz"))
+        if len(_SCENES) >= 2:
+            _SCENES.pop(next(iter(_SCENES)))
+        _SCENES[sc] = v
+    return v
+
+
 class Tester:
     """Exact membership test of candidate sources; on failure returns the mismatching receivers (window x, y, z)."""
 
     def __init__(self, bundle, policy, lit_zyx, solid_zyx, origin, N=1024, max_report=64):
-        from rind3d.rendering.backends import BackendFactory
-        self.fac = BackendFactory(cuda_batch=128); self.bundle = bundle; self.policy = policy
+        self.fac = process_factory(); self.bundle = bundle; self.policy = policy
         self.ctx = self.fac.context(bundle, policy)
         self.o = np.asarray(origin, np.int64); self.N = int(N); self.L = lit_zyx.shape[0]; self.M = max_report
-        self.lit_zyx = lit_zyx; self.solid_zyx = solid_zyx; self.tbox = None
+        self.lit_zyx = lit_zyx; self.solid_zyx = solid_zyx; self.tbox = None; self.dg = None
         n = max(self.L // 64, 1)
         self.offs = [(a, b, c) for c in range(n) for b in range(n) for a in range(n)]
         self.origins = np.array([self.o + np.array(t) * 64 for t in self.offs], np.int32)
@@ -67,6 +91,7 @@ class Tester:
         for (a, b, c) in self.offs:
             sl = (slice(c * 64, (c + 1) * 64), slice(b * 64, (b + 1) * 64), slice(a * 64, (a + 1) * 64))
             self.exp.append((np.packbits(lit_zyx[sl].ravel(), bitorder="little"), np.packbits(solid_zyx[sl].ravel(), bitorder="little")))
+        self.expL = np.stack([e[0] for e in self.exp]); self.expS = np.stack([e[1] for e in self.exp])
         self.stats = dict(points=0, bind_s=0.0, render_s=0.0, legal_s=0.0, fail_legal=0, fail_box=0, fail_obs=0, tiles=0)
         import fastplanes
         self.fp = fastplanes.install(check=20)        # exact integer shadow planes; first 20 calls checked against the original
@@ -87,6 +112,16 @@ class Tester:
             v = self._cull[piece] = tiles_to_render(qlo, qhi, self.tbox, self.tcode, P, K, clo, chi)
         return v
 
+    def need_tiles_point(self, s):
+        """Tiles that must be rendered for the point source s: every pure tile is certified by the exact shadow
+        polyhedra of s (tilecull.tiles_to_render_point); mixed tiles are rendered."""
+        from tilecull import tiles_to_render_point
+        P, K, clo, chi, _, _ = self.geom.tup()
+        t = time.perf_counter()
+        v = tiles_to_render_point(np.asarray(s, float), self.tbox, self.tcode, P, K, clo, chi)
+        self.stats["cull_s"] = self.stats.get("cull_s", 0) + time.perf_counter() - t
+        return v
+
     def test(self, s, need=None):
         from rind3d_1k.physical import legal_source
         self.stats["points"] += 1
@@ -96,35 +131,35 @@ class Tester:
         t = time.perf_counter(); ok = legal_source(self.ctx, s) is not None; self.stats["legal_s"] += time.perf_counter() - t
         if not ok:
             self.stats["fail_legal"] += 1; return False, None
-        t = time.perf_counter(); src = self.fac.source(self.bundle, s, "cuda_certified", self.policy); self.stats["bind_s"] += time.perf_counter() - t
         t = time.perf_counter()
-        try:
-            bad = []
-            idx = np.arange(len(self.origins)) if need is None else np.flatnonzero(need)
-            self.stats["tiles_skipped"] = self.stats.get("tiles_skipped", 0) + len(self.origins) - len(idx)
-            for i0 in range(0, len(idx), 128):
-                sel = idx[i0:i0 + 128]
-                out = src.packed_batch(self.origins[sel], 64, self.N); self.stats["tiles"] += len(out)
-                for jj, (pl, ps) in enumerate(out):
-                    i, j = 0, int(sel[jj])
-                    el, es = self.exp[i + j]
-                    got = np.frombuffer(pl, np.uint8)
-                    if not np.array_equal(got, el):
-                        diff = np.flatnonzero(np.unpackbits(got ^ el, bitorder="little"))
-                        z, y, x = np.unravel_index(diff, (64, 64, 64))
-                        a, b, c = self.offs[j]
-                        bad.append(np.stack([x + a * 64, y + b * 64, z + c * 64], 1))
-            if not bad:
-                return True, None
-            vox = np.concatenate(bad)                  # every receiver this source gets wrong (all tiles)
-            self.stats["fail_obs"] += 1
-            if len(vox) > self.M:
-                vox = vox[self.rng.choice(len(vox), self.M, replace=False)]
-            return False, vox
-        finally:
+        import gpurender
+        if self.dg is None:
+            self.dg = gpurender.device_geometry(self.fac, self.bundle, self.policy, s)
+        idx = np.arange(len(self.origins)) if need is None else np.flatnonzero(need)
+        self.stats["tiles_skipped"] = self.stats.get("tiles_skipped", 0) + len(self.origins) - len(idx)
+        if len(idx) == 0:
             self.stats["render_s"] += time.perf_counter() - t
-            src.close()
-
+            return True, None
+        lit, sol = gpurender.render_tiles(self.dg, self.ctx, s, self.origins[idx], lock=GPU_LOCK)
+        self.stats["tiles"] += len(idx)
+        if not np.array_equal(sol, self.expS[idx]):
+            raise AssertionError("SOLID mismatch: renderer and stored crop disagree")
+        badt = np.flatnonzero(np.any(lit != self.expL[idx], axis=1))
+        self.stats["render_s"] += time.perf_counter() - t
+        if len(badt) == 0:
+            return True, None
+        out = []
+        for bt in badt:
+            j = int(idx[bt])
+            diff = np.flatnonzero(np.unpackbits(lit[bt] ^ self.expL[j], bitorder="little"))
+            z, y, x = np.unravel_index(diff, (64, 64, 64))
+            a_, b_, c_ = self.offs[j]
+            out.append(np.stack([x + a_ * 64, y + b_ * 64, z + c_ * 64], 1))
+        vox = np.concatenate(out)                      # every receiver this source gets wrong (rendered tiles)
+        self.stats["fail_obs"] += 1
+        if len(vox) > self.M:
+            vox = vox[self.rng.choice(len(vox), self.M, replace=False)]
+        return False, vox
 
 def items_from_vox(win, vox):
     c = win.cls
@@ -152,15 +187,15 @@ def max_failures(n, eps, alpha):
     return k
 
 
-def run(sc, w, s, nbd=2048, nin=1024, n=None, C=3, R=8, m_disc=16, race_nodes=2000, race_records=20000, race_max_L=64, eps=0.05, delta=0.01, small_records=64, M=64, seed=0, p1_budget=5_000_000):
+def run(sc, w, s, nbd=2048, nin=1024, n=None, C=3, geometric=True, C_geo=8, R=12, m_disc=16, race_nodes=2000, race_records=20000, race_max_L=64, eps=0.05, delta=0.01, small_records=64, M=64, seed=0, p1_budget=5_000_000):
     from rind3d.geometry import load_geometry
     from rind3d_1k.physical import POLICY
     out = dict(sc=sc, w=w, s=s, nbd=nbd, nin=nin, n=n, R=R)
     tt = {}
     t0 = time.perf_counter(); c0 = time.process_time()
     from fastwin import fast_cls, LazyWindow
-    S = T.SceneObs(T.R / sc); cls = fast_cls(S, w, s)
-    geom = T.Geom(np.asarray(S.P, float), np.asarray(S.K)); win = LazyWindow(cls, np.asarray(S.origin(w), np.int64), 1024)
+    scn = scene_cache(sc); S = scn["S"]; geom = scn["geom"]; cls = fast_cls(S, w, s)
+    win = LazyWindow(cls, np.asarray(S.origin(w), np.int64), 1024)
     tt["setup"] = time.perf_counter() - t0
     t = time.perf_counter(); roots, _ = T.stage1(geom, win); tt["stage1"] = time.perf_counter() - t
     t = time.perf_counter(); xc, xk = T.point_items(win, nbd, nin, seed); tt["points"] = time.perf_counter() - t
@@ -180,7 +215,7 @@ def run(sc, w, s, nbd=2048, nin=1024, n=None, C=3, R=8, m_disc=16, race_nodes=20
             out["path"] = "exact_small_B"; break
         if tester is None:
             t = time.perf_counter()
-            tester = Tester(load_geometry(T.R / sc / "privileged" / "geometry.npz"), POLICY, S.crop(w, s), S.crop(w, -1), S.origin(w))
+            tester = Tester(scn["bundle"], POLICY, S.crop(w, s), S.crop(w, -1), S.origin(w))
             tester.set_cull(geom)
             tt["tester_init"] = time.perf_counter() - t
         # exact-first race: a budgeted exact phase 2 on B; kept if it completes without undetermined mass
@@ -206,16 +241,17 @@ def run(sc, w, s, nbd=2048, nin=1024, n=None, C=3, R=8, m_disc=16, race_nodes=20
         rr["disc_failures"] = kd
         if not new:
             attempts += 1
-            n_c = cert_n(eps, delta / C); kmax = max_failures(n_c, eps, delta / C)
+            dc = delta * 0.5 ** attempts if geometric else delta / C        # sum over attempts <= delta
+            n_c = cert_n(eps, dc); kmax = max_failures(n_c, eps, dc)
             t = time.perf_counter()
             nt, k, cnew = test_samples(tester, res, n_c, rng, stop_after=kmax)
             tt["cert_s"] = tt.get("cert_s", 0) + time.perf_counter() - t
             rr.update(cert_attempt=attempts, cert_n=n_c, cert_failures=k, cert_tested=nt, kmax=kmax)
             if k <= kmax and nt == n_c:
                 out["path"] = "stat_certified"; out["tv_cert"] = eps; out["delta"] = delta; out["k"] = k
-                out["p_lower"] = cp_lower(n_c - k, n_c, delta / C)
+                out["p_lower"] = cp_lower(n_c - k, n_c, dc); out["delta_attempt"] = dc
                 break
-            if attempts >= C or not cnew:
+            if attempts >= (C_geo if geometric else C) or not cnew:
                 out["path"] = "fallback_exact"; break
             new = cnew
         nc, nk = items_from_vox(win, np.concatenate(new))
