@@ -1,0 +1,141 @@
+# RIND3D 1K: sampling law, effective-layer balancing, and the posterior target of each source channel
+
+Status:
+* **Derived** (mathematics): sections 2–5.
+* **Implemented**: `rind3d_1k/physical.py` and `rind3d_1k/controller.py`.
+* **To be checked empirically in the canaries**: the quantities marked *[measured]*.
+
+## 1. The complete generative process (contract `rind3d-1k-contract-v1`)
+
+For campaign slot t, with every random stream keyed by (seed, slot, stream, attempt):
+
+1. **Geometry.**
+   * G ~ family generator `FAMILIES[slot mod 9]` (the v0.2 producer), followed by the v0.2 geometry acceptance.
+   * The geometry is drawn without reference to sources.
+2. **Source count.**
+   * k ∈ {1, 2, 3, 4} is chosen by the balancing controller.
+   * Its inputs are the controller state: cumulative histograms and pooled estimates from **previous** scenes, plus a keyed random number of this slot.
+   * k is therefore independent of this scene's source positions. It may depend on the slot and on earlier scenes.
+3. **Sources.**
+   * s₁ … s_k are i.i.d. Uniform(D(G)), where D(G) = {p ∈ (0,1)³ : p ∉ solid, certified clearance > 2⁻²⁶} (the v0.1/v0.2 driver rule).
+   * They are drawn by rejection from uniform proposals.
+   * The only interaction is an anti-duplicate rule: |s_i − s_j|_∞ ≥ 2⁻²⁰.
+   * The v0.2 multi-source rule `MIN_SEPARATION = 1/32` is **not** used. Section 4 explains why.
+4. **Thinning table.** The controller fixes c(m, L, k) ∈ [c_min, 1] before the sources are drawn.
+5. **Window proposals, for each side L ∈ {64, 128, 256}.**
+   * i.i.d. uniform origins o ∈ {0, …, N − L}³, from a stream keyed by (seed, slot, L) only.
+   * One more independent U ~ Uniform(0, 1) per proposal.
+6. **Responses.** R_j(x) = V_G(s_j, x) ∈ {0, 1}: closed-solid, closed-segment visibility at the voxel centres. They are computed exactly as certified full fields, with exact count indices.
+7. **Acceptance of one proposal W.**
+   * A(W, S) = [s_i ∉ B̄(W) for every i] ∧ [FREE(W) ≠ ∅] ∧ [m(W, S) ≥ 1].
+   * B̄(W) is the closed box [o/N, (o + L)/N]³.
+   * m = Σ_j I_j, with I_j = [R_j has lit and dark FREE receivers in W].
+   * W is accepted iff A(W, S) = 1 and U < c(m, L, k).
+   * A repeated origin is skipped.
+8. **Quotas.** Proposals continue until n_L ∈ {16, 24, 24} windows are accepted, or the side's cap is reached.
+9. **Scene acceptance.** The scene is accepted iff all three quotas are filled. Otherwise it is rejected: the attempt number increases and new geometry and sources are drawn. Every attempt is recorded.
+10. **Rate stream.** A further R = 1024 proposals per side, from separate keyed streams, are evaluated with the same rule. They give:
+    * Λ̂_L(G, S) = (1/R) Σ 1[accept], used for the training weights;
+    * the natural histogram of m among A-windows, used for the controller statistics and diagnostics.
+
+**What a flattened Student example observes:** e = (K_local(W), R_j|_W, W), i.e. the local SOLID mask, one source channel and the window geometry.
+* It does not see the other channels, the sources, G outside W, k, or the selection log.
+
+**Privileged label information** (Teacher only): G, and the selection law.
+
+## 2. The posterior of one source channel
+
+Write λ(W | G, S) for the probability that W is one of the accepted windows of side L.
+
+Under the quota design, the n_L accepted windows are i.i.d. draws from
+
+    q(W | G, S) = p_nat(W) · A(W, S) · c(m(W,S), L, k) / Λ_L(G, S),      Λ_L(G, S) = E_{p_nat}[A · c].
+
+Two factors depend on the sources:
+* the normalisation 1/Λ_L(G, S), which is the quota effect also seen in v0.1;
+* the scene-acceptance probability P_acc(G, S).
+
+### Weighted population (the training distribution)
+
+Give every accepted window of side L in scene (G, S) the weight ω = Λ_L(G, S). In practice the estimate Λ̂_L from the rate stream is used; it is unbiased. The weighted joint density of (G, k, S, W) is then
+
+    π(G) κ(k) Π_i u_D(s_i) · n_L p_nat(W) A(W,S) c(m, L, k) · P_acc(G, S)          (∗)
+
+where u_D is the uniform density on D(G). For clarity this omits the 2⁻²⁰ anti-duplicate factor (section 4).
+
+**Theorem (per-channel posterior).** Under (∗), with P_acc ≡ 1:
+
+    p(s_j | G, W, R_j|_W)  ∝  u_D(s_j) · 1[s_j ∉ B̄(W)] · 1[R_j(s_j) = r_j on FREE(W)].
+
+That is, the label is exactly the source-excluded single-source target Uniform(F_W^j) certified by the tau-pencil engine.
+
+**Proof.**
+1. Factorise A(W, S) c(m, L, k) as
+
+       1[s_j ∉ B̄] · Π_{i≠j} 1[s_i ∉ B̄] · 1[m ≥ 1] · c(I_j + m_{−j}, L, k).
+
+2. Given the observation, I_j is fixed because it is a function of r_j.
+3. m_{−j} and the exclusion of the other sources depend only on s_{−j}, G and W.
+4. Integrating over s_{−j} and k, which given G are independent of s_j, therefore gives a factor h(G, W, I_j) that does not depend on s_j.
+5. p_nat(W) and n_L do not depend on S.
+6. The remaining s_j-dependence is u_D(s_j) · 1[s_j ∉ B̄] · 1[R_j consistent]. ∎
+
+**Notes.**
+* The same statement holds for an **uninformative** channel of an accepted window (I_j = 0, with m ≥ 1 coming from the other channels). Its target is Uniform{s ∈ D(G) \ B̄ : s reproduces the all-lit or all-dark FREE pattern}.
+* The theorem also covers **dataset-level balancing**: c may depend on (m, L, k), because it is fixed before the scene's sources are drawn.
+* What would break it, and is therefore forbidden:
+  * a c that depends on this scene's realised source positions, rates or responses;
+  * a source prior that depends on the geometry;
+  * any choice of k or c made after looking at S.
+
+### Unweighted counting
+
+If training ignores ω, the per-channel posterior acquires the factor E_{s_{−j}}[1/Λ_L(G, S) | s_j]. This is the v0.1 mechanism. Its size is recorded per scene through Λ̂_L, so it can be audited. It is **not** covered by the label certificate. **Training must use ω** (scene-level, per side); the weights are stored with every window.
+
+## 3. Scene rejection (finite caps)
+
+Let E be the event that the scene is accepted. The actual population is the weighted population (∗) conditioned on E.
+
+**Bound.**
+* For a single example, the label error from conditioning on E is TV(p(· | obs, E), p(· | obs)) ≤ P(Eᶜ | obs).
+* Averaged over the examples of the dataset, it is at most r/(1 − r), where r = P_ω(Eᶜ) is the ω-weighted rejection probability.
+
+**Proof sketch.** TV(μ(· | E), μ) = μ(Eᶜ) for any event E. Averaging over obs ~ P(· | E) gives E[P(Eᶜ | obs) | E] ≤ P(Eᶜ)/P(E).
+
+**Estimate.**
+* r is estimated from all attempted scenes, accepted and rejected, using each attempt's rate-stream Λ̂ values *[measured]*.
+* With caps of 6000 proposals per side and the measured acceptance rates, rejection is expected to be rare.
+* This average bound is reported in the release statistics. It is statistical: it carries the sampling uncertainty of r̂, reported with a binomial upper 99% bound.
+
+## 4. The anti-duplicate rule (instead of MIN_SEPARATION = 1/32)
+
+A separation constraint couples the sources. Given s_j, each other source is uniform on D \ C(s_j), where C is the cube of half-width δ. Under balancing, both the conditional selection factor h(s_j) and the marginal prior of s_j vary with s_j. The relative variation is ≤ (k − 1) · vol(C) / (vol(D) · ḡ), where ḡ ≥ c_min · (vol(D) − vol(B̄)) is the mean acceptance factor of one other source. The TV error is ≤ 1 − a/b when the factor lies in [a, b].
+
+| δ | vol(C) | TV error (k = 4, c_min = 0.01) |
+|---|---|---|
+| 1/32 (v0.2) | 2.4·10⁻⁴ | up to ~0.1 (**not negligible**) |
+| 2⁻²⁰ (1K) | 6.9·10⁻¹⁸ | < 10⁻¹⁴ (negligible) |
+
+**Decision:** the 1K release uses δ = 2⁻²⁰ and states this bound. Pairs closer than 1/32 are allowed. They occur with probability about C(k, 2) · (4π/3)(1/32)³ / vol(D) ≤ 10⁻³ per scene, and they are physically legal. The realised minimum distances are reported.
+
+## 5. Total error budget of a label, under the weighted population
+
+| Term | Size | Kind |
+|---|---|---|
+| Certified engine bound (cell volume intervals) | per label, stored (`tv_bound`) | deterministic, given the engine's numerical model |
+| Binary64 rounding of the canonical rational rows, and engine margins | covered by the decision margins of the Phase-1 predicates (MARG 1e-11 on unit-normalised planes) | numerical assumption, documented in Phase 1 |
+| Anti-duplicate rule | < 1e-14 | derived bound |
+| Finite-cap scene rejection | dataset average ≤ r/(1 − r) | statistical estimate *[measured]* |
+| Rate-stream estimation of ω | affects training weights, not labels | statistical (relative s.e. ≈ √((1 − Λ)/(1024 Λ))) |
+| Output discretisation (128³ cells) | none: the target is the cell-mass vector itself | definition |
+
+**Not covered:**
+* bit-identity between the GPU pass and the CPU reference is a software equivalence, not a proof of real-arithmetic correctness;
+* the engine's geometric predicates are exact only up to the stated floating-point margins (Phase-1 METHOD.md).
+
+## 6. Effective layers
+
+* **I_j(W) = 1** iff channel j has at least one lit FREE receiver and at least one dark FREE receiver in W.
+* **m(W) = Σ_j I_j** is the effective layer count. It is a per-channel informativeness count, **not** the additive overlap R_sum(x) = Σ_j R_j(x).
+* R_sum is reported separately: an overlap histogram per window, the lit fraction per channel, and the minimum pairwise Hamming distance between informative channels.
+* **Balancing target:** a dataset-wide histogram of m over the 64,000 windows close to (¼, ¼, ¼, ¼). The weighted histogram (under ω) is also reported.
