@@ -69,9 +69,12 @@ The machine-readable copy is `contract/RIND3D_1K_CONTRACT_v1.json`. Any deviatio
 |---|---|
 | Student | Local SOLID crop, response channel(s), window side (origin optional) |
 | Target | Posterior slots with status and TV bound |
-| Privileged | Sources, global geometry, full fields, selection log, ω weights |
+| Training weight | ω for every window (`weight`, contract default = rate-stream Λ̂_L; `weights` = rate / quota / combined, SELECTION_LAW §8). A **loss weight**, never a model input; training must use it. |
+| Privileged | Sources, global geometry, full fields, selection log |
 
-Flattening to single-source examples is a loader adapter (`rind3d_1k.loader.flatten`). The canonical loader returns multi-channel window records.
+Flattening to single-source examples is a loader adapter (`rind3d_1k.loader.flatten`). The canonical loader returns multi-channel window records. Each flattened example carries its window's ω.
+
+Label slot statuses: `certified` (TV ≤ 0.05), `certified_loose` (≤ 0.10), `uncertified` (> 0.10, stored, never presented as qualified), `unavailable` (informative, not computed yet), `not_computed` (uninformative, deferred), `engine_failure` / `timeout` (the supervised labeller recorded a native crash or a wall-clock limit for this task; no label is stored).
 
 ## Splits
 
