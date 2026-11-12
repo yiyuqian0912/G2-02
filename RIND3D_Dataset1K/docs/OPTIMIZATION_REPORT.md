@@ -121,3 +121,22 @@ See `RENDERING_BENCHMARK.md`. Summary: certified full fields plus exact count in
 * **The real lever** is the heavy tail of individual large windows (queue blow-up from dual-tree expansions). Next steps:
   * smarter receiver-block ordering;
   * a source-space subdivision that keeps the expansion fronts bounded.
+
+## Recommended production architecture (adopted for 1K v1)
+
+1. **Physical stage.**
+   * Runs sequentially in slot order, so the balancing controller is deterministic.
+   * Per scene: certified CUDA full fields, exact count indices, quota selection with thinning, rate streams, source-separated observations.
+   * Cost: ≈ 23 s per scene at 1024³, using one CPU core and the GPU briefly.
+2. **Label stage.**
+   * A resumable task queue over (scene, window, source), restricted to informative channels.
+   * Scenes are processed in batches of 4, heaviest windows first within a batch, so complete scenes accumulate.
+   * Workers: a mixed pool of 5 GPU-assisted + 10 CPU workers, exact and bit-identical to the CPU reference.
+3. **Certification.**
+   * Every slot stores its deterministic TV bound and status.
+   * Slots with TV bound > 0.05 are retried automatically at the larger queue capacity (tier 2).
+   * Anything left is stored as `uncertified` and never presented as qualified.
+4. **Validation.**
+   * Every scene gets the structural validator.
+   * A seeded sample of scenes also gets physics spot checks against the canonical certified and independent predicates.
+5. **Scaling beyond this machine.** Labels are embarrassingly parallel. The same code runs on a many-core CPU node (the `cpu` engine), or on several GPU nodes each with its own process pool. No algorithm or contract change is needed.

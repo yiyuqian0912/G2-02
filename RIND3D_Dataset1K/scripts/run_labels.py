@@ -37,6 +37,8 @@ def main():
     from rind3d_1k.labels import tasks_for_scene, task_path, scene_label_summary
     root = Path(sys.argv[1]); k = int(sys.argv[2]); kg = int(sys.argv[3])
     uninf = "--uninformative" in sys.argv
+    if not (root / "scenes").exists():
+        print(json.dumps(dict(scenes=0, pending=0, note="no published scenes yet")), flush=True); return
     scenes = sorted(p for p in (root / "scenes").iterdir() if (p / "scene.json").exists())
     if "--scenes" in sys.argv:
         a, b = (int(x) for x in sys.argv[sys.argv.index("--scenes") + 1].split(":"))
