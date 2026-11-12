@@ -16,7 +16,8 @@ from rind3d_posterior.tpl.window import Window, enc
 R = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1/scenes")
 
 
-def stage2(geom, win, codes, kls, roots, max_records=1 << 22, ne_cap=1 << 26, nq_cap=1 << 25, max_vertices=1 << 23, bf=None):
+def stage2(geom, win, codes, kls, roots, max_records=1 << 22, ne_cap=1 << 26, nq_cap=1 << 25, max_vertices=1 << 23, bf=None,
+           max_nodes_cell=2_000_000, max_nodes_total=5_000_000):
     P, K, clo, chi, adj, aoff = geom.tup()
     wmode, wfront = window_aspects(geom, win)
     rec_cell = np.empty(max_records, np.int64); rec_lo = np.empty(max_records); rec_hi = np.empty(max_records)
@@ -29,7 +30,7 @@ def stage2(geom, win, codes, kls, roots, max_records=1 << 22, ne_cap=1 << 26, nq
     fbc = np.zeros(geom.C, np.int64); fs = np.zeros(geom.C, np.int64)
     t0 = time.perf_counter()
     args = (P, K, clo, chi, adj, aoff, win.origin, float(win.N), win.L, codes, kls, np.ascontiguousarray(roots, np.int64), n,
-            2_000_000, 5_000_000, 400, 24, True, True, 2.0, wmode, wfront, 2.0 ** -26,
+            max_nodes_cell, max_nodes_total, 400, 24, True, True, 2.0, wmode, wfront, 2.0 ** -26,
             rec_cell, rec_lo, rec_hi, rec_kind, rec_voff, rec_vn, vpool, vtop, stats, cell_nodes, cell_evals,
             fbc, fs, dep_evals, dep_nodes, ne_cap, nq_cap)
     if bf is None:
