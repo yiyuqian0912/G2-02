@@ -147,3 +147,64 @@ The GPU was 77% busy.
 **Estimated combined effect of 1–3:** ≈ 2–3× (to ≈ 6–9 h). That would approach, but likely not reach, the 6 h
 maximum on this laptop. On the 16 × H20 server the GPU side is not a constraint, so these methods cut the 100K label
 work from ≈ 33,400 to ≈ 5,500 laptop-thread-hours [projection: 2.94M labels × 6.75 s].
+
+---
+
+# Checkpoint 4 (2026-11-12, paused on request): FastLabel v3 — batched certified GPU verification
+
+**New code:**
+* `verify.cu`, `gpuverify.py`: batched exact point verification. Design and numerics are in `GPUVERIFY.md`.
+* `adaptive3.py`: v3 pipeline with a round-wise k-tolerant certificate and keyed per-label streams. Default policy: dataset-simultaneous δ = 0.01 / 159,802.
+* `runner3.py`, `analyze3.py`: throughput benchmark and its analysis.
+* `fastwin.py` v3 helpers (numba class tensor, boundary mask and top items; identical outputs, `test_fastwin2.py`).
+* `bench_plan.json`: DEV / HOLDOUT / GATEA plan, train split only.
+
+**Audit:** `CERTIFICATE_AUDIT.md`. v2 is valid per label at δ = 0.01. Findings:
+* seed 0 for every label;
+* float-margin tile culling;
+* all-pass waste.
+
+All three are removed in v3.
+
+**Gate A passed** (`gatea/`). On 27 windows (9 families × 3 sides), 2684 legal candidates gave bit-identical FREE-voxel
+fields against the certified renderer. The FP64-band build (904 candidates) and the forced-UNKNOWN build (896
+candidates; 643,872 voxels decided exactly) were also identical. There were 0 batch disagreements and 0 false violations.
+
+**Speed of point tests:** 40–90× per point uncontended (0.23–0.67 ms vs 20–44 ms). Point tests are now 2–8% of the time.
+
+**Throughput, production-like** (same 691 labels / 4 scenes as run4e, 15 workers; DEV tuning, not the final assessment):
+
+| run | config | labels/s | 1K projection |
+|---|---|---|---|
+| run4e (v2) | | 2.13 | 20.9 h |
+| v3a | v3 defaults (race on, subset 1024 + 512) | 5.73 | 7.75 h |
+| v3b | race off | 5.93 | 7.48 h |
+| v3c | subset 512 + 256 | 6.55 | 6.77 h |
+| v3d | race off + 512 + 256 | 7.36 | 6.03 h |
+| v3e | race off + small B statistical | 6.20 | 7.16 h |
+| v3f | race off + 512 + 256 + small B statistical | 7.54 | 5.89 h |
+| v3g | race off + 256 + 128 | 8.31 | 5.34 h |
+| **v3h** | **race off + 256 + 128 + small B statistical** | **8.80** | **5.04 h** |
+| v3i | race off + 512 + 256 + lighter stage 1 | 8.00 | 5.55 h |
+
+v3j (stage-1 depth 3) and v3k (16 workers) were interrupted by the pause.
+
+* Every run had 0 errors and 0 exact fallbacks.
+* Every statistical label was certified at the dataset-simultaneous level (p_lower ≥ 0.950).
+* Every deterministic label has tv_bound ≤ 3.3e-7.
+
+**Resume from here:**
+1. Finish the stage-1 / worker-count sweep (v3j, v3k) and combine with v3h.
+2. Representative benchmark on the 18 DEV scenes, then the final assessment on the 18 HOLDOUT scenes (Gate C/D):
+   * latency quantiles;
+   * per family and side;
+   * tail;
+   * scene-affine scheduling (cold scene loads ≈ 0.9 s each).
+3. Accuracy: v3 on the refs (random120) and the release labels (scenes 0–3), plus `validate_n` Monte Carlo checks.
+4. Integration as a `certified_stat` tier in the production labeller:
+   * package `rind3d_posterior.fastlabel`;
+   * a `rind3d_1k.labels` engine;
+   * loader status handling;
+   * a GPU lock in the Supervisor;
+   * tests.
+5. Do not start the 1K backfill before Gates C/D and the user's go.
