@@ -1,6 +1,6 @@
 """Aggregate pilot evaluations: population-weighted means, scene-bootstrap 95% intervals, paired arm differences, strata.
 
-usage: analyze.py <out.json> <arm>=<eval.npz> [<arm>=<eval.npz> ...]
+usage: analyze.py <out.json> <arm>=<eval.npz> [...] [--pairs A:B,C:D]  (paired difference A minus B)
 Weights per set: tstar / ood sets: equal per example within side, equal side shares (T*); b1k: omega_hat side-normalised.
 Intervals: 2000 scene-bootstrap resamples (scenes are the independent units; channels of one scene share G).
 Paired differences use the same examples for both arms."""
@@ -62,6 +62,12 @@ def summarise(d, setname, rng):
             continue
         res[m] = dict(mean=wmean(x, w), ci95=boot(lambda ii: wmean(x[ii], w[ii]), sc, rng), n=int(np.sum(~np.isnan(x))))
     gain = d["nll_prior"] - d["nll"]
+    if "supp_mass" in d and "ig_ref" in d:
+        # prior mass on the reference support: q_G is uniform on F at cell level up to boundary cells, so u(supp) ~ exp(-KL(q||u))
+        ratio = d["supp_mass"] / np.exp(-d["ig_ref"])
+        if not np.all(np.isnan(ratio)):
+            res["supp_mass_over_prior"] = dict(mean=wmean(ratio, w), median=float(np.nanmedian(ratio)),
+                                               ci95=boot(lambda ii: wmean(ratio[ii], w[ii]), sc, rng))
     res["info_gain_vs_prior"] = dict(mean=wmean(gain, w), ci95=boot(lambda ii: wmean(gain[ii], w[ii]), sc, rng))
     cov = {str(a): wmean((d["hpd_u"] < a).astype(float), w) for a in LEVELS}
     res["hpd_coverage"] = cov
@@ -79,6 +85,13 @@ def summarise(d, setname, rng):
         from scipy.stats import spearmanr
         res["adaptivity_spearman_ig_vs_ig_ref"] = float(spearmanr(d["ig"][ok], d["ig_ref"][ok]).correlation)
         res["adaptivity_spearman_gain_vs_ig_ref"] = float(spearmanr(gain[ok], d["ig_ref"][ok]).correlation)
+        oi = np.flatnonzero(ok)
+
+        def rho(ii, a):
+            ii = ii[ok[ii]]
+            return float(spearmanr(a[ii], d["ig_ref"][ii]).correlation) if len(ii) > 5 else np.nan
+        res["adaptivity_ig_ci95"] = boot(lambda ii: rho(ii, d["ig"]), sc, rng)
+        res["adaptivity_gain_ci95"] = boot(lambda ii: rho(ii, gain), sc, rng)
     if "rel_p" in d:
         res["reliability"] = dict(pred=d["rel_p"].tolist(), hits=d["rel_h"].tolist(), n=d["rel_n"].tolist())
     res["n"] = int(len(w)); res["n_scenes"] = int(len(np.unique(sc)))
@@ -87,7 +100,11 @@ def summarise(d, setname, rng):
 
 def main():
     out = sys.argv[1]
-    arms = dict(a.split("=", 1) for a in sys.argv[2:])
+    pairs = None
+    argv = sys.argv[2:]
+    if "--pairs" in argv:
+        i = argv.index("--pairs"); pairs = [tuple(x.split(":")) for x in argv[i + 1].split(",")]; argv = argv[:i] + argv[i + 2:]
+    arms = dict(a.split("=", 1) for a in argv)
     data = {a: load(p) for a, p in arms.items()}
     rng = np.random.default_rng(7)
     R = dict(arms={})
@@ -96,10 +113,11 @@ def main():
     # paired differences vs the first arm, per set, on the common examples
     names = list(arms)
     R["paired"] = {}
-    for a in names[1:]:
-        for b in names:
-            if a == b:
-                continue
+    todo = pairs if pairs is not None else [(a, b) for a in names[1:] for b in names if a != b]
+    for a, b in todo:
+        if a not in data or b not in data:
+            continue
+        if True:
             for s in data[a]:
                 if s not in data[b] or not len(data[a][s]["Lp"]):
                     continue

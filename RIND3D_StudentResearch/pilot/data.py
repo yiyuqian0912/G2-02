@@ -91,7 +91,8 @@ class Table:
         root = REL if r["ds"] == 0 else NAT
         return root / "scenes" / f"{int(r['scene']):06d}" / "labels" / "tasks" / f"w{int(r['window']):03d}_s{int(r['source'])}.npz"
 
-    def label(self, i, accept=("certified", "certified_stat"), max_tv=0.05):
+    def label(self, i, accept=("certified", "certified_stat"), max_tv=0.05 + 1e-5):
+        # max_tv allows the deterministic term eta (<= 2e-8 observed) of S6 OOD references: TV <= eps + eta
         """(cells, q, status) of the certified label, or (None, None, status) if missing / not accepted."""
         p = self.label_path(i)
         if not p.exists():

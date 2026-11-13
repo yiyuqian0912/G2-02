@@ -37,7 +37,7 @@
 |---|---|---|
 | certified | **9 / 18** (3 uncertified, 6 timeouts at 150 s) | **18 / 18** |
 | solid volume removed / vol(B′) | — | 0 to 15% (median 1.1%) |
-| η | — | ≤ 2.0·10⁻⁸ (median 4·10⁻¹⁴) |
+| η | — | ≤ 2.0·10⁻⁸ (median 4·10⁻¹⁴); in the 180 OOD all-dark references: ≤ 2.8·10⁻⁶ |
 | wall per label, under full contention from the backfill | 3–113 s | 17–273 s |
 
 **Independent empirical validation** (`s6/validate_s6.py`; not part of the certificate). On the three labels with the
@@ -77,7 +77,7 @@ So S6 makes all-dark windows certifiable: 53,590 exactly feasible points over th
 | criterion | all-lit | all-dark | solid-separated |
 |---|---|---|---|
 | 1. scientifically correct (properly conditioned Uniform(F) under T*) | yes: the same theorem, X-measurable stratum | yes, with S6 (B′ ⊇ F; Monte Carlo validated) | yes: already in the contract |
-| 2. adequately certified (TV ≤ 0.05) | yes: 180/180 statistical | yes: 180/180 statistical + η ≤ 2·10⁻⁸; research prototype, not production-reviewed | yes: 100% |
+| 2. adequately certified (TV ≤ 0.05) | yes: 180/180 statistical | yes: 180/180 statistical + η ≤ 2.8·10⁻⁶; research prototype, not production-reviewed | yes: 100% |
 | 3. cost comparable to mixed labels | **no: ≈ 25× per label** | **no: ≈ 80–100× per label** | **no: ≈ 12×** (already paid in the 1K) |
 | 4. scalable within the 1K / 100K budgets | **no.** 1K: 25,795 natural-equivalent all-lit channels ≈ 18 h extra. 100K: × ~20 | **no.** 1K: 13,443 channels ≈ 31 h extra | it is 2.5% of labels but about 23% of the 1K label compute. In the 100K, consider X-measurable thinning of this stratum if the budget binds |
 | 5. compatible with multi-source sampling | only for channels drawn by an X-measurable rule from *natural* windows (not the release's stored extreme channels, audit M4) | same | yes |

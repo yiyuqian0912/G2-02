@@ -1,0 +1,32 @@
+{
+ "FL_B1K_s0": {
+  "train_scenes_gain": 4.215012404522096,
+  "train_scenes_kl": 6.459158705311829,
+  "heldout_gain": 3.690593973146406,
+  "heldout_kl": 6.724757736654709,
+  "n_train_rows": 6000
+ },
+ "OH_B1K_s0": {
+  "train_scenes_gain": 3.1454326484465454,
+  "train_scenes_kl": 8.637221918118039,
+  "heldout_gain": 1.096948988087704,
+  "heldout_kl": 9.329056902174996,
+  "n_train_rows": 6000
+ },
+ "FL_B1K_sc25_s0": {
+  "train_scenes_gain": 7.8389452364379295,
+  "train_scenes_kl": 4.348087094828574,
+  "heldout_gain": 2.9699792274452315,
+  "heldout_kl": 7.435979562346731,
+  "n_train_rows": 1505,
+  "unseen_train_split_scenes_gain": 2.9249912095085584
+ },
+ "OH_B1K_sc25_s0": {
+  "train_scenes_gain": 4.851193684123602,
+  "train_scenes_kl": 9.165397651660863,
+  "heldout_gain": -0.729641935276839,
+  "heldout_kl": 11.106866932019818,
+  "n_train_rows": 1505,
+  "unseen_train_split_scenes_gain": -0.7849440923067484
+ }
+}
