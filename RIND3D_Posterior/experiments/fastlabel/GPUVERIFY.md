@@ -105,3 +105,27 @@ clearance certificate, with the host check only for flagged sources.
 * It uses only `__d{add,sub,mul,div}_r{d,u}`, which are IEEE directed-rounding intrinsics on all architectures since sm_20.
 * The batch size is bounded by a device-memory budget per worker (`mem_budget`, default 96 MB).
 * There is no host-CPU assumption. Re-run Gate A on a new device type before use; it takes about 10 minutes.
+
+## verify2 (default since v3.1)
+
+**Schedule.** One block of 128 threads per (source, 64³ tile):
+1. tile box test;
+2. 64 bricks × tile-masked bodies, in parallel;
+3. 512 leaves;
+4. voxels of the unresolved leaves.
+
+**Decisions:** the same predicates, the same expected values and the same per-16³-brick (min, max) violation records as `verify`.
+
+**Validation:**
+* Bit-identical fields on 4 windows (384 legal candidates), including L256 and many-body scenes, with 0 batch disagreements.
+* Production copy (`rind3d_1k.fastlabel`): `tests/test_fastlabel.py::test_verifier_matches_original_renderer`
+  compares against the original `CUDASource.packed_batch`.
+
+**Kernel time** (`kbench.py`, 1024 certification-like points, uncontended): 45–455 ms. It is bound by voxel visits
+along shadow boundaries, not by launch overhead. The tile schedule alone gave only about 10%.
+
+**Shadow-row construction:** 25–35 ms per 1024 sources for scenes with many faces (FP64 pair rows).
+
+**Next kernel levers (not done):**
+* 4³ / 2³ sub-leaf observation codes, to cut voxel visits about 2–4×;
+* a block-per-source rows kernel.

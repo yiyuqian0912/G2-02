@@ -1,6 +1,7 @@
 """Uniform sampling in the phase-1 outer bound B (same law as stat_tier.sample_in_B: piece ∝ exact volume `hi`,
 tetrahedron of the piece's Delaunay tetrahedralisation ∝ volume, Rocchini-Cignoni uniform barycentric), vectorised
-per piece, with a per-label triangulation cache (pieces repeat across rounds) and lazy chunks."""
+per piece, with a per-label triangulation cache (pieces repeat across rounds) and lazy chunks. Pieces that are exact
+axis-aligned boxes (8 vertices = the 8 corners of their bounding box) are sampled directly (same uniform law)."""
 import numpy as np
 from stat_tier import _tetrahedra
 
@@ -23,6 +24,12 @@ class BSampler:
         V = res["vpool"][res["voff"][i]:res["voff"][i] + res["vn"][i]]
         key = V.tobytes()
         v = self.cache.get(key)
+        if v is None and len(V) == 8:
+            # exact axis-aligned box: its 8 vertices are exactly the 8 corners of their bounding box, so the convex
+            # hull is the box and the uniform law on it needs no triangulation
+            lo = V.min(0); hi = V.max(0)
+            if np.all(lo < hi) and np.all((V == lo) | (V == hi)) and len(set(((V == hi) @ np.array([1, 2, 4])).tolist())) == 8:
+                v = self.cache[key] = ("box", lo, hi - lo)
         if v is None:
             ctr = V.mean(0); sc = max(float(np.max(np.abs(V - ctr))), 1e-300)
             T = _tetrahedra((V - ctr) / sc)
@@ -41,7 +48,10 @@ class BSampler:
         u, first, cnt = np.unique(picks[order], return_index=True, return_counts=True)
         out = np.empty((n, 3))
         for i, f, m in zip(u.tolist(), first.tolist(), cnt.tolist()):
-            T, pv, ctr, sc = self._tri(i)
+            tri = self._tri(i)
+            if isinstance(tri[0], str):          # ("box", lo, size)
+                out[order[f:f + m]] = tri[1] + tri[2] * rng.random((m, 3)); continue
+            T, pv, ctr, sc = tri
             k = rng.choice(len(pv), size=m, p=pv) if len(pv) > 1 else np.zeros(m, np.int64)
             a = rng.random((m, 3)); x, y, z = a[:, 0].copy(), a[:, 1].copy(), a[:, 2].copy()
             s1 = x + y > 1

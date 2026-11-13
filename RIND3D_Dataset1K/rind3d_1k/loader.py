@@ -93,7 +93,8 @@ class Scene:
         cells, inv = np.unique(cell, return_inverse=True)
         Lc = np.bincount(inv, weights=lo, minlength=len(cells)); Uc = np.bincount(inv, weights=hi, minlength=len(cells))
         q = Lc / Lc.sum() if Lc.sum() > 0 else Lc
-        out = dict(cells=cells, q=q, lo=Lc, hi=Uc, tv_bound=tv, status=m["status"], informative=m["informative"])
+        out = dict(cells=cells, q=q, lo=Lc, hi=Uc, tv_bound=tv, status=m["status"], informative=m["informative"],
+                   certificate=m.get("certificate"), engine=m.get("engine"))
         if dense:
             g = np.zeros(128 ** 3); g[cells] = q; out["dense"] = g.reshape(128, 128, 128)
         return out
@@ -139,10 +140,13 @@ class RIND3D1K:
         return self.scene(idx // 64).window(idx % 64)
 
 
-def flatten(ds, informative_only=True, certified_only=True, max_tv=0.05, weight="rate"):
+def flatten(ds, informative_only=True, certified_only=True, max_tv=0.05, weight="rate", accept_statistical=False):
     """Downstream adapter: yields single-source examples (solid, response_j, L, origin, label_j, weight, ids).
     `weight` selects the omega estimator ("rate" = contract default, "quota", "combined"); every example of a window
-    carries its window's omega, and training must use it as the loss weight."""
+    carries its window's omega, and training must use it as the loss weight.
+    `accept_statistical`: also yield FastLabel labels with status "certified_stat" (TV <= 0.05 except with the
+    probability stated in label["certificate"]; dataset-simultaneous policy). Off by default, so the behaviour on
+    deterministic labels is unchanged; the status and certificate travel with every label."""
     for i in range(len(ds.scenes)):
         S = ds.scene(i)
         for w in range(len(S.W)):
@@ -151,7 +155,8 @@ def flatten(ds, informative_only=True, certified_only=True, max_tv=0.05, weight=
                 if informative_only and not rec["informative"][j]:
                     continue
                 lab = rec["posteriors"][j]
-                if certified_only and not (lab.get("status") == "certified" and lab.get("tv_bound", 1) <= max_tv):
+                ok_status = ("certified", "certified_stat") if accept_statistical else ("certified",)
+                if certified_only and not (lab.get("status") in ok_status and lab.get("tv_bound", 1) <= max_tv):
                     continue
                 yield dict(scene_id=rec["scene_id"], window=w, source=j, L=rec["L"], origin=rec["origin"],
                            solid=rec["solid"], response=rec["responses"][j], label=lab,

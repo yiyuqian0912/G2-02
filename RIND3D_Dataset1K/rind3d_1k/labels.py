@@ -24,6 +24,8 @@ import zstandard
 STATUS_CERT = "certified"          # TV bound <= 0.05 for the declared target
 STATUS_LOOSE = "certified_loose"   # 0.05 < TV bound <= 0.10
 STATUS_UNCERT = "uncertified"      # TV bound > 0.10 (stored, but never presented as qualified)
+STATUS_STAT = "certified_stat"     # FastLabel statistical certificate: TV <= eps (0.05) except with the stated probability;
+                                   # meta["certificate"] has eps, delta, n, K, thresholds, seed (dataset-simultaneous policy)
 
 
 class SceneObs:
@@ -83,6 +85,8 @@ def run_task(t, engine, **kw):
     S = _CACHE.get(scene_dir)
     if S is None:
         _CACHE.clear(); S = _CACHE[scene_dir] = SceneObs(scene_dir)
+    if engine == "fastlabel":
+        return _run_fastlabel(t, out, kw)
     from rind3d_posterior import label_window, ENGINE_VERSION
     cls = S.cls(w, s)
     c0 = time.process_time(); t0 = time.perf_counter()
@@ -147,6 +151,31 @@ def scene_label_summary(scene_dir, include_uninformative=False, failures=None):
     return cov, missing
 
 
+def _run_fastlabel(t, out, kw):
+    """FastLabel v3.3 (rind3d_1k.fastlabel): writes the same task-file fields as the tau-pencil engine.
+    Statistical labels: one record per cell with lo = hi = the cell volume of the certified outer bound B (so the
+    loader's q = lo / sum(lo) is q_B), kind = 4, tv_bound = eps, status "certified_stat", certificate in meta."""
+    from rind3d_1k.fastlabel import label_task
+    scene_dir, w, s, L, inf = t
+    c0 = time.process_time(); t0 = time.perf_counter()
+    lab = label_task(scene_dir, w, s, **kw)
+    m = lab["meta"]
+    meta = dict(window=w, source=s, L=L, informative=inf, tv_bound=float(lab["tv_bound"]), status=lab["status"],
+                engine="fastlabel", engine_version=m["version"], path=m["path"], certificate=m.get("certificate"),
+                cpu=time.process_time() - c0, wall=time.perf_counter() - t0, n_records=int(len(lab["cell"])),
+                vol_lo=float(np.sum(lab["lo"])), vol_hi=float(np.sum(lab["hi"])), n_cells=m.get("n_cells"),
+                rounds=[{k: x.get(k) for k in ("round", "items", "records", "tested", "K", "p1_s")} for x in m.get("rounds", [])],
+                validation=m.get("validation"),
+                params={kk: v for kk, v in kw.items() if isinstance(v, (int, float, str))})
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_name(out.stem + f".tmp{os.getpid()}.npz")
+    np.savez_compressed(tmp, cell=np.asarray(lab["cell"], np.int32), lo=np.asarray(lab["lo"], float),
+                        hi=np.asarray(lab["hi"], float), kind=np.asarray(lab["kind"], np.int8),
+                        tv_bound=float(lab["tv_bound"]), meta=json.dumps(meta, default=float))
+    os.replace(tmp, out)
+    return meta
+
+
 def supervised_task(t, engine, kw):
     """Worker entry for rind3d_1k.supervise (scripts/run_labels.py). kw = {"all": {...}, "gpu": {...}}.
     Python exceptions are returned as an error record; native faults are handled by the supervisor."""
@@ -157,7 +186,9 @@ def supervised_task(t, engine, kw):
         time.sleep(1e9)
     try:
         a = dict(kw.get("all", {}))
-        if engine == "gpu":
+        if engine == "fastlabel":
+            m = run_task(t, engine, **a, **kw.get("fastlabel", {}))
+        elif engine == "gpu":
             m = run_task(t, engine, gpu_min=1024, gpu_prefix=64, **a, **kw.get("gpu", {}))
         else:
             m = run_task(t, engine, **a)

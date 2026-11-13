@@ -34,7 +34,7 @@ from stat_tier import sample_in_B
 from sampler3 import BSampler
 from fastbf import build_filter2, items_from_vox2
 
-VERSION = "fastlabel-v3.3"
+VERSION = "fastlabel-v3.4"
 N_DATASET = 159802                     # informative channels of the 1K (for the dataset-level delta policy)
 
 DEFAULTS = dict(nbd=256, nin=128, R=12, n_cert=1024, n_stage1=512, chunks=(128, 384, 512), eps=0.05, delta=0.01 / N_DATASET,

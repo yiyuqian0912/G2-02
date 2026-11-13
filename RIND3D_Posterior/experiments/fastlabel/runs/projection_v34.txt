@@ -1,0 +1,3 @@
+scenes 36 labels 5082 pooled worker-s/label 1.412 machine efficiency 0.980
+1K projection (15 workers, pooled 36 scenes): 4.27 h; scene-bootstrap 90% interval [3.53, 5.03] h, 99% upper 5.36 h
+per-scene worker-s/label: min 0.48 median 1.21 max 3.61

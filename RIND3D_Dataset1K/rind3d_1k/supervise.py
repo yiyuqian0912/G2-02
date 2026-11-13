@@ -20,13 +20,16 @@ from collections import deque
 from multiprocessing.connection import wait
 
 
-def _worker_main(conn, fn_path, engine, kw, nice, sys_path):
+def _worker_main(conn, fn_path, engine, kw, nice, sys_path, init=None):
     for p in reversed(sys_path):
         if p not in sys.path:
             sys.path.insert(0, p)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     if nice:
         os.nice(nice)
+    if init is not None:                 # optional per-worker initialiser: ("module:function", args)
+        imod, iname = init[0].split(":")
+        getattr(importlib.import_module(imod), iname)(*init[1])
     mod, name = fn_path.split(":")
     fn = getattr(importlib.import_module(mod), name)
     while True:
@@ -37,8 +40,9 @@ def _worker_main(conn, fn_path, engine, kw, nice, sys_path):
 
 
 class Supervisor:
-    def __init__(self, ctx, engines, fn_path, kw=None, nice=0, sys_path=()):
+    def __init__(self, ctx, engines, fn_path, kw=None, nice=0, sys_path=(), init=None):
         self.ctx, self.fn_path, self.kw, self.nice, self.sys_path = ctx, fn_path, kw or {}, nice, list(sys_path)
+        self.init = init
         self.slots = [dict(engine=e) for e in engines]
         for s in self.slots:
             self._spawn(s)
@@ -46,7 +50,7 @@ class Supervisor:
     def _spawn(self, s):
         a, b = self.ctx.Pipe()
         p = self.ctx.Process(target=_worker_main, daemon=True,
-                             args=(b, self.fn_path, s["engine"], self.kw, self.nice, self.sys_path))
+                             args=(b, self.fn_path, s["engine"], self.kw, self.nice, self.sys_path, self.init))
         p.start(); b.close()
         s.update(proc=p, conn=a, task=None, t0=None)
 

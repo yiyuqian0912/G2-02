@@ -257,3 +257,108 @@ In v3r, p99 is 5.5 s and the GPU is 65% busy.
    * tests.
 
 **Separate task (user, 2026-11-12):** the scientific foundations audit. Its brief is `RIND3D_Audit/BRIEF.md`. A background audit agent was started and then stopped by the pause before writing any results; relaunch it on resume. Constraints: no GPU, at most one niced CPU process, write only in `RIND3D_Audit/`.
+
+---
+
+# Checkpoint 6 (2026-11-13): FastLabel v3.4 — final assessment and production integration
+
+**v3.4 = v3.3 plus an exact box fast path in the sampler.** A piece whose 8 vertices are the 8 corners of its bounding
+box is that box, so it is sampled directly. The law is unchanged. It removes about 97% of the sampling time on
+1M-piece bounds: 1.23 s → 0.04 s per 512 points.
+
+The configuration was frozen before the HOLDOUT run.
+
+## C. Performance (production-like, 15 workers, full machine, `runner3.py`, all informative channels of the scenes)
+
+| set | scenes | labels | labels/s | 1K projection | p50 / p95 / p99 / max (s) | errors | exact fallbacks |
+|---|---|---|---|---|---|---|---|
+| run4e sample (v2 baseline) | 4 | 691 | 2.13 | 20.9 h | | 0 | 1 |
+| DEV-18 (tuning set) | 18 | 2562 | 9.06 | 4.90 h | 0.81 / 3.8 / 23.6 / 37.8 | 0 | 0 |
+| **HOLDOUT-18 (never used for tuning)** | 18 | 2520 | **12.23** | **3.63 h** | 0.72 / 2.5 / 14.5 / 34.5 | 0 | 0 |
+| **pooled DEV + HOLDOUT** | 36 | 5082 | ≈ 10.4 | **4.27 h** | | 0 | 0 |
+
+* Scene-bootstrap of the pooled projection (`runs/projection_v34.txt`, 20,000 resamples of the 36 scenes, machine efficiency 0.98 measured):
+  * 90% interval **[3.53, 5.03] h**;
+  * 99% upper bound **5.36 h**.
+  * Per-scene cost varies from 0.48 to 3.61 worker-s per label; this is the dominant uncertainty.
+* GPU utilisation is 34–40%. Peak memory is ≈ 16 GB of 31 GB.
+* By family (HOLDOUT, mean s/label): occluder_clusters 0.53 … corridors 2.58. The heaviest tails come from very broad
+  posteriors (thin sheets, ≈ 10⁵–10⁶ cells), mostly at L64 / L128.
+* Worker-time components (HOLDOUT):
+
+| component | share |
+|---|---|
+| phase 1 (tau-pencil on a receiver subset) | 45% |
+| stage 1 | 24% |
+| sampling | 14% |
+| point tests | 6% |
+| setup | 5% |
+| verifier initialisation | 3% |
+
+## Accuracy (`runs/acc_v34.jsonl`, `runs/accuracy_v34.txt`)
+
+Run on every task that has a certified reference (449):
+
+| reference | n | max TV | mean TV |
+|---|---|---|---|
+| certified tau-pencil v3.1 references (random 120) | 113 | 0.0164 | 0.0011 |
+| production release labels (scenes 0–3) | 334 | 0.0147 | 0.0013 |
+
+* Two references with a vacuous bound were excluded.
+* **Independent Monte Carlo check.** This is empirical and NOT part of the certificate: 4096 fresh exact tests for each of the 315 statistical labels.
+  * p̂ = vol(F)/vol(B): min 0.981, median 1.000.
+  * No 99% interval lies below 0.95.
+  * This is consistent with every certificate.
+
+## E. Certification frontier
+
+All rows use the GPU verifier. Costs are tests per statistical label; the round-1 thresholds are shown.
+
+| policy | per-label δ | n₁ / a₁, n₂ / a₂ | P(certify) at p = 0.99 | tests per statistical label (measured) |
+|---|---|---|---|---|
+| v2 all-pass | 0.01 | 104 / 0 | 0.35 (then retries) | ≈ 140 + discovery |
+| v3 single-stage, dataset-simultaneous | 6.3e-8 | 1024 / 17 | 0.98 | 1229 |
+| **v3.2+ two-stage, dataset-simultaneous (default)** | 6.3e-8 | 512 / 3, 1024 / 17 | 0.98 | **787–806** |
+
+* One certificate also bounds other ε′: P(TV > 0.10 and certified) ≤ P(Bin(1024, 0.10) ≤ 17) ≈ 4e-27.
+* Confidence (δ) and the error bound (ε) are reported separately and never added.
+
+## F. Recommendation
+
+**The full 159,802-label backfill is projected to finish within the 6 h maximum on this laptop.** The pooled point
+estimate is 4.27 h, with a 90% interval of 3.53–5.03 h and a 99% upper bound of 5.36 h. Under the GPU-batched pipeline
+this is ≈ 33× fewer machine hours than the original 141 h.
+
+Every label carries one of two certificates:
+* a deterministic one: single-cell support (TV 0), or an exact path;
+* a statistical one: TV ≤ 0.05, with P(any false statistical certificate in the whole 1K) ≤ 0.01.
+
+The **4 h preferred target is not reliably met.** The point estimate exceeds it by about 7%, and the scene-level spread
+is wide.
+
+**Strongest next levers**, by measured share:
+1. Phase 1 (45%): a GPU port of the subset-phase item evaluation, or sharing stage-1 / phase-1 work across the source channels of a window.
+2. Stage 1 (24%): GPU sentinel box tests.
+3. Sampling (14%): a numba convex-hull tetrahedralisation instead of Qhull for non-box pieces.
+
+**Go / no-go:** GO technically, pending the user's decision. The backfill command and the meaning of the label statuses
+are in `RIND3D_Dataset1K/docs/FASTLABEL_1K.md`.
+
+## G. Production integration (`yushu/3d`)
+
+* **`rind3d_1k.fastlabel`** (production copy of the verified research code, v3.4):
+  * `pipeline.label_task`;
+  * `gpuverify` / `verify.cu`;
+  * `fastplanes`, `window`, `sampler`, `filters`, `engine`.
+* **`rind3d_1k.labels`:**
+  * engine `fastlabel` (`run_task`, `supervised_task`), with status `certified_stat` and a certificate in the meta;
+  * statistical records are per-cell volumes of B (kind 4).
+* **`rind3d_1k.supervise`:** optional per-worker initialiser (the GPU semaphore).
+* **`scripts/run_labels.py --engine fastlabel`.**
+* **`rind3d_1k.loader`:** `flatten(..., accept_statistical=False)`; labels expose `certificate` / `engine`.
+* **Tests:** `tests/test_fastlabel.py` (design α and monotonicity, verifier vs the original renderer, labels vs release
+  labels, determinism, task-file round trip in a temporary scene copy) and `tests/test_supervise.py`. All pass.
+
+**Reproduce:**
+* `runner3.py 0 15 0 out.jsonl --gpu-permits 1 --scenes <bench_plan.json holdout>`, then `analyze3.py out.jsonl "<summary line>"` and `--strata`;
+* accuracy: `--tasks runs/acc_tasks.txt --kw '{"validate_n": 4096}'`.
