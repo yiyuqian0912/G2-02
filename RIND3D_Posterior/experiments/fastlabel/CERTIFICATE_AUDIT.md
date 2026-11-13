@@ -88,6 +88,29 @@ At round r:
 4. Stopping a round early only shrinks the certificate event.
 5. Take the union bound over r. ∎
 
+**v3.2 two-stage rounds** (`design2`, now the default). Each round has two stages:
+* stage 1: n₁ = 512 points; certify iff K₁ ≤ a₁;
+* stage 2: otherwise continue to n₂ = 1024 points; certify iff K ≤ a₂.
+
+The thresholds are fixed in advance per round. They are computed exactly at the boundary failure rate ε:
+* P(Bin(n₁, ε) ≤ a₁) ≤ δ_r / 2;
+* a₂ is the largest value with P(K₁ ≤ a₁) + Σ_{k₁ = a₁+1}^{a₂} P(K₁ = k₁) P(Bin(n₂ − n₁, ε) ≤ a₂ − k₁) ≤ δ_r.
+
+The certificate event is an increasing function of the per-point pass indicators. Coupling the indicators as 1[U_i < p] shows that its probability is nondecreasing in p, so for every p < 1 − ε it is at most its value at p = 1 − ε, i.e. at most δ_r. The theorem above therefore holds unchanged.
+
+**Round-1 values at the dataset-simultaneous δ:**
+
+| quantity | value |
+|---|---|
+| δ_1 | 3.1e-8 |
+| a₁ | 3 |
+| a₂ | 17 |
+| exact α | 2.92e-8 |
+
+* The power at p = 0.99 is the same as the single-stage n = 1024 design (0.983).
+* Labels with p ≥ 0.998 stop at stage 1 with probability ≥ 0.98.
+* In the run4e sample, 402 of 457 statistical labels stopped at stage 1.
+
 **Remarks:**
 * Adaptive receiver selection, the data-dependent number of rounds, and the reuse of failing samples for constraints are all covered, because every certificate uses only fresh samples whose law is fixed by the past.
 * Failed or interrupted labels: the stream is keyed, so a rerun reproduces the same decisions. It is not a fresh "re-roll" that would need extra δ.

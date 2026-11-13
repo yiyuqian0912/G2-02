@@ -1,0 +1,2 @@
+{"scenes": ["000623", "000689", "000905", "000949"], "tasks": 691, "workers": 15, "kw": {"race_nodes": 0, "nbd": 256, "nin": 128, "small_records": 0}}
+{"tasks": 691, "wall": 76.36742947400035, "labels_per_s": 9.048360076533076, "gpu_util_mean": 53.625, "proj_1k_hours": 4.905799953691993}

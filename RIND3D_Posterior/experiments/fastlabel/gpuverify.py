@@ -20,6 +20,8 @@ from numba import njit
 
 HERE = Path(__file__).resolve().parent
 _MOD = {}
+_BUFS = {}
+_SOLID_OK = set()          # (geometry id, window origin, L) whose stored SOLID crop was checked in this process
 
 
 def _module(rt):
@@ -33,7 +35,7 @@ def _module(rt):
         ptx, log = rt.compile(code)                       # NVRTC with --fmad=false --ftz=false (Runtime options)
         mod = C.c_void_p(); rt.ck("cuModuleLoadData", C.byref(mod), C.create_string_buffer(ptx))
         fns = {}
-        for name in ("shadow_rows", "verify"):
+        for name in ("shadow_rows", "verify", "verify2"):
             f = C.c_void_p(); rt.ck("cuModuleGetFunction", C.byref(f), mod, name.encode()); fns[name] = f
         d = rt.driver
         d.cuMemsetD32_v2.argtypes = [C.c_uint64, C.c_uint, C.c_size_t]
@@ -91,6 +93,33 @@ class DevBuf:
 
 @njit(cache=True)
 def leaf_codes(cls, solid_mode):
+    """Same output as leaf_codes_ref; reads cls in memory order (x, y, z) with per-leaf counters."""
+    L = cls.shape[0]; nl = L // 8
+    n0 = np.zeros(nl * nl * nl, np.int32); n1 = np.zeros(nl * nl * nl, np.int32)
+    for x in range(L):
+        lx = x >> 3
+        for y in range(L):
+            base = ((y >> 3) * nl) + lx
+            for z in range(L):
+                c = cls[x, y, z]
+                j = (z >> 3) * nl * nl + base
+                if solid_mode:
+                    if c == 2:
+                        n1[j] += 1
+                    else:
+                        n0[j] += 1
+                elif c == 0:
+                    n1[j] += 1
+                elif c == 1:
+                    n0[j] += 1
+    out = np.empty(nl * nl * nl, np.int8)
+    for j in range(nl * nl * nl):
+        out[j] = 3 if n0[j] + n1[j] == 0 else (0 if n1[j] == 0 else (1 if n0[j] == 0 else 2))
+    return out
+
+
+@njit(cache=True)
+def leaf_codes_ref(cls, solid_mode):
     """cls[x, y, z] in {0 dark FREE, 1 lit FREE, 2 SOLID}. Code per 8^3 leaf (index (lz * nl + ly) * nl + lx):
     0 every care voxel expects 'outside', 1 every care voxel expects 'inside', 2 mixed, 3 no care voxel."""
     L = cls.shape[0]; nl = L // 8
@@ -114,6 +143,23 @@ def leaf_codes(cls, solid_mode):
                                 n0 += 1
                 out[(lz * nl + ly) * nl + lx] = 3 if n0 + n1 == 0 else (0 if n1 == 0 else (1 if n0 == 0 else 2))
     return out
+
+
+def _combine(c, f):
+    """Observation code of a block from its f^3 children codes (0, 1, 2 mixed, 3 none)."""
+    n = c.shape[0] // f
+    c = c.reshape(n, f, n, f, n, f)
+    has0 = (c == 0).any(axis=(1, 3, 5)); has1 = (c == 1).any(axis=(1, 3, 5)); has2 = (c == 2).any(axis=(1, 3, 5))
+    out = np.full((n, n, n), 3, np.int8)
+    out[has0] = 0; out[has1] = 1; out[has2 | (has0 & has1)] = 2
+    return out
+
+
+def coarse_codes(lcode, L):
+    nl = L // 8
+    b = _combine(lcode.reshape(nl, nl, nl), 2)                     # [bz, by, bx]
+    t = _combine(b, 4)                                             # [tz, ty, tx]
+    return b.ravel(), t.ravel()
 
 
 def _bricks(lcode, L):
@@ -169,7 +215,7 @@ class GeometryRows:
 
 
 class WindowVerifier:
-    def __init__(self, fac, ctx, S, w, s, cls, kmax=1024, ucap=4096, lock=None, check_solid=True, mem_budget=96 << 20):
+    def __init__(self, fac, ctx, S, w, s, cls, kmax=1024, ucap=4096, lock=None, check_solid=True, mem_budget=96 << 20, kernel2=True):
         from fractions import Fraction
         from rind3d.lite_acceptance import DRIVER_RADIUS
         self.fac = fac; self.rt = rt = fac._cuda(); self.ctx = ctx; self.m = _module(rt); self.lock = lock
@@ -187,30 +233,37 @@ class WindowVerifier:
             o, n = S._pos[(w, j)]
             return np.frombuffer(S.dz.decompress(S.blob[o:o + n]), np.uint8)
         self.cls = cls
-        self.d_lit = rt.upload(raw(s)); self.d_sol = rt.upload(raw(-1))
-        self.lcode = leaf_codes(cls, False); self.d_lcode = rt.upload(self.lcode)
+        bufs = _BUFS.get(id(rt))
+        if bufs is None:                     # process-wide reusable device buffers (no per-label alloc / free)
+            bufs = _BUFS[id(rt)] = {k: DevBuf(rt) for k in ("lit", "sol", "lcode", "src", "R64", "R32", "rcnt", "status", "work",
+                                                             "nmis", "recn", "rec", "nunk", "unk", "lcode2", "dump",
+                                                             "bcode", "tcode", "bcode2", "tcode2")}
+        self.buf = bufs
+        self.d_lit = bufs["lit"].put(raw(s)); self.d_sol = bufs["sol"].put(raw(-1))
+        self.lcode = leaf_codes(cls, False); self.d_lcode = bufs["lcode"].put(self.lcode)
+        self.kernel2 = kernel2
+        self.bcode, self.tcode = coarse_codes(self.lcode, self.L)
+        self.d_bcode = bufs["bcode"].put(self.bcode); self.d_tcode = bufs["tcode"].put(self.tcode)
+        self.tiles = np.flatnonzero(self.tcode != 3).astype(np.int32)
         self.bricks = _bricks(self.lcode, self.L)
         self.ucap = int(ucap)
         self.rcap = 2 * (self.L // 16) ** 3
         per_src = self.G.rows_per_src * 80 + len(self.bricks) * 8 + self.rcap * 4 + self.ucap * 4
         self.kmax = int(min(kmax, max(16, mem_budget // per_src)))           # device memory guard per worker
-        self.buf = {k: DevBuf(rt) for k in ("src", "R64", "R32", "rcnt", "status", "work", "nmis", "recn", "rec", "nunk", "unk")}
         self.stats = dict(batches=0, points=0, legal_fail=0, box_fail=0, host_legal=0, host_rows=0, unknown_voxels=0,
                           unknown_sources=0, work_items=0, gpu_s=0.0, legal_s=0.0, host_s=0.0, exact_s=0.0)
         import json
         sj = json.loads((S.dir / "privileged" / "sources.json").read_text())
         self.true_source = np.array([float.fromhex(v) for v in sj["sources_hex"][s]])
-        if check_solid:
-            self.solid_check()
+        self.solid_key = (ctx.geometry_id, tuple(int(v) for v in self.o), self.L)
+        if check_solid and self.solid_key not in _SOLID_OK:
+            self.solid_check(); _SOLID_OK.add(self.solid_key)
 
     def close(self):
-        for b in self.buf.values():
-            b.close()
-        for p in (self.d_lit, self.d_sol, self.d_lcode):
-            self.rt.free(p)
+        pass                                 # buffers are process-wide and reused by the next label
 
     # ---------------------------------------------------------------- core launch
-    def _run(self, K, work, rows=None, solid_mode=False, dump=None, lcode_ptr=None):
+    def _run(self, K, work, rows=None, solid_mode=False, dump=None, lcode_ptr=None, codes2=None):
         """rows: None -> rows (and legality flags) built on the GPU from buf['src']; else host (R64, R32, rcnt)."""
         rt = self.rt; G = self.G; b = self.buf; fns = self.m["fns"]
         rps = G.rows_per_src
@@ -227,7 +280,14 @@ class WindowVerifier:
         b["nmis"].zero(K * 4); b["recn"].zero(K * 4); b["nunk"].zero(K * 4)
         b["rec"].ensure(K * self.rcap * 4); b["unk"].ensure(K * self.ucap * 4)
         nwork = len(work) // 2
-        if nwork:
+        if nwork and self.kernel2:
+            bc, tc = codes2 if codes2 is not None else (self.d_bcode, self.d_tcode)
+            _launch(rt, fns["verify2"], (nwork, 1, 1), (128, 1, 1),
+                    [b["R32"].p, b["R64"].p, G.d_rstart, b["rcnt"].p, rps, G.nb, b["work"].p, nwork, self.d_lit, self.d_sol,
+                     int(solid_mode), lcode_ptr if lcode_ptr is not None else self.d_lcode, bc, tc, int(self.o[0]), int(self.o[1]),
+                     int(self.o[2]), self.L, self.N, b["nmis"].p, b["recn"].p, b["rec"].p, self.rcap, b["nunk"].p,
+                     b["unk"].p, self.ucap, dump if dump is not None else C.c_uint64(0)])
+        elif nwork:
             _launch(rt, fns["verify"], (nwork, 1, 1), (64, 1, 1),
                     [b["R32"].p, b["R64"].p, G.d_rstart, b["rcnt"].p, rps, G.nb, b["work"].p, nwork, self.d_lit, self.d_sol,
                      int(solid_mode), lcode_ptr if lcode_ptr is not None else self.d_lcode, int(self.o[0]), int(self.o[1]),
@@ -243,6 +303,11 @@ class WindowVerifier:
         return rec, unk
 
     def _work(self, K):
+        if self.kernel2:
+            nt = len(self.tiles)
+            work = np.empty((K * nt, 2), np.int32)
+            work[:, 0] = np.repeat(np.arange(K, dtype=np.int32), nt); work[:, 1] = np.tile(self.tiles, K)
+            return work.ravel()
         nbk = len(self.bricks)
         work = np.empty((K * nbk, 2), np.int32)
         work[:, 0] = np.repeat(np.arange(K, dtype=np.int32), nbk); work[:, 1] = np.tile(self.bricks, K)
@@ -251,13 +316,19 @@ class WindowVerifier:
     def solid_check(self):
         """Stored SOLID mask == certified membership of the canonical geometry at every voxel centre of the window."""
         G = self.G
-        lc = leaf_codes(self.cls, True); d_lc = self.rt.upload(lc)
-        nbr = self.L // 16
-        work = np.stack([np.zeros(nbr ** 3, np.int32), np.arange(nbr ** 3, dtype=np.int32)], 1).ravel()
+        lc = leaf_codes(self.cls, True); d_lc = self.buf["lcode2"].put(lc)
+        if self.kernel2:
+            bc, tc = coarse_codes(lc, self.L)
+            codes2 = (self.buf["bcode2"].put(bc), self.buf["tcode2"].put(tc))
+            nt = (self.L // 64) ** 3
+            work = np.stack([np.zeros(nt, np.int32), np.arange(nt, dtype=np.int32)], 1).ravel()
+        else:
+            codes2 = None
+            nbr = self.L // 16
+            work = np.stack([np.zeros(nbr ** 3, np.int32), np.arange(nbr ** 3, dtype=np.int32)], 1).ravel()
         with (self.lock if self.lock is not None else contextlib.nullcontext()):
-            _, nmis, recn, nunk = self._run(1, work, rows=(G.geo64, G.geo32, G.geocnt), solid_mode=True, lcode_ptr=d_lc)
+            _, nmis, recn, nunk = self._run(1, work, rows=(G.geo64, G.geo32, G.geocnt), solid_mode=True, lcode_ptr=d_lc, codes2=codes2)
             _, unk = self._lists(1, [False], nunk > 0)
-        self.rt.free(d_lc)
         if nmis[0]:
             raise AssertionError("stored SOLID crop disagrees with the canonical geometry")
         if nunk[0]:
@@ -308,7 +379,7 @@ class WindowVerifier:
         self.stats["batches"] += 1; self.stats["work_items"] += K * nbk
         d_dump = None
         if dump:
-            self._dump = DevBuf(self.rt); d_dump = self._dump.ensure(self.L ** 3)
+            self._dump = self.buf["dump"]; d_dump = self._dump.ensure(self.L ** 3)
             self.rt.ck("cuMemsetD8_v2", d_dump, 3, self.L ** 3)
         t = time.perf_counter()
         with (self.lock if self.lock is not None else contextlib.nullcontext()):
@@ -359,8 +430,6 @@ class WindowVerifier:
             for j, kk in enumerate(redo):
                 res[kk] = (int(m2[j]), rec2[j, :min(r2[j], self.rcap)] if m2[j] else None, int(u2[j]),
                            unk2[j] if (m2[j] == 0 and u2[j]) else None)
-        if dump:
-            self._dump.close()
         for kk, (nm, rl, nu, ul) in res.items():
             i = ids[kk]
             if nm > 0:

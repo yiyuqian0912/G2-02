@@ -45,13 +45,19 @@ def main():
         cand = [i for i in range(4, 1000) if split_of(json.load(open(R / f"{i:06d}" / "scene.json"))["scene_id"]) == "train"]
         scenes = sorted(rng.choice(cand, k, replace=False))
     tasks = []
+    if "--tasks" in sys.argv:                       # explicit task list: lines "sc w s L"
+        for l in open(sys.argv[sys.argv.index("--tasks") + 1]):
+            a = l.split()
+            if a:
+                tasks.append((a[0], int(a[1]), int(a[2]), int(a[3])))
+        scenes = []
     for i in scenes:
         W = np.load(R / f"{i:06d}" / "public" / "windows.npy")
         for r in W:
             for j in range(int(r["k"])):
                 if (int(r["mask"]) >> j) & 1:
                     tasks.append((f"{i:06d}", int(r["window"]), j, int(r["L"])))
-    print(json.dumps(dict(scenes=[f"{i:06d}" for i in scenes], tasks=len(tasks), workers=nw)), flush=True)
+    print(json.dumps(dict(scenes=[f"{i:06d}" for i in scenes], tasks=len(tasks), workers=nw, kw=kw)), flush=True)
     util = []; stop = threading.Event()
     def samp():
         while not stop.is_set():

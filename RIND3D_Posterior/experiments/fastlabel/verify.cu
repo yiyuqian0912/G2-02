@@ -233,3 +233,126 @@ extern "C" __global__ void verify(const float4* R32, const double* R64, const in
     if (q + 1 < rcap) { rec[(size_t)k * rcap + q] = s_min; rec[(size_t)k * rcap + q + 1] = s_max; }
   }
 }
+
+// verify2: one block (128 threads) per (source k, 64^3 tile). Same decisions as `verify` (same predicates, same
+// expected values, same per-16^3-brick (min, max) violation records); only the work schedule differs:
+// tile box test -> brick box tests (64 bricks x tile-masked bodies, in parallel) -> leaf box tests (512 leaves) ->
+// voxels of unresolved leaves. tcode / bcode / lcode: observation codes of tiles / bricks / leaves (0, 1, 2, 3 as lcode).
+extern "C" __global__ void verify2(const float4* R32, const double* R64, const int* rstart, const int* rcnt, int rows_per_src,
+                                   int nb, const int* work, int nwork, const unsigned char* lit, const unsigned char* sol,
+                                   int solid_mode, const signed char* lcode, const signed char* bcode, const signed char* tcode,
+                                   int ox, int oy, int oz, int L, int N,
+                                   int* nmis, int* rec_n, int* rec, int rcap, int* nunk, int* unk, int ucap, unsigned char* dump) {
+  int wi = blockIdx.x; if (wi >= nwork) return;
+  int k = work[2 * wi], t = work[2 * wi + 1];
+  const int nt = L >> 6, nbr = L >> 4, nl = L >> 3;
+  int tx = t % nt, ty = (t / nt) % nt, tz = t / (nt * nt);
+  int x0 = tx * 64, y0 = ty * 64, z0 = tz * 64;
+  const float4* R = R32 + (size_t)k * rows_per_src; const double* R6 = R64 + (size_t)k * rows_per_src * 8;
+  const int* cnt = rcnt + k * nb;
+  const float h = 1.0f / (2 * N);
+  __shared__ unsigned long long t_mask, b_mask[64], l_mask[512];
+  __shared__ int t_in, b_in[64], b_cnt[64], b_min[64], b_max[64], nlist, nbod;
+  __shared__ unsigned char l_mode[512]; __shared__ short list[512]; __shared__ signed char bod[64];
+  int tid = threadIdx.x;
+  if (tid == 0) { t_mask = 0ull; t_in = 0; nlist = 0; }
+  if (tid < 64) { b_mask[tid] = 0ull; b_in[tid] = 0; b_cnt[tid] = 0; b_min[tid] = 0x7fffffff; b_max[tid] = -1; }
+  __syncthreads();
+  int tc = tcode[t];
+  if (tc == 3) return;
+  {
+    float lx = (2 * (ox + x0) + 1) * h, ly = (2 * (oy + y0) + 1) * h, lz = (2 * (oz + z0) + 1) * h;
+    float hx = lx + 126 * h, hy = ly + 126 * h, hz = lz + 126 * h;          // centres i + 0.5 .. i + 63.5
+    for (int b = tid; b < nb; b += blockDim.x) {
+      int r = box_body(R, rstart[b], cnt[b], lx, ly, lz, hx, hy, hz);
+      if (r == 1) atomicOr(&t_in, 1); else if (r < 0) atomicOr(&t_mask, 1ull << b);
+    }
+  }
+  __syncthreads();
+  if (!dump && ((t_in && tc == 1) || (!t_in && !t_mask && tc == 0))) return;
+  if (tid == 0) { int n = 0; for (unsigned long long m = t_mask; m; m &= m - 1) bod[n++] = (signed char)(__ffsll((long long)m) - 1); nbod = n; }
+  __syncthreads();
+  // bricks: (brick, body) pairs
+  if (!t_in) {
+    for (int p = tid; p < 64 * nbod; p += blockDim.x) {
+      int bi = p / nbod, b = bod[p % nbod];
+      int bx = x0 + (bi & 3) * 16, by = y0 + ((bi >> 2) & 3) * 16, bz = z0 + (bi >> 4) * 16;
+      float lx = (2 * (ox + bx) + 1) * h, ly = (2 * (oy + by) + 1) * h, lz = (2 * (oz + bz) + 1) * h;
+      int r = box_body(R, rstart[b], cnt[b], lx, ly, lz, lx + 30 * h, ly + 30 * h, lz + 30 * h);
+      if (r == 1) atomicOr(&b_in[bi], 1); else if (r < 0) atomicOr(&b_mask[bi], 1ull << b);
+    }
+  } else if (tid < 64) b_in[tid] = 1;
+  __syncthreads();
+  // leaves
+  for (int q = tid; q < 512; q += blockDim.x) {
+    int bi = q >> 3, l = q & 7;
+    int bxg = tx * 4 + (bi & 3), byg = ty * 4 + ((bi >> 2) & 3), bzg = tz * 4 + (bi >> 4);
+    int bc = bcode[(bzg * nbr + byg) * nbr + bxg];
+    int bx = x0 + (bi & 3) * 16, by = y0 + ((bi >> 2) & 3) * 16, bz = z0 + (bi >> 4) * 16;
+    int lxo = (l & 1) * 8, lyo = ((l >> 1) & 1) * 8, lzo = (l >> 2) * 8;
+    int code = lcode[(((bz + lzo) >> 3) * nl + ((by + lyo) >> 3)) * nl + ((bx + lxo) >> 3)];
+    int mode; unsigned long long lm = 0ull;
+    if (code == 3 || bc == 3) mode = 0;
+    else if (b_in[bi]) mode = (code == 1 && !dump) ? 0 : 2;
+    else if (!b_mask[bi]) mode = (code == 0 && !dump) ? 0 : 1;
+    else {
+      int lin = 0;
+      float lx = (2 * (ox + bx + lxo) + 1) * h, ly = (2 * (oy + by + lyo) + 1) * h, lz = (2 * (oz + bz + lzo) + 1) * h;
+      for (unsigned long long m = b_mask[bi]; m; m &= m - 1) {
+        int b = __ffsll((long long)m) - 1;
+        int r = box_body(R, rstart[b], cnt[b], lx, ly, lz, lx + 14 * h, ly + 14 * h, lz + 14 * h);
+        if (r == 1) { lin = 1; break; }
+        if (r < 0) lm |= 1ull << b;
+      }
+      if (lin) mode = (code == 1 && !dump) ? 0 : 2;
+      else if (!lm) mode = (code == 0 && !dump) ? 0 : 1;
+      else mode = 3;
+    }
+    l_mode[q] = (unsigned char)mode; l_mask[q] = lm;
+    if (mode) { int j = atomicAdd(&nlist, 1); list[j] = (short)q; }
+  }
+  __syncthreads();
+  // voxels of listed leaves
+  for (int j = 0; j < nlist; ++j) {
+    int q = list[j], bi = q >> 3, l = q & 7, mode = l_mode[q];
+    unsigned long long lm = l_mask[q];
+    int bx = x0 + (bi & 3) * 16 + (l & 1) * 8, by = y0 + ((bi >> 2) & 3) * 16 + ((l >> 1) & 1) * 8, bz = z0 + (bi >> 4) * 16 + (l >> 2) * 8;
+    int lc = 0, lmin = 0x7fffffff, lmax = -1;
+    for (int v = tid; v < 512; v += blockDim.x) {
+      int wx = bx + (v & 7), wy = by + ((v >> 3) & 7), wz = bz + (v >> 6);
+      int idx = (wz * L + wy) * L + wx;
+      int sb = (sol[idx >> 3] >> (7 - (idx & 7))) & 1;
+      int e;
+      if (solid_mode) e = sb;
+      else { if (sb) continue; e = 1 - ((lit[idx >> 3] >> (7 - (idx & 7))) & 1); }
+      int pin;
+      if (mode == 1) pin = 0;
+      else if (mode == 2) pin = 1;
+      else {
+        float x = (2 * (ox + wx) + 1) * h, y = (2 * (oy + wy) + 1) * h, z = (2 * (oz + wz) + 1) * h;
+        double dx = (ox + wx + .5) / N, dy = (oy + wy + .5) / N, dz = (oz + wz + .5) / N;
+        bool u = false; pin = 0;
+        for (unsigned long long m = lm; m; m &= m - 1) {
+          int b = __ffsll((long long)m) - 1;
+          int r = pt_body(R, R6, rstart[b], cnt[b], x, y, z, dx, dy, dz);
+          if (r == 1) { pin = 1; break; }
+          if (r < 0) u = true;
+        }
+        if (u && !pin) {
+          int qq = atomicAdd(nunk + k, 1); if (qq < ucap) unk[(size_t)k * ucap + qq] = idx;
+          if (dump && k == 0) dump[idx] = 2;
+          continue;
+        }
+      }
+      if (dump && k == 0) dump[idx] = (unsigned char)pin;
+      if (pin != e) { ++lc; lmin = min(lmin, idx); lmax = max(lmax, idx); }
+    }
+    if (lc) { atomicAdd(&b_cnt[bi], lc); atomicMin(&b_min[bi], lmin); atomicMax(&b_max[bi], lmax); }
+  }
+  __syncthreads();
+  if (tid < 64 && b_cnt[tid]) {
+    atomicAdd(nmis + k, b_cnt[tid]);
+    int qq = atomicAdd(rec_n + k, 2);
+    if (qq + 1 < rcap) { rec[(size_t)k * rcap + qq] = b_min[tid]; rec[(size_t)k * rcap + qq + 1] = b_max[tid]; }
+  }
+}

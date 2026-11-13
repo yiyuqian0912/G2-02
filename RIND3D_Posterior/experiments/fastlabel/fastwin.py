@@ -157,3 +157,31 @@ class LazyWindow2(LazyWindow):
         if getattr(self, "_items", None) is None:
             self._items = _top_items(self.cls, self.q)
         return self._items
+
+
+@njit(cache=True)
+def _cls_from_bits_blocked(lit, sol, L, out):
+    """Same values as _cls_from_bits; loop (z-block of 64, y, x, z): the 64 source rows of a (z-block, y) stay in L1
+    while every x writes one full 64-byte line of out[x, y, z0:z0+64]."""
+    LL = L * L
+    Z = 64 if L >= 64 else L
+    for z0 in range(0, L, Z):
+        for y in range(L):
+            for x in range(L):
+                sh = 7 - (x & 7)
+                base = y * L + x
+                for z in range(z0, z0 + Z):
+                    i = z * LL + base
+                    if (sol[i >> 3] >> sh) & 1:
+                        out[x, y, z] = 2
+                    else:
+                        out[x, y, z] = (lit[i >> 3] >> sh) & 1
+    return out
+
+
+def fast_cls3(S, w, s):
+    L = int(S.W[w]["L"]); dz = S.dz
+    def raw(j):
+        o, n = S._pos[(w, j)]
+        return np.frombuffer(dz.decompress(S.blob[o:o + n]), np.uint8)
+    return _cls_from_bits_blocked(raw(s), raw(-1), L, np.empty((L, L, L), np.uint8))

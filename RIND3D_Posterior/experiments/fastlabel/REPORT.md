@@ -208,3 +208,52 @@ v3j (stage-1 depth 3) and v3k (16 workers) were interrupted by the pause.
    * a GPU lock in the Supervisor;
    * tests.
 5. Do not start the 1K backfill before Gates C/D and the user's go.
+
+---
+
+# Checkpoint 5 (2026-11-12, paused on request): FastLabel v3.3
+
+**Changes since checkpoint 4.** Every change is validated identical, or is a valid change of the certificate design.
+1. Lazy chunk sampling (`sampler3.BSampler`): vectorised folding, verified identical to the scalar version on 100k inputs; per-label triangulation cache.
+2. Vectorised `build_filter2` / `items_from_vox2` (`fastbf.py`). Identical arrays on 6 windows; 1.75 s → 0.15 s on a 289k-piece B.
+3. Process-wide reusable device buffers, and a per-process cache of the per-window solid check.
+4. `verify2` kernel: one block per (source, 64³ tile), with bricks and leaves classified in parallel. Bit-identical on 4 windows (384 candidates). Speed is about the same as `verify`; the kernel is bound by voxel visits along shadow boundaries.
+5. **Two-stage certificate per round** (`design2`; audited in CERTIFICATE_AUDIT.md):
+   * n₁ = 512 with a₁ = 3, else n₂ = 1024 with a₂ = 17;
+   * exact α = 2.9e-8 ≤ δ_r at the dataset-simultaneous level;
+   * the same power as single-stage;
+   * 402 of 457 labels stop at 512.
+6. Cache-blocked class tensor (`fast_cls3`): identical on 29 windows. Under 15-way contention it takes 0.095 s, against 0.68 s for `fast_cls2` and 0.36 s for the original. `leaf_codes` is now read in memory order (identical).
+7. Defaults are now the v3h configuration: race off, initial subset 256 + 128, small B certified statistically.
+8. **v3.3: the vertex pool grows ×4 as needed and is kept for later rounds.**
+   * Before the fix, very broad posteriors (≈ 1.1M pieces, ≈ 900k cells) fell back to the exact engine: 41–522 s each in DEV-18.
+   * With the fix they certify in about 14 s (4 labels re-run individually).
+
+**Throughput on the run4e sample** (691 labels, 15 workers):
+
+| run | labels/s | 1K projection |
+|---|---|---|
+| v3p (items 1–3) | 9.05 | 4.91 h |
+| v3q (+ two-stage) | 10.34 | 4.29 h |
+| v3r (+ fast_cls3) | 11.22 | 3.96 h |
+
+In v3r, p99 is 5.5 s and the GPU is 65% busy.
+
+**DEV-18** (18 scenes, 2,562 labels): not completed yet.
+* `runs/dev18_v3r_partial_vpoolbug.jsonl`: 1,982 labels, stopped. It exposed the vertex-pool tail of item 8.
+* `runs/dev18_v33_partial.jsonl`: 584 labels with v3.3, stopped by the pause.
+
+**Resume from here:**
+1. Re-run DEV-18 with v3.3 to completion:
+   `runner3.py 0 15 0 runs/dev18_v33.jsonl --gpu-permits 1 --scenes <dev>`
+   then `analyze3.py … --strata`.
+2. Freeze the configuration, then run HOLDOUT-18 (`bench_plan.json` "holdout") as the final assessment.
+3. Accuracy: `runner3.py 0 15 0 runs/acc.jsonl --tasks runs/acc_tasks.txt --kw '{"validate_n": 4096}'` (116 refs and 333 release labels).
+4. Production integration, as planned:
+   * a `rind3d_1k.fastlabel` package;
+   * a `fastlabel` engine in `labels.py` (status `certified_stat`, certificate in meta);
+   * an optional Supervisor worker initialiser for the GPU semaphore;
+   * an opt-in `accept_statistical` flag in the loader;
+   * tests.
+
+**Separate task (user, 2026-11-12):** the scientific foundations audit. Its brief is `RIND3D_Audit/BRIEF.md`. A background audit agent was started and then stopped by the pause before writing any results; relaunch it on resume. Constraints: no GPU, at most one niced CPU process, write only in `RIND3D_Audit/`.

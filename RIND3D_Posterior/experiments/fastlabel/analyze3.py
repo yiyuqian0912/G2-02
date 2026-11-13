@@ -63,5 +63,28 @@ def main():
         print(f"machine: {len(rs)} labels in {wall:.0f} s = {lps:.2f} labels/s -> 1K {N1K / lps / 3600:.2f} h (this sample's mix, incl. tail)")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" and "--strata" not in sys.argv:
     main()
+
+
+def strata(path):
+    """Per-family and per-k (sources in the scene) breakdown of a runner3 jsonl."""
+    import collections
+    R = "/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1/scenes"
+    rs = [json.loads(l) for l in open(path)]; meta = {}
+    for r in rs:
+        if r["sc"] not in meta:
+            d = json.load(open(f"{R}/{r['sc']}/scene.json")); meta[r["sc"]] = (d["family"], d["k"])
+    for name, key in (("family", 0), ("k", 1)):
+        g = collections.defaultdict(list)
+        for r in rs:
+            g[meta[r["sc"]][key]].append(r)
+        print(f"by {name}:")
+        for kk in sorted(g):
+            v = g[kk]; tw = np.array([r["task_wall"] for r in v]); err = sum("error" in r for r in v)
+            st = sum(r.get("path") == "stat_certified" for r in v)
+            print(f"  {str(kk):18s} n {len(v):4d} err {err} mean {tw.mean():.2f} p95 {np.percentile(tw, 95):.1f} max {tw.max():.1f} stat {st / len(v):.2f}")
+
+
+if __name__ == "__main__" and "--strata" in sys.argv:
+    strata(sys.argv[1])
