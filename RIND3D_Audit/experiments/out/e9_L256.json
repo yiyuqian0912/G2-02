@@ -1,0 +1,95 @@
+{
+ "Lp": 256,
+ "scenes": [
+  0,
+  40
+ ],
+ "informative_channels": 2331,
+ "with_any_solid": 1771,
+ "solid_separated_6": 9,
+ "solid_separated_26": 8,
+ "share_6": 0.003861003861003861,
+ "examples": [
+  {
+   "scene": "000006",
+   "window": 61,
+   "source": 2,
+   "sep26": true,
+   "n_solid": 217336,
+   "n_lit": 366215,
+   "n_dark": 16193665
+  },
+  {
+   "scene": "000007",
+   "window": 40,
+   "source": 0,
+   "sep26": true,
+   "n_solid": 58308,
+   "n_lit": 16714106,
+   "n_dark": 4802
+  },
+  {
+   "scene": "000009",
+   "window": 43,
+   "source": 0,
+   "sep26": true,
+   "n_solid": 10166100,
+   "n_lit": 8338,
+   "n_dark": 6602778
+  },
+  {
+   "scene": "000015",
+   "window": 42,
+   "source": 0,
+   "sep26": true,
+   "n_solid": 277077,
+   "n_lit": 1342330,
+   "n_dark": 15157809
+  },
+  {
+   "scene": "000015",
+   "window": 59,
+   "source": 3,
+   "sep26": true,
+   "n_solid": 58311,
+   "n_lit": 45,
+   "n_dark": 16718860
+  },
+  {
+   "scene": "000019",
+   "window": 40,
+   "source": 0,
+   "sep26": false,
+   "n_solid": 593,
+   "n_lit": 16775378,
+   "n_dark": 1245
+  },
+  {
+   "scene": "000023",
+   "window": 46,
+   "source": 1,
+   "sep26": true,
+   "n_solid": 13823587,
+   "n_lit": 356721,
+   "n_dark": 2596908
+  },
+  {
+   "scene": "000023",
+   "window": 58,
+   "source": 3,
+   "sep26": true,
+   "n_solid": 11704801,
+   "n_lit": 4985242,
+   "n_dark": 87173
+  },
+  {
+   "scene": "000024",
+   "window": 48,
+   "source": 2,
+   "sep26": true,
+   "n_solid": 637851,
+   "n_lit": 9568,
+   "n_dark": 16129797
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+{
+ "grid_128": {
+  "mean_trace_removed": 0.6520270307789001,
+  "quantiles": {
+   "0.1": 0.0,
+   "0.25": 0.0,
+   "0.5": 0.974282007025183,
+   "0.75": 0.9993902852462351,
+   "0.9": 0.9997995687090871
+  },
+  "by_side": {
+   "64": 0.9698801674803782,
+   "128": 0.8285759855419181,
+   "256": 0.415746422244807
+  },
+  "note": "one-hot gradient covariance trace = posterior-label trace + this quantity (per example, given V)"
+ },
+ "grid_16": {
+  "mean_trace_removed": 0.5681220445257159,
+  "quantiles": {
+   "0.1": 0.0,
+   "0.25": 0.0,
+   "0.5": 0.8102180913709861,
+   "0.75": 0.9639564283855832,
+   "0.9": 0.9874254773208135
+  },
+  "by_side": {
+   "64": 0.911408979078379,
+   "128": 0.7366187398064848,
+   "256": 0.32664567725835725
+  },
+  "note": "one-hot gradient covariance trace = posterior-label trace + this quantity (per example, given V)"
+ }
+}

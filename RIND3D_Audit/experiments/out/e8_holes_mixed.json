@@ -1,0 +1,33 @@
+{
+ "fixture": "holes_mixed",
+ "expected": "mixed",
+ "response_type": "mixed",
+ "n_lit": 28,
+ "n_dark": 36,
+ "n_solid": 0,
+ "lit_dark_adjacent_6": true,
+ "lit_dark_adjacent_26": true,
+ "min_slab_margin": 0.0011250258787967038,
+ "source": [
+  0.9413,
+  0.1673,
+  0.4987
+ ],
+ "engine_seconds": 0.4078514575958252,
+ "engine_tv_bound": 7.274247236986176e-10,
+ "engine_vol_lo": 9.950389006480053e-05,
+ "engine_vol_hi": 9.950389013718437e-05,
+ "engine_cells": 1444,
+ "true_cell_in_support": true,
+ "mc_seconds": 115.98622274398804,
+ "mc_n": 4000000,
+ "mc_vol": 0.000103,
+ "mc_vol_se": 5.074184441858613e-06,
+ "mc_feasible_outside_engine_support": 0,
+ "tv_engine_vs_mc_8cubed": 0.03481900962438114,
+ "tv_mc_splithalf_8cubed": 0.06310679611650484,
+ "engine_support_components_26": 1,
+ "mc_feasible_block_components_26": 1,
+ "label_mass_beyond_obstacle_x": 0.996792045897974,
+ "seconds": 116.47210144996643
+}

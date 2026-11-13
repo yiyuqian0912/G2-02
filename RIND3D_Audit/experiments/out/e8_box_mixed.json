@@ -1,0 +1,33 @@
+{
+ "fixture": "box_mixed",
+ "expected": "mixed",
+ "response_type": "mixed",
+ "n_lit": 48,
+ "n_dark": 16,
+ "n_solid": 0,
+ "lit_dark_adjacent_6": true,
+ "lit_dark_adjacent_26": true,
+ "min_slab_margin": 0.003522301157464436,
+ "source": [
+  0.8713,
+  0.5913,
+  0.5013
+ ],
+ "engine_seconds": 0.3975565433502197,
+ "engine_tv_bound": 1.0466040344978783e-14,
+ "engine_vol_lo": 0.0028218963251758645,
+ "engine_vol_hi": 0.002821896325175894,
+ "engine_cells": 9214,
+ "true_cell_in_support": true,
+ "mc_seconds": 38.544090032577515,
+ "mc_n": 4000000,
+ "mc_vol": 0.002856,
+ "mc_vol_se": 2.6682593876907845e-05,
+ "mc_feasible_outside_engine_support": 0,
+ "tv_engine_vs_mc_8cubed": 0.008964879936006599,
+ "tv_mc_splithalf_8cubed": 0.022934173669467782,
+ "engine_support_components_26": 1,
+ "mc_feasible_block_components_26": 1,
+ "label_mass_beyond_obstacle_x": 0.9300692492436793,
+ "seconds": 39.031832695007324
+}

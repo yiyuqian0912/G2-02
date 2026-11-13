@@ -1,0 +1,33 @@
+{
+ "n_X": 154,
+ "label_size_quantiles": {
+  "0.1": 1.0,
+  "0.5": 4.0,
+  "0.9": 14.0,
+  "0.99": 23.0
+ },
+ "single_cell_only": {
+  "example_mass_kept": 0.19849286250280498,
+  "share_X_mass_lost": 0.41614106346816365,
+  "mean_TV_vs_unfiltered": 0.21682757884192627,
+  "max_TV": 0.961013299054739
+ },
+ "size_le_3": {
+  "example_mass_kept": 0.49484672552324555,
+  "share_X_mass_lost": 0.22265889413253548,
+  "mean_TV_vs_unfiltered": 0.08702364178658127,
+  "max_TV": 0.9340474711703669
+ },
+ "drop_broadest_5pct": {
+  "example_mass_kept": 0.9491450113766848,
+  "share_X_mass_lost": 0.03706502296389066,
+  "mean_TV_vs_unfiltered": 0.0041604994138932415,
+  "max_TV": 0.24906915279462605
+ },
+ "drop_broadest_1pct": {
+  "example_mass_kept": 1.0,
+  "share_X_mass_lost": 0.0,
+  "mean_TV_vs_unfiltered": 0.0,
+  "max_TV": 0.0
+ }
+}

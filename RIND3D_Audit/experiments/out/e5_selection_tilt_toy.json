@@ -1,0 +1,130 @@
+{
+ "config": {
+  "n": 16,
+  "w": 3,
+  "windows": [
+   [
+    3,
+    3
+   ],
+   [
+    10,
+    3
+   ],
+   [
+    3,
+    10
+   ],
+   [
+    10,
+    10
+   ]
+  ],
+  "n_obst": 10,
+  "p_obst": 0.35,
+  "obst": [
+   [
+    9,
+    6
+   ],
+   [
+    14,
+    4
+   ],
+   [
+    12,
+    8
+   ],
+   [
+    13,
+    8
+   ],
+   [
+    8,
+    14
+   ],
+   [
+    4,
+    14
+   ],
+   [
+    14,
+    11
+   ],
+   [
+    0,
+    12
+   ],
+   [
+    3,
+    1
+   ],
+   [
+    10,
+    6
+   ]
+  ],
+  "kappa": [
+   0.154,
+   0.135,
+   0.158,
+   0.553
+  ],
+  "c_table": {
+   "1": [
+    1.0
+   ],
+   "2": [
+    0.01,
+    1.0
+   ],
+   "3": [
+    0.01,
+    0.2241,
+    1.0
+   ],
+   "4": [
+    0.01,
+    0.0965,
+    0.4483,
+    1.0
+   ]
+  },
+  "geometries": 1024
+ },
+ "student_level": {
+  "n_X": 154,
+  "TV_B_vs_N": {
+   "mean_under_B": 0.03101145745569954,
+   "mean_under_N": 0.028179399388435902,
+   "p90_under_B": 0.05256643968433025,
+   "max": 0.08679791229220132
+  },
+  "TV_C_vs_N": {
+   "mean_under_C": 2.466217309519549e-05,
+   "mean_under_N": 2.466213901685796e-05,
+   "max": 8.385216850725907e-05
+  },
+  "excess_logloss_nats_on_N": {
+   "B_optimum": 0.004207167944495209,
+   "C_optimum": 2.7414061390854366e-09
+  },
+  "TV_of_X_marginals": {
+   "B_vs_N": 0.2388281216467009,
+   "C_vs_N": 3.392449381461676e-05
+  },
+  "selection_factor_H_B": {
+   "min": 0.18084468112244897,
+   "max": 1.3225091374331563
+  }
+ },
+ "label_level_k2": {
+  "unweighted_mean_TV_to_UniformF": 0.021511694962092855,
+  "unweighted_max_TV": 0.3351284393277285,
+  "omega_weighted_mean_TV_to_UniformF": 2.1914381272542752e-17,
+  "omega_weighted_max_TV": 2.7755575615628914e-16,
+  "prior_mass_of_unacceptable_source_pairs": 0.36256554209183905,
+  "note": "with an infinite proposal cap, scene acceptance (Lambda > 0) is implied by the example's own acceptance, so P_acc does not tilt the label; the omega-weighted label equals Uniform(F) to rounding. With finite caps P_acc(G,S) is smooth in Lambda and does tilt it (bounded by the rejection rate, SELECTION_LAW_1K section 3)"
+ },
+ "seconds": 10.582620620727539
+}

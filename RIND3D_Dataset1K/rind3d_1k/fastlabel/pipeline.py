@@ -8,7 +8,8 @@ Per task (scene, window w, source channel s):
 3. Statistical round r: two-stage test with fixed (n1, a1, n2, a2) at budget delta_r = delta * 2^-r; points i.i.d.
    Uniform(B_r) from the label's keyed stream, each tested EXACTLY by gpuverify (GPU, certified arithmetic).
    Certificate: TV(q_{B_r}, q_F) <= eps, with P(any false certificate at this label) <= sum_r delta_r < delta.
-   With the default delta = 0.01 / 159,802 the union bound gives P(any false statistical certificate in the 1K) <= 0.01.
+   Default delta = family_delta / n_tasks (0.01 / 159,802 for the 1K): by the union bound, P(any false statistical
+   certificate among the n_tasks planned labels) <= family_delta. For another campaign, set n_tasks to its label count.
 4. Otherwise: violated receivers of failing points join X'; after R rounds: exact phase 2 on B_R (deterministic).
 
 Audit: RIND3D_Posterior/experiments/fastlabel/CERTIFICATE_AUDIT.md; kernel validation (Gate A): GPUVERIFY.md.
@@ -34,7 +35,7 @@ N_DATASET = 159802
 STAT_KIND = 4            # record kind of a statistical label: per-cell volume of the certified outer bound B
 
 DEFAULTS = dict(nbd=256, nin=128, R=12, n_cert=1024, n_stage1=512, chunks=(128, 384, 512), eps=0.05,
-                delta=0.01 / N_DATASET, M=64, M_round=2048, small_records=0, race_nodes=0, race_records=20000,
+                delta=None, n_tasks=N_DATASET, family_delta=0.01, M=64, M_round=2048, small_records=0, race_nodes=0, race_records=20000,
                 race_max_L=64, p1_budget=5_000_000, base_seed=20261112, validate_n=0,
                 s1_d1=4, s1_nb=512, s1_nc=64, s1_learn=32, s1_tests=640, max_vpool=1 << 27)
 
@@ -124,7 +125,10 @@ def label_task(scene_dir, w, s, **kw):
     """Label one (scene, window, source channel). Returns dict(cell, lo, hi, kind, tv_bound, status, meta)."""
     from . import gpuverify as GV
     cfg = dict(DEFAULTS); cfg.update(kw)
-    eps, delta = float(cfg["eps"]), float(cfg["delta"])
+    # per-label delta: explicit, or family_delta / n_tasks for a simultaneous guarantee over the PLANNED workload
+    # (union bound); n_tasks must be the number of labels the campaign will certify (1K: 159,802; 100K: set it)
+    eps = float(cfg["eps"])
+    delta = float(cfg["delta"]) if cfg["delta"] is not None else float(cfg["family_delta"]) / int(cfg["n_tasks"])
     scene_dir = Path(scene_dir); sc = scene_dir.name
     out = dict(version=VERSION, eps=eps, delta=delta)
     tt = {}
@@ -231,7 +235,10 @@ def label_task(scene_dir, w, s, **kw):
                                   eps=eps, delta_label=delta, delta_round=out["delta_r"], round=out["round"], stage=out["stage"],
                                   n=out["n"], K=out["K"], a1=out["a1"], a2=out["a2"], n1=out["n1"], n_max=out["n_max"],
                                   alpha_round=out["alpha_r"], p_lower=out["p_lower"],
-                                  policy=f"dataset-simultaneous: delta = 0.01 / {N_DATASET}",
+                                  policy=(f"simultaneous over {int(cfg['n_tasks'])} planned labels: delta = "
+                                          f"{float(cfg['family_delta'])} / {int(cfg['n_tasks'])}") if cfg["delta"] is None
+                                  else f"explicit per-label delta = {delta}",
+                                  n_tasks=int(cfg["n_tasks"]) if cfg["delta"] is None else None,
                                   seed=[int(cfg["base_seed"]), int(sc), int(w), int(s)])
     elif path == "single_cell_support":
         lab = dict(cell=np.array([out["cell"]], np.int32), lo=np.array([1.0]), hi=np.array([1.0]),
