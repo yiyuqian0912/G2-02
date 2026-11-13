@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pt
+*.npz
+*.u8
+s6/s6.err

@@ -13,6 +13,7 @@ Posterior target of a task (docs/SELECTION_LAW_1K.md): Uniform(F_W^j), with F_W^
 box B(W) : s reproduces R_j on every FREE receiver of W}. The engine certifies per-cell volume intervals and a
 deterministic TV bound for this target. The label is the posterior of the 1K sampling law under the documented
 weights; the selection audit is in the doc."""
+import hashlib
 import json
 import os
 import time
@@ -128,7 +129,7 @@ def scene_label_summary(scene_dir, include_uninformative=False, failures=None):
             inf = bool((int(r["mask"]) >> j) & 1)
             if p.exists():
                 with np.load(p) as z:
-                    rows.append(json.loads(str(z["meta"])))
+                    rows.append(dict(json.loads(str(z["meta"])), sha256=file_sha256(p)))
             else:
                 fr = failures.get((name, int(r["window"]), j))
                 row = dict(window=int(r["window"]), source=j, L=int(r["L"]), informative=inf,
@@ -155,13 +156,16 @@ def _run_fastlabel(t, out, kw):
     """FastLabel v3.3 (rind3d_1k.fastlabel): writes the same task-file fields as the tau-pencil engine.
     Statistical labels: one record per cell with lo = hi = the cell volume of the certified outer bound B (so the
     loader's q = lo / sum(lo) is q_B), kind = 4, tv_bound = eps, status "certified_stat", certificate in meta."""
-    from rind3d_1k.fastlabel import label_task
+    from rind3d_1k.fastlabel import label_task, DEFAULTS
     scene_dir, w, s, L, inf = t
     c0 = time.process_time(); t0 = time.perf_counter()
     lab = label_task(scene_dir, w, s, **kw)
     m = lab["meta"]
+    cfg = dict(DEFAULTS); cfg.update(kw)                 # effective configuration; its hash makes config reruns visible
+    cfg_sha = hashlib.sha256(json.dumps(cfg, sort_keys=True, default=str).encode()).hexdigest()
     meta = dict(window=w, source=s, L=L, informative=inf, tv_bound=float(lab["tv_bound"]), status=lab["status"],
-                engine="fastlabel", engine_version=m["version"], path=m["path"], certificate=m.get("certificate"),
+                engine="fastlabel", engine_version=m["version"], config_sha256=cfg_sha, path=m["path"],
+                certificate=m.get("certificate"),
                 cpu=time.process_time() - c0, wall=time.perf_counter() - t0, n_records=int(len(lab["cell"])),
                 vol_lo=float(np.sum(lab["lo"])), vol_hi=float(np.sum(lab["hi"])), n_cells=m.get("n_cells"),
                 rounds=[{k: x.get(k) for k in ("round", "items", "records", "tested", "K", "p1_s")} for x in m.get("rounds", [])],
@@ -172,8 +176,17 @@ def _run_fastlabel(t, out, kw):
     np.savez_compressed(tmp, cell=np.asarray(lab["cell"], np.int32), lo=np.asarray(lab["lo"], float),
                         hi=np.asarray(lab["hi"], float), kind=np.asarray(lab["kind"], np.int8),
                         tv_bound=float(lab["tv_bound"]), meta=json.dumps(meta, default=float))
+    sha = file_sha256(tmp)                               # checksum of the exact bytes published by the rename below
     os.replace(tmp, out)
-    return meta
+    return dict(meta, sha256=sha)
+
+
+def file_sha256(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
 
 
 def supervised_task(t, engine, kw):

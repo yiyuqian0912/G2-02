@@ -1,7 +1,7 @@
 # FastLabel tier of the 1K labeller (`rind3d_1k.fastlabel`, engine `fastlabel`)
 
-**Status:** integrated and tested (`tests/test_fastlabel.py`). **The 1K backfill has NOT been run.** Launching it is the
-user's decision (see "Go / no-go" below).
+**Status:** integrated and tested (`tests/test_fastlabel.py`). The 1K backfill was approved and launched on 2026-11-13
+(`backfill/run_backfill.sh`; report: RIND3D_StudentResearch/D_BACKFILL_REPORT.md).
 
 ## What it computes
 
@@ -36,11 +36,16 @@ A rerun reproduces the same label: the streams are keyed, and the verifier's dec
 
 ## Loader
 
-`flatten(ds, ..., accept_statistical=False)`: statistical labels are yielded only with `accept_statistical=True`. The
-default behaviour on deterministic labels is unchanged. Every label dict carries `status`, `certificate` and `engine`,
-so training code can always tell statistical labels from deterministic ones.
+`flatten(ds, population=..., accept=("certified", "certified_stat"), fallback=None | "onehot", ...)`. Changed on
+2026-11-13 by audit M2 (RIND3D_StudentResearch/C_LOADER.md):
+* every certified status with tv_bound <= 0.05 is accepted by default, deterministic and statistical;
+* the target population must be declared;
+* missing labels are yielded as supervision "missing" (or counted when dropped);
+* the true-source one-hot fallback is explicit and labelled.
 
-## Running (not done)
+Every example carries `status`, `certificate`, `provenance` (engine, version, config hash, file sha256) and `supervision`.
+
+## Running
 
 ```bash
 # labeller environment with CUDA; scene-ordered tasks, 15 workers (one GPU semaphore is created automatically)
