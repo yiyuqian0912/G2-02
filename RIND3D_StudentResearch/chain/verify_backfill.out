@@ -1,0 +1,63 @@
+{
+ "informative_tasks": 159802,
+ "status_counts": {
+  "L64:certified": 2171,
+  "L128:certified": 14993,
+  "L256:certified": 35359,
+  "L64:certified_stat": 36460,
+  "L128:certified_stat": 45239,
+  "L256:certified_stat": 25580
+ },
+ "problems": 0,
+ "problem_examples": [],
+ "seal_mismatch_scenes": {},
+ "preexisting_checked": 333,
+ "true_in_support": 159802,
+ "paths": {
+  "None": 0,
+  "single_cell_support": 52190,
+  "stat_certified": 107279
+ },
+ "stat_stage": {
+  "r1s1": 5495,
+  "r1s2": 1286,
+  "r2s1": 74819,
+  "r2s2": 13947,
+  "r3s1": 10671,
+  "r3s2": 909,
+  "r4s1": 83,
+  "r4s2": 49,
+  "r5s1": 1,
+  "r5s2": 12,
+  "r6s2": 4,
+  "r7s2": 1,
+  "r10s2": 1,
+  "r11s2": 1
+ },
+ "label_wall_s": {
+  "mean": 1.4362277549662845,
+  "p50": 0.8246776830019371,
+  "p99": 17.080067162921054,
+  "max": 71.73227255500024
+ },
+ "n_cells": {
+  "64": {
+   "median": 2997.0,
+   "mean": 61778.6440941213,
+   "p99": 1085663.899999999,
+   "max": 1842088
+  },
+  "128": {
+   "median": 121.0,
+   "mean": 19412.38426417851,
+   "p99": 688771.0200000029,
+   "max": 1704455
+  },
+  "256": {
+   "median": 1.0,
+   "mean": 3641.860959319976,
+   "p99": 21893.060000000165,
+   "max": 1408499
+  }
+ }
+}

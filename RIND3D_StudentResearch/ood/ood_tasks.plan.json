@@ -1,0 +1,31 @@
+{
+ "seed": 20261113,
+ "n_per": 60,
+ "n_tasks": 360,
+ "strata": {
+  "L64:all_dark": {
+   "pool": 997,
+   "sampled": 60
+  },
+  "L64:all_lit": {
+   "pool": 4037,
+   "sampled": 60
+  },
+  "L128:all_dark": {
+   "pool": 729,
+   "sampled": 60
+  },
+  "L128:all_lit": {
+   "pool": 3277,
+   "sampled": 60
+  },
+  "L256:all_dark": {
+   "pool": 317,
+   "sampled": 60
+  },
+  "L256:all_lit": {
+   "pool": 1796,
+   "sampled": 60
+  }
+ }
+}

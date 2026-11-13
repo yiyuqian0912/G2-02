@@ -8,7 +8,7 @@ arm keys:
   weight:  "b1k" | "trel" | "mis"  (data.py); the training pool is every mixed TRAINING-stratum row with weight > 0
   stratum: "boundary_mixed" (default; solid-separated, all-lit, all-dark are held out for OOD) or "mixed"
   subset:  optional {"scenes_frac": f} or {"examples_frac": f} (seeded; scene-count vs channel-count ablation)
-  steps (6000), batch (32), lr (4e-4), wd (0.05), warmup (300), ckpt_every (1000), select_n (2000)
+  steps (8000), batch (32), ckpt (True: recompute cross blocks in backward; memory), lr (4e-4), wd (0.05), warmup (300), ckpt_every (1000), select_n (2000)
 Selection: every ckpt_every steps, one-hot NLL on a fixed pilot-select set drawn from the arm's own target population
 (b1k: release rows; trel / mis: natural rows), weighted; the best checkpoint is kept. pilot-eval rows are never read."""
 import json, math, sys, time
@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from data import Table, side_normalised, kish, ROLES, TYPES   # noqa: E402
 from student import Student, target_ce                         # noqa: E402
 
-DEF = dict(steps=6000, batch=32, lr=4e-4, wd=0.05, warmup=300, ckpt_every=1000, select_n=2000, stratum="boundary_mixed",
+DEF = dict(steps=8000, batch=32, ckpt=True, lr=4e-4, wd=0.05, warmup=300, ckpt_every=1000, select_n=2000, stratum="boundary_mixed",
            target="posterior", weight="b1k", seed=0, subset=None, workers=6)
 
 
@@ -104,8 +104,9 @@ def main():
     w = side_normalised(T.w[arm["weight"]], T.rows["Lp"])[idx]
     keep = w > 0; idx, w = idx[keep], w[keep]
     # selection set: arm's own population on pilot-select
-    ms = pool_mask(T, arm, "pilot-select")
-    ms &= (T.rows["ds"] == (0 if arm["weight"] == "b1k" else 1))
+    types = (0,) if arm["stratum"] == "boundary_mixed" else (0, 1)
+    ms = (T.rows["role"] == ROLES.index("pilot-select")) & np.isin(T.rows["type"], types)
+    ms &= (T.rows["ds"] == (0 if arm["weight"] == "b1k" else 1))      # B1K: release windows; T*: natural windows
     sidx = np.flatnonzero(ms)
     sw = side_normalised(T.w["b1k" if arm["weight"] == "b1k" else "nat"], T.rows["Lp"])[sidx]
     rng = np.random.default_rng(99)
@@ -115,7 +116,7 @@ def main():
                 side_shares={str(L): float(w[T.rows["Lp"][idx] == L].sum() / w.sum()) for L in (64, 128, 256)})
     print(json.dumps(info), flush=True)
     (out / "info.json").write_text(json.dumps(info, indent=1))
-    model = Student().to(dev)
+    model = Student(ckpt=bool(arm.get("ckpt", False))).to(dev)
     opt = torch.optim.AdamW(model.parameters(), lr=arm["lr"], betas=(0.9, 0.98), weight_decay=arm["wd"])
     lr_at = lambda s: arm["lr"] * min(1, (s + 1) / arm["warmup"]) * (0.025 + 0.975 * 0.5 * (1 + math.cos(math.pi * min(1, s / arm["steps"]))))
     dl = DataLoader(Batches(T, idx, w, arm, arm["steps"]), batch_size=None, shuffle=False, num_workers=arm["workers"],

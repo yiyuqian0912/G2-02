@@ -1,0 +1,33 @@
+{
+ "n_tasks": 30349,
+ "scenes": 907,
+ "by_role_side_type": {
+  "pilot-eval:L128:all_dark": 729,
+  "pilot-eval:L128:all_lit": 3277,
+  "pilot-eval:L128:mixed": 1930,
+  "pilot-eval:L256:all_dark": 317,
+  "pilot-eval:L256:all_lit": 1796,
+  "pilot-eval:L256:mixed": 3542,
+  "pilot-eval:L64:all_dark": 997,
+  "pilot-eval:L64:all_lit": 4037,
+  "pilot-eval:L64:mixed": 908,
+  "pilot-select:L128:all_dark": 510,
+  "pilot-select:L128:all_lit": 2628,
+  "pilot-select:L128:mixed": 1609,
+  "pilot-select:L256:all_dark": 238,
+  "pilot-select:L256:all_lit": 1349,
+  "pilot-select:L256:mixed": 2930,
+  "pilot-select:L64:all_dark": 774,
+  "pilot-select:L64:all_lit": 3230,
+  "pilot-select:L64:mixed": 754,
+  "pilot-train:L128:all_dark": 2207,
+  "pilot-train:L128:all_lit": 9215,
+  "pilot-train:L128:mixed": 5565,
+  "pilot-train:L256:all_dark": 1076,
+  "pilot-train:L256:all_lit": 4765,
+  "pilot-train:L256:mixed": 10373,
+  "pilot-train:L64:all_dark": 3029,
+  "pilot-train:L64:all_lit": 11232,
+  "pilot-train:L64:mixed": 2738
+ }
+}

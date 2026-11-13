@@ -1,0 +1,45 @@
+{
+ "n_examples": 144301,
+ "fine:L64": {
+  "bins": 556,
+  "tv_observed": 0.4380187776485146,
+  "tv_permutation_null": 0.46635654289266915,
+  "excess": -0.02833776524415457,
+  "share_bins_obs_gt_null": 0.32014388489208634
+ },
+ "fine:L128": {
+  "bins": 630,
+  "tv_observed": 0.3133149577084049,
+  "tv_permutation_null": 0.35807654533853683,
+  "excess": -0.04476158763013195,
+  "share_bins_obs_gt_null": 0.273015873015873
+ },
+ "fine:L256": {
+  "bins": 553,
+  "tv_observed": 0.22197650266346192,
+  "tv_permutation_null": 0.24085213340886014,
+  "excess": -0.01887563074539821,
+  "share_bins_obs_gt_null": 0.2730560578661845
+ },
+ "coarse:L64": {
+  "bins": 48,
+  "tv_observed": 0.3015035074335314,
+  "tv_permutation_null": 0.33177331168729096,
+  "excess": -0.030269804253759587,
+  "share_bins_obs_gt_null": 0.22916666666666666
+ },
+ "coarse:L128": {
+  "bins": 48,
+  "tv_observed": 0.23280851883309456,
+  "tv_permutation_null": 0.3036044070381555,
+  "excess": -0.07079588820506093,
+  "share_bins_obs_gt_null": 0.041666666666666664
+ },
+ "coarse:L256": {
+  "bins": 48,
+  "tv_observed": 0.1592621989289114,
+  "tv_permutation_null": 0.1936780227845465,
+  "excess": -0.03441582385563508,
+  "share_bins_obs_gt_null": 0.10416666666666667
+ }
+}

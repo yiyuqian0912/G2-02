@@ -127,3 +127,22 @@ Design study E15, using the 1K's natural m-distributions, with 4 windows per sid
 **Recommendation:**
 * The default 100K design is D1: natural windows with a declared fixed κ.
 * If a multi-channel study needs m-balanced windows, add them as a separately declared stream and combine by the balance heuristic (D3). Do not thin the single-channel population by hidden-channel counts.
+
+## 7. Real-data size of the balancing tilt for tabular Students (E16, E16b): inconclusive
+
+**What was computed** (`experiments/e16_tabular_tilt.py`, `e16b_tilt_permutation.py`; 144,301 labelled non-test examples):
+* for a coarse X-partition, the population optimum of a tabular Student is the weighted mean label in each bin;
+* bins: side × window-centre cell × lit-fraction bin (× solid present);
+* labels aggregated to 16³ or 8³ blocks;
+* the B1K and T* optima were compared by TV, side by side with noise references.
+
+| partition, side | TV(B1K optimum, T* optimum) | noise reference |
+|---|---|---|
+| fine (4³ × 6 × 2), L64 / L128 / L256 | 0.44 / 0.31 / 0.22 | scene halves: 0.90 / 0.91 / 0.96; window-level permutation of the hidden factor: 0.47 / 0.36 / 0.24 |
+| coarse (2³ × 6), L64 / L128 / L256 | 0.30 / 0.23 / 0.16 | window-level permutation: 0.33 / 0.30 / 0.19 |
+
+**Reading:**
+* The observed differences are **not** separable from the finite-sample variability of re-weighting the same examples. They are below the permutation null, which itself exaggerates by mixing scenes.
+* Scene-to-scene variability dominates. Bin-averaged labels from two disjoint halves of the scenes differ by TV ≈ 0.9.
+* So a tabular estimate on 1K data has no power for this question. It neither shows nor excludes a tilt.
+* The real-data answer comes from trained Students evaluated on both populations (`E_STUDENT_PILOT.md`).

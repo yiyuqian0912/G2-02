@@ -13,7 +13,8 @@ Fix (statistical path only; everything else is the v3.4 pipeline, imported uncha
 * Label q_B': the per-cell volumes of B', computed per piece P as vol(P) − vol(P ∩ ∪C).
   * Pieces fully inside a body: removed.
   * Pieces disjoint from every body (a separating face row): kept.
-  * Partial pieces: float64 half-space intersection volumes, with inclusion–exclusion for up to 3 bodies.
+  * Partial pieces: float64 half-space intersection volumes, with exact inclusion–exclusion for up to 8 bodies
+    (every intersection of convex sets is convex), else conservatively kept and counted in eta.
   * The float error enters the TV bound as a deterministic term eta (recorded; ~1e-12).
 * Certificate: TV(q_B', q_F) <= eps + eta, except with probability delta (same per-label delta policy).
 
@@ -101,9 +102,9 @@ def solid_free_volumes(res, P, K):
         V = vpool[voff[i]:voff[i] + vn[i]]
         Ap, bp = _piece_hs(V)
         bodies = [bi for bi, _ in touch[i]]
-        if len(bodies) > 3:
-            raise RuntimeError("piece meets more than 3 bodies (inclusion-exclusion not implemented)")
         st["partial"] += 1; st["multi"] += len(bodies) > 1
+        if len(bodies) > 8:                                # 2^k - 1 convex terms: keep the piece instead (counted in eta)
+            st["unresolved"] += 1; st["unresolved_volume"] += vol[i]; continue
         rem = 0.0
         from itertools import combinations
         try:

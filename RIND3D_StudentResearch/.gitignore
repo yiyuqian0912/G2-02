@@ -4,3 +4,4 @@ __pycache__/
 *.npz
 *.u8
 s6/s6.err
+chain/*.json

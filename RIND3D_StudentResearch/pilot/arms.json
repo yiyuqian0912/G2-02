@@ -1,0 +1,15 @@
+[
+ {"name": "FL_B1K_s0", "target": "posterior", "weight": "b1k", "seed": 0},
+ {"name": "OH_B1K_s0", "target": "onehot", "weight": "b1k", "seed": 0},
+ {"name": "FL_TREL_s0", "target": "posterior", "weight": "trel", "seed": 0},
+ {"name": "FL_B1K_sc25_s0", "target": "posterior", "weight": "b1k", "seed": 0, "subset": {"scenes_frac": 0.25}},
+ {"name": "OH_B1K_sc25_s0", "target": "onehot", "weight": "b1k", "seed": 0, "subset": {"scenes_frac": 0.25}},
+ {"name": "FL_B1K_ex25_s0", "target": "posterior", "weight": "b1k", "seed": 0, "subset": {"examples_frac": 0.25}},
+ {"name": "OH_B1K_ex25_s0", "target": "onehot", "weight": "b1k", "seed": 0, "subset": {"examples_frac": 0.25}},
+ {"name": "FL_MIS_s0", "target": "posterior", "weight": "mis", "seed": 0},
+ {"name": "OH_MIS_s0", "target": "onehot", "weight": "mis", "seed": 0},
+ {"name": "FL_B1K_s1", "target": "posterior", "weight": "b1k", "seed": 1},
+ {"name": "OH_B1K_s1", "target": "onehot", "weight": "b1k", "seed": 1},
+ {"name": "FL_MIS_s1", "target": "posterior", "weight": "mis", "seed": 1},
+ {"name": "OH_MIS_s1", "target": "onehot", "weight": "mis", "seed": 1}
+]

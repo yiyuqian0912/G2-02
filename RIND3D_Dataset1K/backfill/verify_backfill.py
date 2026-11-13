@@ -1,6 +1,7 @@
 """Post-backfill verification of release_1k_v1 labels (read-only).
 
-usage: verify_backfill.py <release_root> <pre_backfill_integrity.json> <out.json> [workers]
+usage: verify_backfill.py <release_root> <pre_backfill_integrity.json> <out.json> [workers] [n_tasks]
+(n_tasks: the delta family size; 159,802 for the release, 30,349 for NAT-1K)
 Checks, per informative task:
 * a task file exists, or a failure / quarantine record explains its absence;
 * sha256 of the file equals the sha256 logged at write time (labels_log.jsonl; FastLabel entries);
@@ -35,13 +36,13 @@ def cell_of(s):
 
 
 def check_scene(args):
-    d, logged, pre = args
+    d, logged, pre, N_TASKS = args
     from rind3d_1k.fastlabel.pipeline import design2
     d = Path(d)
     W = np.load(d / "public" / "windows.npy")
     src = json.loads((d / "privileged" / "sources.json").read_text())
     S = np.array([[float.fromhex(v) for v in s] for s in src["sources_hex"]])
-    seal = json.loads((d / "SEAL.json").read_text())
+    seal = json.loads((d / "SEAL.json").read_text()) if (d / "SEAL.json").exists() else {}   # NAT-1K scenes carry no seal
     seal_bad = [k for k, v in seal.items() if sha(d / k) != v]
     rows = []
     for r in W:
@@ -104,11 +105,12 @@ def main():
         r = json.loads(line)
         if "sha256" in r:
             logged[(r["scene"], int(r["window"]), int(r["source"]))] = r["sha256"]
-    dirs = sorted(p for p in (root / "scenes").iterdir() if (p / "SEAL.json").exists())
+    dirs = sorted(p for p in (root / "scenes").iterdir() if (p / "SEAL.json").exists() or (p / "natural.json").exists())
     by_scene = {}
     for k, v in logged.items():
         by_scene.setdefault(k[0], {})[k] = v
-    args = [(str(d), by_scene.get(d.name, {}), pre.get(d.name, {}).get("labels", {})) for d in dirs]
+    nt = int(sys.argv[5]) if len(sys.argv) > 5 else N_TASKS
+    args = [(str(d), by_scene.get(d.name, {}), pre.get(d.name, {}).get("labels", {}), nt) for d in dirs]
     with ProcessPoolExecutor(nw) as ex:
         res = list(ex.map(check_scene, args, chunksize=4))
     rows = [r for _, _, rr in res for r in rr]

@@ -12,7 +12,8 @@ Per-example metrics (nats; 128^3 label cells; the Student's support is the cube 
   ent        entropy of p (cells); eff_support = exp(ent); ig = KL(p || u)
   with a certified reference label q (if one exists): ce = -sum q log p, hq = H(q), kl = ce - hq, supp_mass = p(supp q),
   ce_prior = -sum q log u, ig_ref = KL(q || u)
-Also: coarse-cell reliability histograms (predicted mass vs. hit frequency) per set."""
+Also: coarse-cell reliability histograms (predicted mass vs. hit frequency) per set.
+Subsamples (seed 20261113, identical for all arms): b1k 6000 rows; ood_nat_alllit 3000 rows incl. every row with a reference label."""
 import json, sys
 from pathlib import Path
 import numpy as np
@@ -49,6 +50,19 @@ def main():
         for t, nm in ((1, "sep"), (2, "alllit"), (3, "alldark")):
             chosen[f"ood_nat_{nm}"] = np.flatnonzero(base & (r["ds"] == 1) & (r["type"] == t))
         chosen["ood_rel_sep"] = np.flatnonzero(base & (r["ds"] == 0) & (r["type"] == 1))
+    # declared subsamples of the two largest sets (identical for every arm; rows with a reference label always kept)
+    caps = {"b1k": 6000, "ood_nat_alllit": 3000}
+    srng = np.random.default_rng(20261113)
+    for name, cap in caps.items():
+        idx = chosen.get(name)
+        if idx is None or len(idx) <= cap:
+            continue
+        has_ref = np.array([T.label_path(i).exists() or (T.label_path(i).parent.parent / "ood" / T.label_path(i).name).exists()
+                            for i in idx]) if name.startswith("ood") else np.zeros(len(idx), bool)
+        keep = np.flatnonzero(has_ref)
+        rest = np.flatnonzero(~has_ref)
+        pick = srng.choice(rest, max(cap - len(keep), 0), replace=False)
+        chosen[name] = np.sort(idx[np.concatenate([keep, pick])])
     res = {}
     rng = np.random.default_rng(12345)
     for name, idx in chosen.items():
