@@ -2,7 +2,7 @@
 
 **Status.** Working document. Every number is exploratory **dev-split** evidence unless it is marked *confirm*.
 * dev = pilot-select, 102 scenes of the 1K train split;
-* confirm = the 1K val split, used once (§9);
+* confirm = the 1K val split, used once (§10);
 * the 1K test split is sealed and was never read.
 
 **Conventions.**
@@ -693,6 +693,11 @@ The IG columns are on the reference rows; the paired IG differences are over all
    * Where the X-measured planes fix a point, F5 (M = 4) is within 0.83 nats of the full-world label.
    * The largest remaining gap (3.1 nats) is on near-pencil facet sets, where X fixes only a line.
 6. **Calibration splits into two regimes.** Models are near-perfectly calibrated where the facet law holds and strongly over-confident on law-violating rows. Headline HPD-MAE averages the two.
+7. **The projective Student is data-efficient; the generic one is data- and compute-limited** (H4, dev only, §6).
+   * With 86 training worlds F1 scores 7.45 nats, 96% of its 684-world score and 1.9× G0 trained on all 684.
+   * G0 gains 2.2 nats over the same 8× range, with shrinking returns per doubling (1.02 → 0.76 → 0.43) at a fixed step budget.
+   * 4× more steps at full data add +0.91 to G0 (G0long) but leave F1 − G0long at +2.90, and make G0 over-confident.
+   * At 1K scale, neither more steps nor more worlds lets the generic decoder find the projective operator.
 
 ### What is falsified
 
@@ -718,7 +723,7 @@ The IG columns are on the reference rows; the paired IG differences are over all
 * **Most efficient next experiments, ranked by the measured gap share:**
   1. Point-precision on near-pencil facet sets. Use a depth prior learned along the pencil line, conditioned on the window context; test it on the pencil stratum of §4.5.
   2. Occluder-face detection from X: a visible-caster descriptor (is a visible solid edge on the plane?) feeding the facet head; target the violating stratum (0.48 nats of F5's gap).
-  3. The facet-free hard cases (solid-separated, all-dark): the generic field is the only source of information there, so this is where data scale (Q4) should matter most.
+  3. The facet-free hard cases (solid-separated, all-dark): the generic field is the only source of information there. Data scale alone does not fix them: F1's solid-separated deficit against G0 is the same at every training fraction (§6).
 
 ### Novel contributions
 

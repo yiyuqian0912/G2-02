@@ -31,11 +31,15 @@ class Generic(PilotStudent):
     """Pilot architecture, flat readout. forward -> (logits (B, 4096, 512), context dict).
     facet_tokens=True (arm G1): the X-measurable facets enter as K extra key/value tokens of every cross-attention
     block (embedding of centroid, normal, size and fit quality), but the decoder has no geometric operator: the same
-    information as the facet model, generic decoding."""
+    information as the facet model, generic decoding.
+    side_bucket_max (evaluation-time diagnostic for the side-holdout arms, §8 of B_RESULTS): clamp the window-size
+    bucket (0: L64, 1: L128, 2: L256) so a side never seen in training reuses the largest trained bucket's embedding."""
 
-    def __init__(self, d=128, layers=3, heads=4, ckpt=True, blind=False, facet_tokens=False, min_inliers=24):
+    def __init__(self, d=128, layers=3, heads=4, ckpt=True, blind=False, facet_tokens=False, min_inliers=24,
+                 side_bucket_max=None):
         super().__init__(d=d, layers=layers, heads=heads, ckpt=ckpt)
         self.blind = blind
+        self.side_bucket_max = side_bucket_max
         self.facet_tokens = facet_tokens; self.min_inliers = min_inliers
         if facet_tokens:
             self.ftok = nn.Sequential(nn.Linear(16 + 3 * 2 * 4 + 3 + 1, d), nn.GELU(), nn.Linear(d, d))
@@ -47,6 +51,8 @@ class Generic(PilotStudent):
         if self.blind:
             x = torch.zeros_like(x)
         sidx = torch.bucketize(side, torch.tensor([96, 192], device=side.device))
+        if self.side_bucket_max is not None:
+            sidx = sidx.clamp_max(self.side_bucket_max)
         h = self.down2(self.down1(self.stem(x)))
         tok = h.flatten(2).transpose(1, 2)
         g = (torch.arange(8, device=feats.device, dtype=torch.float32) + 0.5) / 8
@@ -236,7 +242,8 @@ class Facet(Generic):
 
 def build(cfg):
     kind = cfg.get("model", "generic")
-    kw = dict(d=cfg.get("d", 128), layers=cfg.get("layers", 3), heads=cfg.get("heads", 4), ckpt=cfg.get("ckpt", True))
+    kw = dict(d=cfg.get("d", 128), layers=cfg.get("layers", 3), heads=cfg.get("heads", 4), ckpt=cfg.get("ckpt", True),
+              side_bucket_max=cfg.get("side_bucket_max"))
     if kind == "generic":
         return Generic(blind=cfg.get("blind", False), facet_tokens=cfg.get("facet_tokens", False),
                        min_inliers=cfg.get("min_inliers", 24), **kw)
