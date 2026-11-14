@@ -1,0 +1,131 @@
+# A — Research plan: global source inference from local shadows
+
+Branch `yushu/3d-experiment`. This is a working plan. It was revised after the Stage A audit, whose numbers are in §1. Results are in `B_RESULTS.md`.
+
+## 0. Task (unchanged; `RIND3D_StudentResearch/A_TASK_DEFINITION.md`)
+
+**Input.** The Student sees X = (SOLID ∩ W, r_j = R_j|FREE(W), L, o). That is the local geometry, one channel's binary response, and the window side and origin.
+
+**Output.** p(s | X) over the 128³ source cells outside the closed window box.
+
+**Target.** p*(s | X) = E_T*[q_G(s) | X]. This marginalises the hidden world. The certified labels q_G = Uniform(F_W(G)) are per-world posteriors, not targets to be matched one by one.
+
+**Hidden from the Student.** Other channels, K, m, the mask, ids, weights and the label status.
+
+## 1. Stage A audit: the main finding
+
+### 1.1 Shadow posteriors are projective
+
+The lit/dark interface inside the window consists of FREE receiver pairs of opposite response. That interface is a piece of the shadow boundary.
+
+In free space, the shadow boundary of a point source is a cone with its apex at the source. With convex polyhedral occluders it is a union of **planar facets, and every facet plane contains the source**. This holds whether or not the occluder is visible.
+
+The facets are measurable from X. Greedy local RANSAC on the interface midpoints finds them (`slab/facets.py`; it uses no privileged data).
+
+On the dev split, NAT-1K boundary-mixed rows (5,218 rows, 102 scenes):
+
+| facet size (inliers) | facets | true source within 2 voxels of the facet plane | median distance |
+|---|---|---|---|
+| ≥ 1000 | 11,750 | **95–96%** | **0.04–0.09 voxel**, at a median ~700 voxels from the window |
+| 100–999 | 2,121 | 68–79% | 0.5–1.0 voxel |
+| 24–99 | 196 | 19% | 8–11 voxels |
+
+Facets per row, mean: 1.4 at L64, 2.0 at L128, 3.4 at L256.
+
+The certified labels agree. Their supports are one cell thick: a plane at L64, a line at L128 (median sd 0.3, 0.3, 15 cells), and a single cell in 56% of L256 labels.
+
+### 1.2 The pilot Student does not use this structure
+
+The pilot Student (FL_MIS_s0, 3.9–4.0 nats information gain) puts 29% of its mass within ±8 voxels of a single-facet window's plane. The label puts 100% there.
+
+**Non-learned, X-only estimators** (dev, side-balanced information gain over the uniform-legal prior):
+
+| estimator | IG (nats) |
+|---|---|
+| pilot Student | 3.92 |
+| **uniform prior × Π_k [ε + exp(−d_k² / 2σ_k²)] over the X-measured facets** | **7.18** |
+| Student × facet factor | 7.3 (pooled 8.17) |
+| full-world label (privileged upper reference) | 10.28 |
+
+The earlier interpretation (`E_STUDENT_PILOT.md` §2.6) attributed the gap of about 6.4 nats between the Student and the labels to hidden geometry and capacity. **About half of that gap is X-measurable projective information that the Student fails to extract.**
+
+### 1.3 Cause
+
+The pooled 32³ input still fixes the plane to 0.2–0.7 voxel: weighted PCA of the pooled boundary channel on single-facet windows. So the information is present in the input.
+
+What fails is the computation. A plane fitted over 64–256 voxels has to be extrapolated about 700 voxels with sub-cell precision. A CNN plus Fourier-query cross-attention decoder has no operator for this.
+
+## 2. Questions, in priority order
+
+| | question | why it matters | decisive comparison |
+|---|---|---|---|
+| **Q1** | Does an explicit projective factor, computed from X with learned reliability and width, let a Student recover the X-measurable information? | It tests the central mechanism and is the basis for the other questions | **G0** (generic) vs **F1** (generic + facet factor): same encoder, data, budget and seeds |
+| **Q2** | Which part of the projective computation must be built in? | It separates "plane extraction" from "plane extrapolation" as the bottleneck | F1 ablations: fixed facet head (no learning); facet-only (no generic field); generic with 4× steps (does scale fix it?); learned plane extraction from pooled features (slot PCA) |
+| **Q3** | Does posterior supervision still beat one-hot once the inductive bias is right? (H1) | The pilot's +2.2–2.6 nats came from memorisation by a generic model | one-hot vs posterior for G0 and F1 |
+| **Q4** | How do the models scale with independent worlds? (H4) | Data efficiency of the structured model vs the generic one | scene fractions 1/8, 1/4, 1/2, 1 for G0 and F1 |
+| **Q5** | What remains after the projective constraints, and is the model calibrated about it? (H5) | It separates irreducible hidden-world uncertainty from model error | residual vs label information by facet count; along-plane analysis; HPD calibration |
+| **Q6** | Does it generalise? (H6) | Facet-free strata (solid-separated, all-lit, all-dark) need other mechanisms | dev OOD strata; window-size transfer |
+
+**Deferred.** Counterfactual hidden-world ensembles (§8 of the brief). The resampled hidden geometry would have to reproduce the observed shadow facets exactly, which is a conditional sampler the generator does not provide. A cheaper partial version is noted in §6.
+
+## 3. Evaluation protocol (fixed before the comparisons)
+
+**Splits.** These are the pilot's hash-declared, scene-disjoint roles:
+
+| split | scenes | use |
+|---|---|---|
+| train | pilot-train, 684 | training only |
+| dev | pilot-select, 102 | every exploratory comparison and OOD development |
+| confirm | pilot-eval = 1K val split, 121 | used once, for a small pre-declared set of final comparisons (`--confirm`, logged) |
+| 1K test | — | sealed; never opened |
+
+**Primary score.** Held-out information gain IG = −log u(s_true) + log p(s_true), on dev T* rows (NAT-1K natural windows, boundary-mixed). Sides are pooled with equal shares.
+* IG is strictly proper for p*. It needs no reference posterior and no privileged data.
+* KL(q_G ‖ p) and CE to the labels are secondary diagnostics. Their floor is not zero (§0).
+
+**Also reported:**
+* B1K (release windows);
+* HPD calibration MAE;
+* per side and per facet count;
+* OOD strata (solid-separated, all-lit, all-dark) on dev rows, never trained on.
+
+**Uncertainty.**
+* 95% scene-bootstrap intervals; all channels of a scene resample together.
+* Paired differences on identical rows.
+* At least 2 seeds for every decision-relevant arm, and 3 for the main comparison.
+
+**Checkpoint.** Each arm is represented by its final checkpoint (cosine schedule). No checkpoint selection on dev, so dev comparisons carry no selection bias. One-hot arms also report their best dev-curve step, flagged as optimistic.
+
+**Training.** Unless stated otherwise every arm uses the pilot's protocol:
+* AdamW 4·10⁻⁴, 8k steps × 32, bf16;
+* T*-MIS weights (balance heuristic, release + NAT-1K);
+* boundary-mixed training rows only;
+* no augmentation.
+
+**Population.** Every arm trains on T* via the MIS weights. No unweighted oversampling.
+
+## 4. Order of work and cost
+
+Laptop RTX 3060, 6 GB.
+
+| stage | runs | GPU time |
+|---|---|---|
+| A | audit; facet law; non-learned bounds; G0 reproduction; pilot checkpoints re-evaluated | done / ~1 h |
+| B | Q1: G0 × 3 seeds, F1 × 3 seeds | ~3.5 h |
+| C | Q2 ablations (fixed, facet-only, slot-PCA, G0 4× steps); Q3 one-hot arms | ~4 h |
+| D | Q4 learning curves (3 fractions × 2 models × 2 seeds) | ~6 h |
+| E | Q5/Q6 analyses (no training); confirmatory evaluation of the final arms on the confirm split | ~1 h |
+
+**CPU.** Facet extraction for all 194,532 rows takes ~2 h on 12 cores, once.
+
+## 5. Risks
+
+* **Facet-extraction errors.** About 4% of large facets miss the source, for example coplanar merges. Mitigation: robust factors with a learned outlier floor ε_k. Errors are measured per facet size.
+* **Label-free OOD strata have no facets.** The model falls back to the generic field there. Q6 checks it does not become overconfident.
+* **The 1K scale.** 684 training worlds. Results are 1K-scale results and are not presented as 100K-scale ones. The protocol (splits, metrics, models) transfers unchanged.
+* **A facet-structured model could exploit artefacts of the voxel staircase.** Facets are computed from the same X at train and test time, and the facet law (§1.1) is physical, not an artefact. The test is generalisation to strata and sides with different facet statistics.
+
+## 6. Ideas held in reserve
+
+* **Lit-cone visibility factor.** Every lit receiver must see the source through the visible window geometry, which gives a hard X-measurable support constraint. It is the only geometric information in all-lit windows.
+* **Partial counterfactuals.** Perturb hidden objects that avoid the source's view of the window. X is unchanged and q_G changes, which shows non-identifiability directly. It needs FastLabel runs (~1 s each).
