@@ -14,14 +14,14 @@ configs/OHF1_s0.json
 configs/F2_s0.json
 # F5: F1 + sparse sub-cell quadrature of the facet product (failure analysis mode 1; amendment A1)
 configs/F5_s0.json
-# F3: two-hypothesis facets (shadow | occluder face) + facet dropout with availability flag; single-change arms
+# F3: two-hypothesis facets (shadow | occluder face) + facet dropout with availability flag (failure mode 3)
 configs/F3_s0.json
-configs/F1drop_s0.json
-configs/F1hyp_s0.json
 # F4: F3 + leave-one-out facet consensus descriptors
 configs/F4_s0.json
-# sampling design with a low-variance Student: release-only balanced weights (B1K) vs T*-MIS
-configs/F1b1k_s0.json
+# F5 second seed (F5 beat F1 by 0.25 on dev; seed check before the confirm selection)
+configs/F5_s1.json
+# generic with 4x step budget (is G0 merely under-trained?)
+configs/G0long_s0.json
 # (third seeds of G0/F1 dropped: seed spread 0.03 nats << 3.8-nat effect)
 # Q4: independent-scene learning curves (same scene subsets for both models)
 configs/F1sc125_s0.json
@@ -35,6 +35,8 @@ configs/G0side_s0.json
 configs/F1side_s0.json
 configs/G0fam_s0.json
 configs/F1fam_s0.json
-# window-aware prior; generic with 4x budget
+# single-change arms of F3 (dropout+flag only; two-hypothesis only); sampling design; window-aware prior
+configs/F1drop_s0.json
+configs/F1hyp_s0.json
+configs/F1b1k_s0.json
 configs/Gblind_s0.json
-configs/G0long_s0.json

@@ -203,6 +203,34 @@ G1 has **the information F1 has, but no geometric decoding operator**.
 * **Calibration.** HPD-MAE rises from 0.024 (P0) to 0.053 (F1), still within the pilot's 0.03–0.05 range.
 * (F1fix uses facets with ≥ 24 inliers and P0 those with ≥ 100.)
 
+### 4.4 Can the planes be learned from the Student's own input? (F2)
+
+**F2.** The same generic field as G0, plus a plane operator whose planes are *learned* from the pooled input (4 × 32³ per channel), with no RANSAC facets:
+* slot attention over the top 3,072 pooled boundary cells;
+* weighted PCA planes (eigh plus shifted power iterations);
+* a self-supervised planarity loss computed on X only;
+* the same facet head and plane factor as F1.
+
+| arm | planes from | T* IG | KL | IG L64 / L128 / L256 | IG by facet count 1 / 2 / 3 / ≥ 4 |
+|---|---|---|---|---|---|
+| G0 | — | 3.90 | 6.37 | 3.56 / 3.89 / 4.26 | 2.62 / 4.30 / 4.72 / 5.19 |
+| **F2** | pooled input (learned) | **5.62 [5.45, 5.81]** | 4.66 | 5.48 / 5.59 / 5.78 | 4.00 / 6.30 / 6.94 / 6.43 |
+| F1 | full-resolution crop (RANSAC) | 7.72 | 2.58 | 6.08 / 7.36 / 9.71 | 4.66 / 8.78 / 10.46 / 11.80 |
+
+**Paired differences:**
+* F2 − G0 = **+1.71 [1.60, 1.83]**: the operator alone, on the same input as G0.
+* F1 − F2 = **+2.10 [1.95, 2.24]**: plane precision.
+
+Solid-separated: F2 − G0 = −0.16, the same co-adaptation as F1.
+
+**Readings.**
+* **The decoding operator is the larger single ingredient.** On G0's own input, a learned plane operator gains 1.7 nats, whereas G1 (the exact planes as tokens, without the operator) loses 0.09.
+* **The input representation is the second bottleneck.**
+  * The pooled input discretises a 64–256-voxel window into 32³ cells (2–8 voxels per cell).
+  * F2 is flat in window size and saturates at ~6.5 nats with ≥ 3 planes. F1 instead rises to 9.7 at L256, where full-resolution facets are most precise (§2.1).
+  * Sub-voxel plane geometry must come from full-resolution X. Any 100K Student should either carry X-measured facets (cheap: §8 of the plan) or a full-resolution boundary encoder.
+* F2 costs ~2× the step time of F1 (slot attention and PCA). Its dev NLL plateaued at 8.6 from step 6k, so more steps would not close the gap.
+
 ### 4.3 The cell integral: a non-learned probe (motivated by the failure analysis, §9)
 
 **Probe.** `scripts/quadrature_probe.py`: P0's fixed facet factor, with one change.
@@ -248,6 +276,38 @@ G1 has **the information F1 has, but no geometric decoding operator**.
 * **Arm F5** = F1 + amplitude-consistent sparse quadrature, M = 2 (M = 4 would cost several times more per step).
   * The fused kernels are tested against a torch reference of the same rule, values and gradients, with and without the amplitude.
   * F5 is the only change relative to F1. It was added before any F3–F5 dev result (amendment A1 of the plan).
+
+### 4.5 F5: the Student with an exact-enough cell integral
+
+**F5** = F1 + the amplitude-consistent sparse quadrature (M = 2) of §4.3. It is the only change, with the same seed, data and steps.
+
+| arm | T* IG | B1K IG | KL | HPD-MAE | IG L64 / L128 / L256 | sep | all-lit | all-dark |
+|---|---|---|---|---|---|---|---|---|
+| F1 s0 | 7.72 | 7.73 | 2.58 | 0.053 | 6.08 / 7.36 / 9.71 | 0.37 | −0.05 | 0.30 |
+| F1 s1 | 7.71 | 7.74 | 2.57 | 0.055 | 6.09 / 7.35 / 9.70 | 0.42 | −0.02 | 0.32 |
+| **F5 s0** | **7.97 [7.74, 8.20]** | **7.98** | **2.32** | **0.031** | 6.17 / 7.57 / 10.18 | 0.42 | −0.03 | 0.29 |
+
+**Paired differences:**
+* F5 − F1 = **+0.25 [0.22, 0.29]** on T* and +0.25 [0.22, 0.29] on B1K. The seed difference F1 s0 − s1 is 0.00 [−0.01, 0.02].
+* F5 − G0 = **+4.07 [3.92, 4.21]**.
+* On the OOD strata, F5 is equal to or slightly better than F1.
+
+**By failure stratum** (F1 → F5; label in brackets):
+* point-determined law-obeying rows: 11.00 → **11.62** (14.42);
+* two-plane rows: 9.41 → 9.67 (11.15);
+* single-plane rows: 5.01 → 5.03 (7.21), unchanged as designed;
+* ≥ 3-facet violating rows: 8.73 → 9.04.
+* The pooled label gap falls from 2.66 to 2.32 nats per row. The point-determined share falls from 0.93 to 0.70.
+
+**Calibration.**
+* Law-obeying rows: HPD-MAE 0.036 → 0.019.
+* Point-determined rows are now slightly under-confident (signed +0.025), which leaves room for more sub-points.
+* Violating rows stay over-confident (−0.171): quadrature does not address occluder interfaces. F3 and F4 target them.
+
+**What the head learned.**
+* F1's facet head had widened the planes: median s0 = 1.27 voxels, ε ≈ 6·10⁻⁴.
+* F5's head makes them sharp: s0 ≈ 10⁻³, so the width now comes only from the fitted angular term; ε ≈ 10⁻⁵.
+* With the cell integral done properly, the model no longer needs to blur planes to hedge. This confirms §9's reading that F1's wide kernels were compensating for the cell-centre approximation.
 
 ## 5. Q3 (H1): does posterior supervision still matter once the inductive bias is right?
 

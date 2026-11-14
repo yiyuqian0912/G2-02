@@ -1,7 +1,9 @@
 """Shared evaluation of lab models (and of the frozen pilot checkpoints) on declared row sets.
 
 usage: python -m slab.evaluate <run_dir | pilot:<ckpt.pt>> [--sets tstar,b1k,sep,alllit,alldark] [--split dev]
-                                [--confirm] [--tag NAME]
+                                [--confirm] [--tag NAME] [--ckpt final.pt] [--override JSON]
+--override: evaluation-time model options merged into the run config (e.g. '{"quad": 4}' for a quadrature change at test
+time; architecture-changing keys would fail at load). Requires --tag, so the default evaluation file is never replaced.
 --split confirm (pilot-eval = the 1K val split) requires --confirm and is appended to OUT/CONFIRM_LOG.jsonl; it is
 reserved for the pre-declared confirmatory comparisons. The sealed 1K test split is not in the feature table.
 Per example (nats, 128^3 label cells; support = cube minus the closed window box; u = uniform-legal prior):
@@ -38,8 +40,8 @@ def pilot_model(ck, dev):
     return logp_of
 
 
-def lab_model(run, dev, which="final.pt"):
-    cfg = json.loads((Path(run) / "config.json").read_text())
+def lab_model(run, dev, which="final.pt", override=None):
+    cfg = json.loads((Path(run) / "config.json").read_text()); cfg.update(override or {})
     m = build(cfg).to(dev); m.load_state_dict(torch.load(Path(run) / which, map_location=dev)); m.eval()
 
     def logp_of(B):
@@ -99,7 +101,10 @@ def main():
         od = OUT / "pilot_evals" / Path(ck).parent.name; od.mkdir(parents=True, exist_ok=True)
         outp = od / f"eval_{split}{'_' + tag if tag else ''}.npz"
     else:
-        logp_of = lab_model(tgt, dev, arg("--ckpt", "final.pt")); outp = Path(tgt) / f"eval_{split}{'_' + tag if tag else ''}.npz"
+        ov = json.loads(arg("--override", "{}"))
+        if ov and not tag:
+            raise SystemExit("--override needs --tag")
+        logp_of = lab_model(tgt, dev, arg("--ckpt", "final.pt"), ov); outp = Path(tgt) / f"eval_{split}{'_' + tag if tag else ''}.npz"
     res = {}; t0 = time.time()
     for s in sets:
         idx = T.eval_set(s, split)
