@@ -606,3 +606,69 @@ The IG columns are on the reference rows; the paired IG differences are over all
 * **Hard cases carry information no Student extracts.**
   * The full-world label has 1.6–1.9 nats on all-dark and solid-separated windows, and 0.36 on all-lit. Both models stay at 0–0.9.
   * How much of this is X-measurable is unknown: these labels condition on the hidden world, and windows without lit/dark interfaces have no facets.
+
+## 11. Conclusions (deliverable F)
+
+**The research question.** How can a model infer a global 3-D source distribution from limited local geometry and binary observations, and what makes the inference accurate, efficient and generalisable?
+
+**Answer at the 1K scale.**
+* The observation contains a *projective* structure: every planar lit/dark interface lies on a plane through the source.
+* A Student is accurate when its output representation can express that structure *exactly*. Concretely: an exactly normalised density over the 128³ cells, factorised as a learned generic field times analytic plane factors whose planes are measured from X, each factor integrated over the cell.
+* That design doubles the information gain of the established Student (3.9 → 8.1 nats on confirm T*) and cuts KL to the full-world label from 6.4 to 2.2 nats. It trains in ~1k steps, and its non-learned core needs no training at all.
+
+### What is demonstrated (dev, replicated on the confirm split)
+
+1. **The facet law, and its exception.**
+   * Large X-measured facets lie a median 0.04–0.09 voxel from the true source at distances of ~700 voxels.
+   * The exception is occluder interfaces: sub-voxel slabs invisible in the SOLID mask. They are 3.8% of large facets, mostly thin_slabs and occluder_clusters.
+2. **The established Student's gap was an operator deficit, not hidden information** (H2).
+   * A non-learned product of facet factors beats the pilot Student by 3.36 nats on confirm (C2).
+   * Giving the generic decoder the same planes as attention tokens does not help (G1: −0.09 on dev).
+   * A projective decoder gains +3.94 / +3.97 per seed (C1).
+3. **The probability representation matters at the sub-cell level** (H3).
+   * Integrating the facet product over each cell, rather than evaluating it at the centre, adds +0.22 on confirm (F5 − F1), +0.34 with 4³ sub-points.
+   * HPD calibration error falls to 0.010.
+   * The consistent cell *average* (amplitude-corrected) is essential for a sparse implementation (§4.3).
+4. **Posterior supervision beats one-hot supervision under every inductive bias** (H1).
+   * Its margin shrinks from 2.5 to 0.5 nats once the operator is right (early-stopped one-hot).
+   * One-hot memorises the 684 training worlds, is badly calibrated, and scores below the prior on OOD strata.
+5. **Hidden-world uncertainty is small next to the remaining model error, except on degenerate pencils** (H5).
+   * Editing hidden geometry while keeping X identical changes the label by 0.016 (body removal) and 0.15 nats (caster depth).
+   * Where the X-measured planes fix a point, F5 (M = 4) is within 0.83 nats of the full-world label.
+   * The largest remaining gap (3.1 nats) is on near-pencil facet sets, where X fixes only a line.
+6. **Calibration splits into two regimes.** Models are near-perfectly calibrated where the facet law holds and strongly over-confident on law-violating rows. Headline HPD-MAE averages the two.
+
+### What is falsified
+
+* "The pilot's 6.4-nat KL gap is hidden geometry plus capacity" (`E_STUDENT_PILOT.md` §2.6). At least 4.2 nats of it is X-measurable: confirm KL falls from 6.38 (G0) to 2.12 (F5, M = 4) with X-only inputs.
+* "Access to the planes suffices" (G1).
+* "A two-hypothesis (occluder | shadow) factor fixes occluder interfaces" (F3 − F1drop: +0.07 on violating rows, no calibration gain).
+* "Planes learned from the pooled 32³ input are enough" (F2: +1.7 over G0, but −2.1 vs full-resolution facets).
+
+### What is inconclusive
+
+* Why facet dropout repairs facet-free windows with the cell-centre factor (F1drop, +0.27) but not with quadrature (F6).
+* How much of the hard-case label information (all-dark 1.6, solid-separated 1.9 nats on confirm) is X-measurable at all.
+* The X-only floor on pencil-degenerate rows.
+* [G0long, Q4 and Q6 readings: §6 and §8]
+
+### Strongest design, and the most efficient next experiments
+
+* **Strongest design: F5**, run with M = 4 sub-points at evaluation. It adds no learned parameters beyond F1 and costs ~1.3× its wall time (2,138 vs ~1,615 s for 8k steps plus evaluation).
+* **For a 100K Student:**
+  * keep X-measured facets as an input stream (~0.1 core-s per channel, §8 of the plan);
+  * keep the plane-factor decoder with sparse quadrature;
+  * add facet dropout with an availability flag. It is cheap, repaired facet-free windows with the cell-centre factor (dev), and should be verified with quadrature.
+* **Most efficient next experiments, ranked by the measured gap share:**
+  1. Point-precision on near-pencil facet sets. Use a depth prior learned along the pencil line, conditioned on the window context; test it on the pencil stratum of §4.5.
+  2. Occluder-face detection from X: a visible-caster descriptor (is a visible solid edge on the plane?) feeding the facet head; target the violating stratum (0.48 nats of F5's gap).
+  3. The facet-free hard cases (solid-separated, all-dark): the generic field is the only source of information there, so this is where data scale (Q4) should matter most.
+
+### Novel contributions
+
+* The facet law as a measurable property of binary shadow observations, and the occluder-interface exception (sub-voxel occluders invisible in the geometry channel).
+* The G1 control separating information from operator.
+* A projective product-of-experts Student with an exactly normalised flat 128³ density and an amplitude-consistent sparse cell integral, with fused, tested GPU kernels.
+* Exact X-identical counterfactual worlds (verified by the FastLabel verifier) that bound the hidden-world floor.
+
+These are 1K-scale results: 684 training worlds, dev and confirm on the 1K splits. They are not 100K results.
