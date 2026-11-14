@@ -8,6 +8,7 @@
 * `labels/journal/<writer>.r3lj`: append-only binary label journal (coordinator only)
 * `labels/journal/<writer>.idx`: task keys of the journal, for fast resume
 * `labels/scenes/<shard>/<slot:06d>.labels.npz`: consolidated labels of a scene
+* `labels/consolidated.jsonl`: one record per consolidation (slot, path, sha256, bytes, statuses); last record wins
 * `labels/failures.jsonl`: crash / timeout / error / memory records (quarantine)
 * `STOP`: safe stop request
 
@@ -53,13 +54,53 @@ def labels_path(root, slot):
     return Path(root) / "labels" / "scenes" / f"{shard_of(slot):04d}" / f"{int(slot):06d}.labels.npz"
 
 
+def fsync_dir(path):
+    """Make a rename or a file creation in directory `path` durable (POSIX: the entry lives in the directory)."""
+    fd = os.open(str(path), os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def atomic_write(path, data):
+    """tmp, fsync, rename, fsync(dir): after return, the file and its name survive a crash."""
     path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + f".tmp{os.getpid()}")
     with open(tmp, "wb") as f:
         f.write(data); f.flush(); os.fsync(f.fileno())
     os.replace(tmp, path)
+    fsync_dir(path.parent)
     return hashlib.sha256(data).hexdigest()
+
+
+def append_line(path, line):
+    """Durable append of one newline-terminated text record (single writer)."""
+    path = Path(path); new = not path.exists()
+    if new:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as f:
+        f.write(line.rstrip("\n") + "\n"); f.flush(); os.fsync(f.fileno())
+    if new:
+        fsync_dir(path.parent)
+
+
+def read_jsonl(path):
+    """Records of an append-only JSONL file. A torn final line (crash during an append: no trailing newline) is
+    ignored; any other unparsable line is an error."""
+    p = Path(path)
+    if not p.exists():
+        return []
+    text = p.read_text()
+    lines = text.split("\n")
+    tail = lines.pop()                      # "" if the file ends with a newline, else the torn last record
+    out = [json.loads(l) for l in lines if l.strip()]
+    if tail.strip():
+        try:
+            out.append(json.loads(tail))
+        except json.JSONDecodeError:
+            pass
+    return out
 
 
 def sha256_file(p):
@@ -195,11 +236,12 @@ def journal_index(root):
     if not d.exists():
         return out
     for p in sorted(d.glob("*.idx")):
-        jp = str(p.with_suffix(".r3lj"))
-        for line in p.read_text().splitlines():
+        jp = p.with_suffix(".r3lj"); size = jp.stat().st_size if jp.exists() else 0
+        lines = p.read_text().split("\n")[:-1]           # complete (newline-terminated) lines only
+        for line in lines:
             f = line.split("\t")
-            if len(f) == 3 and f[0] not in out:
-                out[f[0]] = (jp, int(f[1]), int(f[2]))
+            if len(f) == 3 and f[0] not in out and int(f[1]) + int(f[2]) <= size:
+                out[f[0]] = (str(jp), int(f[1]), int(f[2]))
     return out
 
 

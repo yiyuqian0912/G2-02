@@ -75,12 +75,44 @@ def validate_scene(root, slot, rec=None, physics=0, deep=False, seed=0):
             errs.append(f"w{w} m/mask")
         if 1 <= m <= 4:
             m_hist[m - 1] += 1
+    if "sampling" in meta:
+        check_sampling_v2(meta, W, k, errs)
     phys = None
     if physics or deep:
         phys = physics_spot_check(S, n_points=int(physics or 512), seed=seed, deep=deep)
         if phys["mismatches"] or phys["independent_mismatches"] or phys.get("illegal_sources"):
             errs.append(f"physics {phys}")
     return dict(slot=int(slot), ok=not errs, errors=errs[:20], m_hist=m_hist.tolist(), k=k, physics=phys)
+
+
+def check_sampling_v2(meta, W, k, errs):
+    """Contract v2 (declared law): k from the kappa draw; streams per side consistent with the windows and the
+    declared coverage rule; coverage acceptances consistent with U < c(m); complete exact-m rate histograms."""
+    smp = meta["sampling"]; cov = (smp.get("selection") or {}).get("coverage") or {}
+    if int(smp["k"]) != k or int(smp.get("k_from_draw", k)) != k:
+        errs.append("k differs from the kappa draw")
+    if "stream" not in W.dtype.names:
+        errs.append("windows without stream field"); return
+    full = meta["windows_full"]
+    for sd in meta["sides"]:
+        Lp = int(sd["Lp"]); idx = [w for w in range(len(W)) if int(W[w]["Lp"]) == Lp]
+        st = {x["name"]: x for x in sd["streams"]}
+        n_nat = sum(int(W[w]["stream"]) in (0, 2) for w in idx); n_cov = sum(int(W[w]["stream"]) == 1 for w in idx)
+        if st["natural"]["accepted"] != n_nat or st.get("coverage", {}).get("accepted", 0) != n_cov:
+            errs.append(f"L{Lp} stream counts")
+        allowed = cov.get("enabled") and Lp in [int(x) for x in cov.get("sides", [])] and k in [int(x) for x in cov.get("k", [])]
+        if ("coverage" in st) != bool(allowed):
+            errs.append(f"L{Lp} coverage stream not as declared")
+        if any(int(W[w]["stream"]) == 2 for w in idx) and st["natural"].get("fallback", 0) == 0:
+            errs.append(f"L{Lp} unrecorded fallback")
+        for w in idx:
+            f = full[w]; c = f["c_row"]; m = int(W[w]["m"])
+            if f["stream"] == "natural" and any(float(x) != 1.0 for x in c):
+                errs.append(f"w{w} natural window with thinning")
+            if not (m >= 1 and float(f["U"]) < float(c[m - 1])):
+                errs.append(f"w{w} acceptance inconsistent with U < c(m)")
+        if int(sd.get("rate_exact", 0)) != int(sd["rate_n"]) or int(sum(sd["rate_m"])) != int(sd["rate_A"]):
+            errs.append(f"L{Lp} rate stream histogram incomplete")
 
 
 def physics_spot_check(S, n_points=512, n_windows=3, independent_points=32, seed=0, deep=False):
@@ -107,13 +139,18 @@ def physics_spot_check(S, n_points=512, n_windows=3, independent_points=32, seed
     return out
 
 
-def validate_labels(root, slot, scene_rec):
+def validate_labels(root, slot, scene_rec, cons_rec=None):
+    """cons_rec: the slot's last labels/consolidated.jsonl record; its sha256 must match the file."""
     p = labels_path(root, slot)
     if not p.exists():
         return dict(slot=int(slot), ok=None, note="labels not consolidated")
+    errs = []
+    if cons_rec is None:
+        errs.append("no consolidation record (sha256 unknown)")
+    elif sha256_file(p) != cons_rec["sha256"]:
+        errs.append("consolidated labels sha256 mismatch")
     z = np.load(p)
     status = json.loads(z["status"].tobytes()); metas = json.loads(z["metas"].tobytes()); offs = z["offsets"]
-    errs = []
     W = scene_rec["windows"]; k = int(scene_rec["k"])
     want = {task_key(slot, w, j) for w in range(len(W)) for j in range(k)}
     if set(status) != want:
@@ -123,9 +160,24 @@ def validate_labels(root, slot, scene_rec):
             st = status.get(task_key(slot, w, j))
             if not (int(mask) >> j) & 1 and st != "not_computed":
                 errs.append(f"w{w} s{j} uninformative status {st}")
+    cp = Path(root) / "CONTRACT.json"
+    fl = (json.loads(cp.read_text()).get("labels", {}).get("fastlabel") or {}) if cp.exists() else {}
+    src = SceneFile(scene_path(root, slot)).sources()
+    cells_all = z["cell"]
     for i, m in enumerate(metas):
+        a_, b_ = int(offs[i]), int(offs[i + 1])
+        j = int(m["source"]); s_ = np.minimum((src[j] * 128).astype(np.int64), 127)
+        if (s_[0] * 128 + s_[1]) * 128 + s_[2] not in set(cells_all[a_:b_].astype(np.int64).tolist()):
+            errs.append(f"{m['key']} true source outside the label support")
+        if m["status"] == "certified_stat" and fl.get("n_tasks") and (m.get("certificate") or {}).get("n_tasks") != fl["n_tasks"]:
+            errs.append(f"{m['key']} certificate n_tasks differs from the contract")
         if m["status"] == "certified" and m["tv_bound"] > 0.05:
             errs.append(f"{m['key']} certified with tv {m['tv_bound']}")
+        if m["status"] == "certified_stat":
+            c = m.get("certificate") or {}
+            if c.get("kind") != "statistical" or not (c.get("eps", 1) <= 0.05 and m["tv_bound"] == c.get("eps")) or \
+                    not (0 < c.get("delta_label", 1) < 1) or c.get("K", 1) > c.get("a2", -1):
+                errs.append(f"{m['key']} certified_stat without a valid statistical certificate")
         nseg = offs[i + 1] - offs[i]
         if ("n_cells" in m and nseg != m["n_cells"]) or ("n_cells" not in m and not 0 < nseg <= m["n_records"]):
             errs.append(f"{m['key']} cell count")       # legacy piece-format records: at most one cell per piece

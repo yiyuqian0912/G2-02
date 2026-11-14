@@ -53,7 +53,8 @@ def default_env(root):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", required=True)
-    ap.add_argument("--contract", default=str(HERE / "contract" / "RIND3D_100K_CONTRACT_v1.json"))
+    ap.add_argument("--contract", default=str(HERE / "contract" / "RIND3D_100K_CONTRACT_v2.json"),
+                    help="contract JSON (default: v2, the provisional pre-production contract; v1 for regression only)")
     ap.add_argument("--config")
     ap.add_argument("--slots"); ap.add_argument("--label-slots")
     ap.add_argument("--gpus"); ap.add_argument("--phys-per-gpu", type=int); ap.add_argument("--label-gpu-per-gpu", type=int)
@@ -64,11 +65,15 @@ def main():
     ap.add_argument("--stop-grace", type=float); ap.add_argument("--phys-timeout", type=float)
     ap.add_argument("--prior-manifest"); ap.add_argument("--epoch-scenes", type=int); ap.add_argument("--progress-s", type=float)
     ap.add_argument("--label-sample", help="benchmark only: n64,n128,n256,seed stratified sample of label tasks")
+    ap.add_argument("--label-engine", choices=("tpe", "fastlabel"),
+                    help="label engine (default: the contract's labels.engine; v2: fastlabel, v1: tpe)")
+    ap.add_argument("--fastlabel-n-tasks", type=int, help="planned label count of the campaign (delta = 0.01 / n)")
+    ap.add_argument("--fastlabel-base-seed", type=int, help="base seed of the FastLabel label streams")
     a = ap.parse_args()
     conf = json.loads(Path(a.config).read_text()) if a.config else {}
     contract = json.loads(Path(conf.get("contract", a.contract)).read_text())
     if a.epoch_scenes or conf.get("epoch_scenes"):
-        contract["controller"]["epoch_scenes"] = int(a.epoch_scenes or conf["epoch_scenes"])
+        contract["planning" if "planning" in contract else "controller"]["epoch_scenes"] = int(a.epoch_scenes or conf["epoch_scenes"])
     slots = parse_range(a.slots or conf.get("slots"), (0, int(contract["n_scenes"])))
     o = dict(slots=slots, gpus=parse_gpus(a.gpus or conf.get("gpus")),
              phys_per_gpu=a.phys_per_gpu if a.phys_per_gpu is not None else conf.get("phys_per_gpu", 1),
@@ -82,7 +87,11 @@ def main():
              stop_grace=a.stop_grace or conf.get("stop_grace", 600), phys_timeout=a.phys_timeout or conf.get("phys_timeout", 1800),
              prior_manifest=a.prior_manifest or conf.get("prior_manifest"), progress_s=a.progress_s or conf.get("progress_s", 30),
              label_slots=parse_range(a.label_slots or conf.get("label_slots"), None),
-             label_sample=[int(x) for x in a.label_sample.split(",")] if a.label_sample else None)
+             label_sample=[int(x) for x in a.label_sample.split(",")] if a.label_sample else None,
+             label_engine=a.label_engine or conf.get("label_engine"),
+             fastlabel={k: v for k, v in dict(n_tasks=a.fastlabel_n_tasks or conf.get("fastlabel_n_tasks"),
+                                              base_seed=a.fastlabel_base_seed or conf.get("fastlabel_base_seed")).items()
+                        if v is not None})
     default_env(a.root)
     from rind3d_100k.coordinator import Coordinator
     sys.exit(Coordinator(a.root, contract, o).run())

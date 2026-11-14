@@ -17,7 +17,7 @@ import time
 from multiprocessing.connection import wait
 
 
-def _worker_main(conn, fn_path, engine, kw, env, nice, sys_path):
+def _worker_main(conn, fn_path, engine, kw, env, nice, sys_path, init=None):
     os.environ.update({k: str(v) for k, v in env.items()})
     for p in reversed(sys_path):
         if p not in sys.path:
@@ -25,6 +25,9 @@ def _worker_main(conn, fn_path, engine, kw, env, nice, sys_path):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     if nice:
         os.nice(nice)
+    if init is not None:                      # (fn_path, args), e.g. the per-GPU FastLabel semaphore
+        imod, iname = init[0].split(":")
+        getattr(importlib.import_module(imod), iname)(*init[1])
     mod, name = fn_path.split(":")
     fn = getattr(importlib.import_module(mod), name)
     while True:
@@ -36,7 +39,7 @@ def _worker_main(conn, fn_path, engine, kw, env, nice, sys_path):
 
 class WorkerPool:
     def __init__(self, ctx, specs, sys_path=(), nice=0, rss_limit_bytes=None):
-        """specs: list of dict(name, kind, fn, engine, kw, env)."""
+        """specs: list of dict(name, kind, fn, engine, kw, env[, init=(fn_path, args)])."""
         self.ctx, self.sys_path, self.nice = ctx, list(sys_path), nice
         self.rss_limit = rss_limit_bytes
         self.slots = []
@@ -48,7 +51,7 @@ class WorkerPool:
     def _spawn(self, s):
         a, b = self.ctx.Pipe()
         p = self.ctx.Process(target=_worker_main, daemon=True,
-                             args=(b, s["fn"], s["engine"], s["kw"], s["env"], self.nice, self.sys_path))
+                             args=(b, s["fn"], s["engine"], s["kw"], s["env"], self.nice, self.sys_path, s.get("init")))
         p.start(); b.close()
         s.update(proc=p, conn=a, task=None, t0=None, limit=None, restarts=s.get("restarts", -1) + 1)
 

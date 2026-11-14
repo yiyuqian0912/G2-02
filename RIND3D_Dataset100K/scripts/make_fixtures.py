@@ -9,7 +9,13 @@
 * **Controller prior** (`handoff/prior/release_1k_rate_stats.jsonl`): the rate-stream statistics of the independent
   1K release, which the contract uses as prior.
 
-Usage: make_fixtures.py <release_1k_root> [--physical-slots 0:4]"""
+* **Contract v2 fixtures** (`--v2`): `handoff/fixtures/physical_v2/slot_<s>.json` (windows with their stream, crop
+  digests, rate-stream statistics, the kappa draw) and `handoff/fixtures/fastlabel_v2/INDEX.json` (FastLabel labels of
+  one informative channel per side of every v2 fixture scene, with the contract's FastLabel configuration: digest of
+  the per-cell arrays, status, tv_bound, certificate summary). They are the cross-device references of the H20 gate.
+
+Usage: make_fixtures.py <release_1k_root> [--physical-slots 0:4]
+       make_fixtures.py --v2 [--physical-slots 0:4] [--work <scratch dir>]"""
 import hashlib
 import json
 import sys
@@ -109,11 +115,93 @@ def physical_fixtures(slots):
         print("physical", slot, rec["status"], rec["timing"].get("total"), flush=True)
 
 
+def v2_scene_fixture(rec, payload):
+    import io
+    z = np.load(io.BytesIO(payload)); blob = z["obs"].tobytes(); dz = zstandard.ZstdDecompressor()
+    return dict(windows=z["windows"].tolist(), scene_id=rec["scene_id"],
+                crops={f"{int(a)}:{int(b)}": hashlib.sha256(dz.decompress(blob[int(c):int(c) + int(n)])).hexdigest()[:16]
+                       for a, b, c, n in z["obs_index"]},
+                sides=[{kk: sd[kk] for kk in ("Lp", "rate_n", "rate_A", "rate_m", "P_A_hat", "Lambda_hat")} |
+                       dict(streams=[{kk: st.get(kk) for kk in ("name", "accepted", "proposals", "fallback")} for st in sd["streams"]],
+                            Lambda_cov_hat=sd.get("Lambda_cov_hat")) for sd in rec["sides"]])
+
+
+def fastlabel_digest(lab):
+    u, inv = np.unique(np.asarray(lab["cell"], np.int64), return_inverse=True)
+    lo = np.bincount(inv, weights=np.asarray(lab["lo"], np.float64)); hi = np.bincount(inv, weights=np.asarray(lab["hi"], np.float64))
+    h = hashlib.sha256()
+    for a_ in (u, lo, hi):
+        h.update(np.ascontiguousarray(a_).tobytes())
+    h.update(f"{lab['status']}|{float(lab['tv_bound'])!r}".encode())
+    return h.hexdigest()[:16]
+
+
+def fastlabel_tasks(container):
+    """One informative channel per side: the first window of the side and its first informative source."""
+    z = np.load(container); W = z["windows"]; out = []
+    for Lp in (64, 128, 256):
+        r = next(r for r in W if int(r["Lp"]) == Lp)
+        out.append((int(r["window"]), next(j for j in range(int(r["k"])) if (int(r["mask"]) >> j) & 1)))
+    return out
+
+
+def v2_fixtures(slots, work):
+    """Contract v2 physical fixtures and FastLabel fixtures (see the module docstring)."""
+    from rind3d.rendering.backends import BackendFactory
+    from rind3d_100k.controller import plan_epoch
+    from rind3d_100k.physical import run_scene
+    cfg = json.loads((HERE / "contract" / "RIND3D_100K_CONTRACT_v2.json").read_text())
+    plans = plan_epoch(cfg, 0, [])
+    out = HERE / "handoff" / "fixtures" / "physical_v2"; out.mkdir(parents=True, exist_ok=True)
+    work = Path(work); work.mkdir(parents=True, exist_ok=True)
+    fac = BackendFactory()
+    # phase 1: physical scenes. Phase 2: FastLabel. One rind3d CUDA runtime per phase: two runtimes in one process
+    # invalidate each other's context (production runs them in separate worker processes).
+    done = []
+    for slot in range(*slots):
+        pl = plans[slot]
+        rec, payload = run_scene(cfg, slot, pl["k"], pl["c_table"], fac, 0)
+        d = dict(contract=cfg["contract"], slot=slot, k=pl["k"], status=rec["status"])
+        if payload is not None:
+            d.update(v2_scene_fixture(rec, payload), timing=rec["timing"], work=rec["work"])
+            c = work / f"slot_{slot:06d}.npz"; c.write_bytes(payload); done.append((slot, c))
+        (out / f"slot_{slot:06d}.json").write_text(json.dumps(d, indent=0, default=str))
+        print("physical_v2", slot, rec["status"], rec["timing"].get("total"), flush=True)
+    import subprocess
+    r = subprocess.run([sys.executable, __file__, "--v2-labels", str(work)] + [str(c) for _, c in done], check=True)
+
+
+def v2_label_fixtures(containers):
+    """Phase 2 of v2_fixtures (separate process): FastLabel labels of the fixture scenes."""
+    from rind3d_posterior.fastlabel import label_window_fast, window_from_100k
+    cfg = json.loads((HERE / "contract" / "RIND3D_100K_CONTRACT_v2.json").read_text())
+    fl_cfg = {kk: cfg["labels"]["fastlabel"][kk] for kk in ("n_tasks", "base_seed", "family_delta", "eps")}
+    index = []
+    for c in containers:
+        c = Path(c); slot = int(c.stem.split("_")[1])
+        for w, j in fastlabel_tasks(c):
+            lab = label_window_fast(window_from_100k(c, w, j), **fl_cfg)
+            cert = lab["meta"].get("certificate") or {}
+            index.append(dict(slot=slot, window=w, source=j, digest=fastlabel_digest(lab), status=lab["status"],
+                              tv_bound=float(lab["tv_bound"]), path=lab["meta"]["path"], n_cells=lab["meta"]["n_cells"],
+                              certificate={kk: cert.get(kk) for kk in ("kind", "n", "K", "stage", "round", "a1", "a2")}))
+            print("fastlabel", slot, w, j, lab["status"], index[-1]["digest"], flush=True)
+    fo = HERE / "handoff" / "fixtures" / "fastlabel_v2"; fo.mkdir(parents=True, exist_ok=True)
+    (fo / "INDEX.json").write_text(json.dumps(dict(contract=cfg["contract"], config=fl_cfg, labels=index), indent=1))
+
+
 if __name__ == "__main__":
-    rel = Path(sys.argv[1])
-    prior(rel)
-    label_fixtures(rel)
     ps = (0, 4)
     if "--physical-slots" in sys.argv:
         a, b = sys.argv[sys.argv.index("--physical-slots") + 1].split(":"); ps = (int(a), int(b))
+    if "--v2-labels" in sys.argv:
+        v2_label_fixtures(sys.argv[sys.argv.index("--v2-labels") + 2:])
+        sys.exit(0)
+    if "--v2" in sys.argv:
+        wk = sys.argv[sys.argv.index("--work") + 1] if "--work" in sys.argv else str(HERE / ".cache_fixtures_v2")
+        v2_fixtures(ps, wk)
+        sys.exit(0)
+    rel = Path(sys.argv[1])
+    prior(rel)
+    label_fixtures(rel)
     physical_fixtures(ps)

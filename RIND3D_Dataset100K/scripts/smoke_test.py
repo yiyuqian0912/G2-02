@@ -8,10 +8,17 @@ Steps:
 2. engine regression: RIND3D_Posterior/tests (bit-exact CPU and GPU digests, record-buffer rerun);
 3. label fixtures: the smoke set (or all, with --full-fixtures) on CPU and GPU; every digest must equal the 1K
    reference;
-4. physical fixtures: 100K-contract slots 0..3 regenerated from scratch; windows, every crop's packed bits and
+4. physical fixtures: contract-v1 slots 0..3 regenerated from scratch; windows, every crop's packed bits and
    Lambda_hat must equal the reference (cross-machine determinism of the certified renderer);
-5. mini node run: run_node on 2 slots (no labels), then the validator with physics spot checks;
+4b. contract-v2 physical fixtures (production contract): slots 0..3 regenerated; windows with streams, crop bits,
+   rate-stream histograms and P_A must equal the reference; the containers are kept in <work>/fixtures_v2;
+4c. FastLabel fixtures: the v2 fixture labels recomputed on those containers; every digest (cells, masses, status,
+   tv_bound) must equal the reference (cross-device bit-exactness of the statistical labeller);
+4d. Gate A smoke: the GPU verifier against the certified renderer on two windows of the v2 fixture scenes;
+5. mini node run: run_node on 2 slots with the default contract (v2) and FastLabel labels, then the validator with
+   physics spot checks and label validation (sha256, certificates, true source in support);
 6. journal: append, torn tail, recovery.
+Steps 4b-5 run in subprocesses: one rind3d CUDA runtime per process.
 Writes <work>/smoke_report.json and exits non-zero on any failure."""
 import argparse
 import hashlib
@@ -53,10 +60,74 @@ def s_env():
 
 
 def s_pytest():
-    env = dict(os.environ, PYTHONPATH=str(REPO / "RIND3D_Posterior" / "src"))
-    r = subprocess.run([sys.executable, "-m", "pytest", "-q", str(REPO / "RIND3D_Posterior" / "tests")], capture_output=True,
-                       text=True, env=env, timeout=3600)
-    return dict(ok=r.returncode == 0, tail=r.stdout.strip().splitlines()[-3:])
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPO / "RIND3D_Posterior" / "src"), str(REPO / "RIND3D_Dataset1K"), str(HERE)]))
+    out = {}
+    for name, d in (("posterior", REPO / "RIND3D_Posterior" / "tests"), ("dataset100k", HERE / "tests")):
+        r = subprocess.run([sys.executable, "-m", "pytest", "-q", str(d)], capture_output=True, text=True, env=env, timeout=3600)
+        out[name] = dict(ok=r.returncode == 0, tail=r.stdout.strip().splitlines()[-3:])
+    return dict(ok=all(v["ok"] for v in out.values()), **out)
+
+
+def _sub(fn_name, *args, timeout=7200):
+    """Run a function of this script in a fresh interpreter (isolates the CUDA runtime) and return its JSON result."""
+    code = (f"import sys, json; sys.path[:0] = {[str(Path(__file__).resolve().parent)]!r}; import smoke_test as T; "
+            f"print('@@RESULT@@' + json.dumps(T.{fn_name}(*{list(args)!r}), default=str))")
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=timeout)
+    line = [l for l in r.stdout.splitlines() if l.startswith("@@RESULT@@")]
+    if r.returncode != 0 or not line:
+        return dict(ok=False, error=r.stderr[-1500:])
+    return json.loads(line[-1][len("@@RESULT@@"):])
+
+
+def physical_v2(work):
+    from rind3d.rendering.backends import BackendFactory
+    from rind3d_100k.controller import plan_epoch
+    from rind3d_100k.physical import run_scene
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from make_fixtures import v2_scene_fixture
+    cfg = json.loads((HERE / "contract" / "RIND3D_100K_CONTRACT_v2.json").read_text())
+    plans = plan_epoch(cfg, 0, []); fac = BackendFactory(); res = []
+    out = Path(work) / "fixtures_v2"; out.mkdir(parents=True, exist_ok=True)
+    for f in sorted((HERE / "handoff" / "fixtures" / "physical_v2").glob("slot_*.json")):
+        ref = json.loads(f.read_text()); slot = ref["slot"]; pl = plans[slot]
+        rec, payload = run_scene(cfg, slot, pl["k"], pl["c_table"], fac, 0)
+        d = dict(slot=slot, k=pl["k"] == ref["k"], status=rec["status"] == ref["status"])
+        if payload is not None:
+            (out / f"slot_{slot:06d}.npz").write_bytes(payload)
+            got = json.loads(json.dumps(v2_scene_fixture(rec, payload), default=str))
+            for kk in ("windows", "crops", "sides", "scene_id"):
+                d[kk] = got[kk] == ref[kk]
+            d["seconds"] = rec["timing"]["total"]
+        d["ok"] = all(v for kk, v in d.items() if kk not in ("slot", "seconds"))
+        res.append(d)
+    return dict(ok=bool(res) and all(r["ok"] for r in res), results=res)
+
+
+def fastlabel_v2(work):
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from make_fixtures import fastlabel_digest
+    from rind3d_posterior.fastlabel import label_window_fast, window_from_100k
+    ref = json.loads((HERE / "handoff" / "fixtures" / "fastlabel_v2" / "INDEX.json").read_text())
+    res = []
+    for r in ref["labels"]:
+        c = Path(work) / "fixtures_v2" / f"slot_{r['slot']:06d}.npz"
+        t0 = time.perf_counter()
+        lab = label_window_fast(window_from_100k(c, r["window"], r["source"]), **ref["config"])
+        res.append(dict(slot=r["slot"], window=r["window"], source=r["source"], ok=fastlabel_digest(lab) == r["digest"],
+                        status=lab["status"], wall=round(time.perf_counter() - t0, 2)))
+    return dict(ok=bool(res) and all(x["ok"] for x in res), results=res)
+
+
+def gate_a_v2(work):
+    from rind3d_posterior.fastlabel import window_from_100k
+    from rind3d_posterior.fastlabel.gate_a import check_window
+    ref = json.loads((HERE / "handoff" / "fixtures" / "fastlabel_v2" / "INDEX.json").read_text())
+    res = []
+    for r in ref["labels"][:2]:
+        rec = check_window(window_from_100k(Path(work) / "fixtures_v2" / f"slot_{r['slot']:06d}.npz", r["window"], r["source"]),
+                           seed=r["window"])
+        res.append({kk: rec[kk] for kk in ("key", "L", "legal", "field_diff", "batch_disagree", "bad_violation", "ok")})
+    return dict(ok=bool(res) and all(x["ok"] for x in res), results=res)
 
 
 def s_fixtures(full):
@@ -101,14 +172,19 @@ def s_node(work, gpu):
     root = Path(work) / "node"
     import shutil
     shutil.rmtree(root, ignore_errors=True)
-    cmd = [sys.executable, str(HERE / "scripts" / "run_node.py"), "--root", str(root), "--slots", "0:2", "--no-labels",
-           "--gpus", str(gpu), "--prior-manifest", str(HERE / "handoff" / "prior" / "release_1k_rate_stats.jsonl"), "--progress-s", "10"]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
-    from rind3d_100k.validate import validate_scene
-    recs = [json.loads(l) for l in (root / "manifest" / "physical.jsonl").read_text().splitlines()]
-    vals = [validate_scene(root, x["slot"], x, physics=256, deep=True) for x in recs if x["status"] == "accepted"]
-    return dict(ok=r.returncode == 0 and len(vals) == 2 and all(v["ok"] for v in vals),
-                validation=[{k: v[k] for k in ("slot", "ok", "errors", "physics")} for v in vals], stderr_tail=r.stderr[-500:])
+    cmd = [sys.executable, str(HERE / "scripts" / "run_node.py"), "--root", str(root), "--slots", "0:2",
+           "--gpus", str(gpu), "--progress-s", "10"]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+    from rind3d_100k.storage import read_jsonl
+    from rind3d_100k.validate import validate_scene, validate_labels
+    recs = read_jsonl(root / "manifest" / "physical.jsonl")
+    cons = {int(x["slot"]): x for x in read_jsonl(root / "labels" / "consolidated.jsonl")}
+    acc = [x for x in recs if x["status"] == "accepted"]
+    vals = [validate_scene(root, x["slot"], x, physics=256, deep=True) for x in acc]
+    labs = [validate_labels(root, x["slot"], x, cons.get(int(x["slot"]))) for x in acc]
+    return dict(ok=r.returncode == 0 and len(vals) == 2 and all(v["ok"] for v in vals) and all(v["ok"] for v in labs),
+                validation=[{k: v[k] for k in ("slot", "ok", "errors", "physics")} for v in vals],
+                labels=[{k: v.get(k) for k in ("slot", "ok", "errors", "coverage")} for v in labs], stderr_tail=r.stderr[-500:])
 
 
 def s_journal(work):
@@ -145,7 +221,10 @@ def main():
         ok &= step("2_engine_regression", s_pytest, rep)
     ok &= step("3_label_fixtures", lambda: s_fixtures(a.full_fixtures), rep)
     ok &= step("4_physical_fixtures", s_physical, rep)
-    ok &= step("5_node_run_and_validation", lambda: s_node(a.work, 0), rep)
+    ok &= step("4b_physical_fixtures_v2", lambda: _sub("physical_v2", a.work), rep)
+    ok &= step("4c_fastlabel_fixtures_v2", lambda: _sub("fastlabel_v2", a.work), rep)
+    ok &= step("4d_gate_a_smoke", lambda: _sub("gate_a_v2", a.work), rep)
+    ok &= step("5_node_run_and_validation", lambda: _sub("s_node", a.work, 0), rep)
     ok &= step("6_journal_recovery", lambda: s_journal(a.work), rep)
     rep["ok"] = bool(ok)
     (Path(a.work) / "smoke_report.json").write_text(json.dumps(rep, indent=1, default=str))

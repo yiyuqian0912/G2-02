@@ -103,12 +103,18 @@ class Controller100K:
 
 
 def epoch_of(slot, cfg):
-    return int(slot) // int(cfg["controller"]["epoch_scenes"])
+    from .sampling import epoch_size
+    return int(slot) // epoch_size(cfg)
 
 
 def plan_epoch(cfg, epoch, accepted_records, prior_manifest=None):
     """Deterministic plan {slot: {"k", "c_table", "plan"}} for every slot of `epoch`.
-    accepted_records: accepted scene records of all epochs <= epoch - lag (anything later is ignored)."""
+    Contract v2 (declared kappa, `sampling.plan_epoch_declared`): independent of every outcome; the other arguments are
+    ignored. Contract v1 (adaptive controller): accepted_records of all epochs <= epoch - lag (anything later is
+    ignored)."""
+    from .sampling import declared, plan_epoch_declared
+    if declared(cfg):
+        return plan_epoch_declared(cfg, epoch)
     cc = cfg["controller"]; E = int(cc["epoch_scenes"]); lag = int(cc.get("plan_lag_epochs", 1))
     ctl = Controller100K(cfg["quota"], cc.get("c_min", 0.01))
     if prior_manifest and Path(prior_manifest).exists():

@@ -48,12 +48,45 @@ def tasks_for_scene(root, slot, include_uninformative=False):
     return out
 
 
+def _fastlabel_task(root, slot, w, s, L, inf, key, kw):
+    """FastLabel v3.4 (rind3d_posterior.fastlabel) on the scene container. Journal arrays are per-cell (dcell, lo, hi) as
+    for the tau-pencil engine; the label status and tv_bound are the CERTIFICATE's (statistical labels: lo = hi =
+    vol(B ∩ cell), status certified_stat, tv_bound = eps; never re-derived from lo/hi)."""
+    import hashlib, json
+    from rind3d_posterior.fastlabel import label_window_fast, window_from_100k, DEFAULTS, VERSION
+    cfg = dict(kw.get("fastlabel") or {})
+    if cfg.get("delta") is None and not cfg.get("n_tasks"):
+        raise ValueError("fastlabel: n_tasks (planned label count of the campaign) must be set")
+    c0 = time.process_time(); t0 = time.perf_counter()
+    lab = label_window_fast(window_from_100k(scene_path(root, slot), w, s), **cfg)
+    cpu = time.process_time() - c0; wall = time.perf_counter() - t0
+    m = lab["meta"]; eff = dict(DEFAULTS); eff.update(cfg)
+    u, inv = np.unique(np.asarray(lab["cell"], np.int64), return_inverse=True)
+    Lc = np.bincount(inv, weights=np.asarray(lab["lo"], np.float64), minlength=len(u))
+    Uc = np.bincount(inv, weights=np.asarray(lab["hi"], np.float64), minlength=len(u))
+    arrays = dict(dcell=np.diff(u, prepend=0).astype(np.int32), lo=Lc, hi=Uc)
+    meta = dict(key=key, slot=int(slot), window=int(w), source=int(s), L=int(L), informative=bool(inf),
+                tv_bound=float(lab["tv_bound"]), status=lab["status"], engine="fastlabel", fallback=None,
+                engine_version=VERSION, config_sha256=hashlib.sha256(json.dumps(eff, sort_keys=True, default=str).encode()).hexdigest(),
+                path=m["path"], certificate=m.get("certificate"), cpu=cpu, wall=wall, n_records=int(len(lab["cell"])),
+                n_cells=int(len(u)), vol_lo=float(Lc.sum()), vol_hi=float(Uc.sum()),
+                rounds=[{k: x.get(k) for k in ("round", "items", "records", "tested", "K")} for x in m.get("rounds", [])],
+                verifier={k: v for k, v in (m.get("verifier") or {}).items() if not k.endswith("_s")}, pid=os.getpid())
+    if lab["status"] != "certified_stat":
+        from rind3d_posterior.rpl.bound import tv_bound
+        meta["tv_bound_cells"] = float(tv_bound(Lc, Uc)) if Lc.sum() > 0 else 1.0
+    return dict(key=key, arrays=arrays, meta=meta)
+
+
 def label_task(t, engine, kw):
     """Supervisor worker entry. t = (root, slot, window, source, L, informative). Returns dict(key, arrays, meta)
-    or dict(key, error). GPU out-of-memory falls back to the exact CPU engine, recorded in meta."""
+    or dict(key, error). GPU out-of-memory falls back to the exact CPU engine, recorded in meta.
+    engine "fastlabel": FastLabel v3.4 (needs CUDA in the worker; never mixed with the CuPy engine in one process)."""
     root, slot, w, s, L, inf = t
     key = task_key(slot, w, s)
     try:
+        if engine == "fastlabel":
+            return _fastlabel_task(root, slot, w, s, L, inf, key, kw)
         S = _CACHE.get(slot)
         if S is None:
             _CACHE.clear(); S = _CACHE[slot] = SceneFile(scene_path(root, slot))

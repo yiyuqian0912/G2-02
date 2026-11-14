@@ -37,16 +37,30 @@ from pathlib import Path
 import numpy as np
 
 from .controller import plan_epoch, epoch_of
+from .sampling import declared, epoch_size
 from .pool import WorkerPool, _rss
-from .storage import (Journal, journal_index, read_record, decode_payload, labels_path, task_key, atomic_write)
+from .storage import (Journal, journal_index, read_record, decode_payload, labels_path, task_key, atomic_write,
+                      append_line, read_jsonl)
 from .labels import decode_cells
 
 HERE = Path(__file__).resolve().parent.parent
 
 
+def contract_digest(c):
+    """sha256 of the scientific content of a contract (documentation fields and the epoch size excluded)."""
+    import copy
+    import hashlib
+    d = copy.deepcopy(c)
+    for kk in ("status", "supersedes"):
+        d.pop(kk, None)
+    for blk in ("planning", "controller"):
+        if isinstance(d.get(blk), dict):
+            d[blk].pop("epoch_scenes", None)
+    return hashlib.sha256(json.dumps(d, sort_keys=True).encode()).hexdigest()
+
+
 def _jsonl(path):
-    p = Path(path)
-    return [json.loads(l) for l in p.read_text().splitlines() if l.strip()] if p.exists() else []
+    return read_jsonl(path)
 
 
 def detect_resources():
@@ -79,8 +93,9 @@ class Coordinator:
         cp = self.root / "CONTRACT.json"
         if cp.exists():
             old = json.loads(cp.read_text())
-            if old["contract"] != contract["contract"] or old["seed"] != contract["seed"]:
-                raise SystemExit("root holds a different contract")
+            if old["contract"] != contract["contract"] or old["seed"] != contract["seed"] or \
+                    contract_digest(old) != contract_digest(contract):
+                raise SystemExit("root holds a different contract (id, seed or scientific fields differ)")
         else:
             atomic_write(cp, json.dumps(contract, indent=1).encode())
         self.a, self.b = opts["slots"]
@@ -125,12 +140,13 @@ class Coordinator:
         if p.exists():
             self.plans[epoch] = {int(k): v for k, v in json.loads(p.read_text()).items()}
             return self.plans[epoch]
-        lag = int(self.cfg["controller"].get("plan_lag_epochs", 1)); E = int(self.cfg["controller"]["epoch_scenes"])
-        lo = max(self.a, 0)
-        for e in range(0, epoch - lag + 1):
-            for slot in range(max(e * E, lo), min((e + 1) * E, self.b)):
-                if not self.final(slot):
-                    return None          # an earlier epoch is still running: barrier
+        if not declared(self.cfg):       # v1 controller: plans use the outcomes of epochs <= e - lag (barrier)
+            lag = int(self.cfg["controller"].get("plan_lag_epochs", 1)); E = epoch_size(self.cfg)
+            lo = max(self.a, 0)
+            for e in range(0, epoch - lag + 1):
+                for slot in range(max(e * E, lo), min((e + 1) * E, self.b)):
+                    if not self.final(slot):
+                        return None      # an earlier epoch is still running: barrier
         acc = [self.accepted(s) for s in self.recs if self.accepted(s)]
         plans = plan_epoch(self.cfg, epoch, acc, self.o.get("prior_manifest"))
         atomic_write(p, json.dumps({str(k): v for k, v in plans.items()}).encode())
@@ -139,7 +155,7 @@ class Coordinator:
 
     def physical_queue(self):
         """Pending (slot, attempt) of the earliest epochs whose plan is available (bounded look-ahead)."""
-        E = int(self.cfg["controller"]["epoch_scenes"]); out = []
+        E = epoch_size(self.cfg); out = []; look = 2 if declared(self.cfg) else 1; used = 0
         for epoch in range(epoch_of(self.a, self.cfg), epoch_of(self.b - 1, self.cfg) + 1):
             slots = [s for s in range(max(epoch * E, self.a), min((epoch + 1) * E, self.b)) if not self.final(s)]
             if not slots:
@@ -150,7 +166,9 @@ class Coordinator:
             for s in slots:
                 att, tries = self.next_attempt(s)
                 out.append((s, att, tries, pl[s]))
-            break                        # one epoch at a time (the next one is planned when this one is final)
+            used += 1
+            if used >= look:             # v1: one epoch at a time; v2 (declared plans): two, so GPUs never drain
+                break
         return out
 
     # ------------------------------------------------------------------ labels bookkeeping
@@ -213,7 +231,12 @@ class Coordinator:
                  offsets=np.array(offs, np.int64),
                  metas=np.frombuffer(json.dumps(metas).encode(), np.uint8),
                  status=np.frombuffer(json.dumps(status).encode(), np.uint8))
-        atomic_write(labels_path(self.root, slot), buf.getvalue())
+        p = labels_path(self.root, slot)
+        sha = atomic_write(p, buf.getvalue())
+        from collections import Counter
+        append_line(self.root / "labels" / "consolidated.jsonl",
+                    json.dumps(dict(slot=int(slot), path=str(p.relative_to(self.root)), sha256=sha, bytes=len(buf.getvalue()),
+                                    statuses=dict(Counter(status.values())), time=time.strftime("%Y-%m-%dT%H:%M:%S"))))
         self.scene_tasks.pop(slot, None)
 
     # ------------------------------------------------------------------ main loop
@@ -246,14 +269,36 @@ class Coordinator:
             g = gpus[i % len(gpus)]
             specs.append(dict(name=f"phys{i}", kind="phys", fn="rind3d_100k.worker:physical_task", engine="gpu",
                               kw=cfg, env=dict(base_env, CUDA_VISIBLE_DEVICES=g)))
-        for i in range(nlg):
-            g = gpus[i % len(gpus)]
-            specs.append(dict(name=f"lgpu{i}", kind="label", gpu=True, fn="rind3d_100k.labels:label_task", engine="gpu",
-                              kw=lkw, env=dict(base_env, CUDA_VISIBLE_DEVICES=g)))
-        for i in range(nlc):
-            specs.append(dict(name=f"lcpu{i}", kind="label", gpu=False, fn="rind3d_100k.labels:label_task", engine="cpu",
-                              kw=lkw, env=dict(base_env, CUDA_VISIBLE_DEVICES="")))
+        engine = o.get("label_engine") or cfg["labels"].get("engine", "tpe")
+        if engine not in ("fastlabel", "tpe") and str(engine).startswith("rind3d_posterior tpe"):
+            engine = "tpe"                       # contract v1 names the tau-pencil engine by its version string
+        self.label_engine = engine
+        if engine == "fastlabel":
+            # every FastLabel worker needs CUDA (exact verifier); one semaphore per GPU serialises its submissions.
+            # All label workers (GPU and CPU budget) become FastLabel workers, round-robin over the GPUs.
+            # FastLabel and the CuPy tau-pencil engine never share a process (rind3d's CUDA runtime owns its context).
+            fl = dict((cfg["labels"].get("fastlabel") or {})); fl.update(o.get("fastlabel") or {})
+            fl = {kk: v for kk, v in fl.items() if kk in ("n_tasks", "base_seed", "family_delta", "eps", "delta")}
+            if not fl.get("n_tasks") and fl.get("delta") is None:
+                raise ValueError("FastLabel labels need n_tasks (planned label count) in the contract or options")
+            lkw["fastlabel"] = fl
+            sems = {g: mp.get_context("spawn").Semaphore(1) for g in gpus}
+            for i in range(nlg + nlc):
+                g = gpus[i % len(gpus)]
+                specs.append(dict(name=f"lfl{i}", kind="label", gpu=i < nlg, fn="rind3d_100k.labels:label_task",
+                                  engine="fastlabel", kw=lkw, env=dict(base_env, CUDA_VISIBLE_DEVICES=g),
+                                  init=("rind3d_posterior.fastlabel:set_gpu_lock", (sems[g],))))
+            nlg, nlc = nlg + nlc, 0
+        else:
+            for i in range(nlg):
+                g = gpus[i % len(gpus)]
+                specs.append(dict(name=f"lgpu{i}", kind="label", gpu=True, fn="rind3d_100k.labels:label_task", engine="gpu",
+                                  kw=lkw, env=dict(base_env, CUDA_VISIBLE_DEVICES=g)))
+            for i in range(nlc):
+                specs.append(dict(name=f"lcpu{i}", kind="label", gpu=False, fn="rind3d_100k.labels:label_task", engine="cpu",
+                                  kw=lkw, env=dict(base_env, CUDA_VISIBLE_DEVICES="")))
         layout = dict(resources=res, gpus=gpus, physical_workers=nphys, label_gpu_workers=nlg, label_cpu_workers=nlc,
+                      label_engine=self.label_engine, contract=cfg["contract"],
                       slots=[self.a, self.b], options={k: v for k, v in o.items() if k != "prior_manifest"})
         self.log(dict(event="start", **layout))
         sys_path = [str(HERE), str(HERE.parent / "RIND3D_Dataset1K"), str(HERE.parent / "RIND3D_Posterior" / "src")]
@@ -357,8 +402,7 @@ class Coordinator:
                             fr = dict(key=key, slot=t[1], window=t[2], source=t[3], L=t[4], kind=kind if kind != "result" else "error",
                                       worker=sl["name"], engine=sl["engine"], time=time.strftime("%Y-%m-%dT%H:%M:%S"),
                                       **({kk: v for kk, v in payload.items() if kk in ("error", "trace", "exitcode", "wall", "limit", "rss")}))
-                            with open(self.fail_path, "a") as f:
-                                f.write(json.dumps(fr) + "\n")
+                            append_line(self.fail_path, json.dumps(fr))
                             self.failed[key] = fr; self.n_fail += 1
                         open_ = self.scene_tasks.get(t[1])
                         if open_ is not None:
@@ -375,8 +419,7 @@ class Coordinator:
 
     def record(self, rec):
         rec.setdefault("time", time.strftime("%Y-%m-%dT%H:%M:%S"))
-        with open(self.man_path, "a") as f:
-            f.write(json.dumps(rec, default=str) + "\n")
+        append_line(self.man_path, json.dumps(rec, default=str))      # after the container's atomic_write (worker)
         self.recs.setdefault(int(rec["slot"]), []).append(rec)
 
     def log(self, d):
