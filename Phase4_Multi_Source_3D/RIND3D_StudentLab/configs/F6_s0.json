@@ -1,0 +1,1 @@
+{"name":"F6_s0","model":"facet","quad":2,"amp":true,"drop":0.2,"flag":true,"cons":true,"target":"posterior","weight":"mis","seed":0,"note":"F5 + facet dropout/flag (F3 repaired solid-separated windows) + leave-one-out consensus descriptors (F4); single-hypothesis factor (the quadrature kernel has no occluder branch). Declared in amendment A3 before the F4 and F1drop results."}

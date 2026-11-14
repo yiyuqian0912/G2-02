@@ -337,6 +337,34 @@ Solid-separated: F2 − G0 = −0.16, the same co-adaptation as F1.
 * F5's head makes them sharp: s0 ≈ 10⁻³, so the width now comes only from the fitted angular term; ε ≈ 10⁻⁵.
 * With the cell integral done properly, the model no longer needs to blur planes to hedge. This confirms §9's reading that F1's wide kernels were compensating for the cell-centre approximation.
 
+### 4.6 Robust facets: F3 (two-hypothesis factor + facet dropout), targeted at failure mode 3
+
+**F3** = F1 with three changes:
+1. Each facet is a mixture: a shadow plane through the source, or an occluder face with the source in its lit half-space (lit side from facets v2), plus the outlier floor.
+2. Facet dropout: p = 0.2 per training example.
+3. A facet-availability flag for the generic field.
+
+| | T* | B1K | solid-separated | all-lit | all-dark | T* KL | HPD-MAE |
+|---|---|---|---|---|---|---|---|
+| F1 | 7.72 | 7.73 | 0.37 | −0.05 | 0.30 | 2.58 | 0.053 |
+| F3 | 7.75 | 7.78 | **0.64** | −0.01 | 0.27 | 2.54 | 0.049 |
+| F3 − F1 (paired) | +0.03 [0.01, 0.05] | +0.05 [0.03, 0.08] | **+0.28 [0.18, 0.37]** | +0.05 [0.02, 0.08] | −0.03 [−0.07, 0.00] | | |
+
+**Breakdown of F3 − F1:**
+* law-violating rows (12% of T*): **+0.23 [0.09, 0.35]**;
+* law-obeying rows: +0.01 [−0.01, 0.02];
+* by family: thin_slabs +0.12 [0.01, 0.22], occluder_clusters +0.07 [0.02, 0.10].
+
+**Readings.**
+* **Solid-separated windows are repaired.** F3 scores 0.64 there, against 0.37 for F1 and 0.57 for G0. The projective Student no longer pays for its facet factor on facet-free windows.
+  * The single-change arm F1drop (dropout + flag only) will tell whether the repair comes from dropout or from the occluder hypothesis.
+* **Occluder interfaces are only partly handled.** F3 recovers 0.23 of the ~4–6-nat label gap on violating rows. Its calibration there does not improve: signed HPD −0.191 vs −0.184.
+  * The mixture lets a facet be "either", but with only size, fit and lit-side descriptors the head cannot tell which. It hedges a little and stays confidently wrong when it chooses the shadow reading.
+  * The slab face behind an occluder interface is itself invisible in X (§2.2), so the distinction must come from evidence beyond the facet:
+    * agreement with the other facets' common intersection (F4: leave-one-out consensus; violators have median z 4.0 against 0.06);
+    * or a visible solid edge lying on the plane inside the window (a visible caster), which is not yet a descriptor.
+* By the pre-declared rule, F3 does not replace F1 on T* (+0.03 < 0.06). F5 remains the best projective arm (F5 − F3 = +0.22 [0.19, 0.26]).
+
 ## 5. Q3 (H1): does posterior supervision still matter once the inductive bias is right?
 
 Same architectures, same rows and MIS weights, 8k steps, seed 0. The only change is the target: a one-hot at the true

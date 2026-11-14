@@ -18,6 +18,10 @@ configs/F5_s0.json
 configs/F3_s0.json
 # F4: F3 + leave-one-out facet consensus descriptors
 configs/F4_s0.json
+# F3 single-change arm moved up: does dropout + availability flag alone fix the solid-separated deficit (F3 sep +0.28)?
+configs/F1drop_s0.json
+# F6 = F5 + dropout/flag + consensus (amendment A3)
+configs/F6_s0.json
 # F5 second seed (F5 beat F1 by 0.25 on dev; seed check before the confirm selection)
 configs/F5_s1.json
 # generic with 4x step budget (is G0 merely under-trained?)
@@ -36,7 +40,6 @@ configs/F1side_s0.json
 configs/G0fam_s0.json
 configs/F1fam_s0.json
 # single-change arms of F3 (dropout+flag only; two-hypothesis only); sampling design; window-aware prior
-configs/F1drop_s0.json
 configs/F1hyp_s0.json
 configs/F1b1k_s0.json
 configs/Gblind_s0.json

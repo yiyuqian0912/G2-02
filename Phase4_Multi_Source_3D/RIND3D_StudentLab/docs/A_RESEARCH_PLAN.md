@@ -154,6 +154,12 @@ Everything else (ablations, scaling, generalisation arms) stays dev-only.
 * F5 s0 evaluated with M = 4 sub-points at test time ("F5q4") is added to confirm as a **secondary, descriptive** comparison: F5q4 − F5 and F5q4 − F1 on T*/B1K.
 * It is dev-selected (+0.12 on dev), so its confirm result is a check of that selection, not a pre-registered test.
 
+**Amendment A3 (written 2026-11-14 ~10:55, after the F3 dev result, before the F4, F1drop and F6 results; the confirm split still unopened).**
+* **F6** = F5 + facet dropout (0.2) + availability flag + leave-one-out consensus descriptors, single-hypothesis factor. Motivation: F3 repaired solid-separated windows (+0.28), and quadrature has no occluder branch.
+* F6 joins the A1 candidate set: F3, F4, F5, F6.
+* Unchanged rule: the arm with the largest dev T* IG, if it beats F1 s0 by more than 0.06 nats, else F1.
+* If the selected arm is F6, the A2 secondary comparison uses F6 with M = 4 at test time instead of F5.
+
 ## 8. Carrying the protocol to the 100K (no production change proposed here)
 
 * **Facets are a per-channel function of X.** They come from the stored crop and response, so they can be computed for any release without touching the contract.
