@@ -304,6 +304,34 @@ Solid-separated: F2 − G0 = −0.16, the same co-adaptation as F1.
 * Point-determined rows are now slightly under-confident (signed +0.025), which leaves room for more sub-points.
 * Violating rows stay over-confident (−0.171): quadrature does not address occluder interfaces. F3 and F4 target them.
 
+**More sub-points at test time.** The same F5 checkpoint (trained with M = 2) was evaluated with M = 4 (`slab.evaluate --override '{"quad": 4}' --tag q4`):
+
+| | T* IG | B1K IG | KL | HPD-MAE | IG L64 / L128 / L256 |
+|---|---|---|---|---|---|
+| F5, M = 2 | 7.97 | 7.98 | 2.32 | 0.031 | 6.17 / 7.57 / 10.18 |
+| F5, M = 4 at test time | **8.10 [7.86, 8.34]** | 8.11 | **2.20** | **0.017** | 6.19 / 7.66 / 10.43 |
+
+* The paired gain is +0.12 [0.11, 0.14], so F5 at M = 4 is +0.38 [0.34, 0.42] over F1. The returns diminish: +0.25 from M = 1 to 2, then +0.12 from 2 to 4.
+* This is a post-hoc, dev-selected variant. It goes to confirm only as a declared secondary comparison (plan, amendment A2).
+
+**Where the residual is now: degenerate pencils.**
+* "≥ 3 large facets" does not guarantee a point. Facets cast by one straight edge all contain the line through that edge and the source: a *pencil* of planes, which fixes a line, not a point.
+* Measure: the smallest singular value σ_min of the stacked unit normals of the large facets (0 = all normals perpendicular to one common line).
+* Law-obeying ≥ 3-facet dev rows, by σ_min tertile:
+
+| σ_min | rows | label | G0 | F1 | F5 | F5, M = 4 | label − F5 (M = 4) |
+|---|---|---|---|---|---|---|---|
+| 0.000–0.061 (near-pencil) | 576 | 14.38 | 5.43 | 10.37 | 10.94 | 11.26 | 3.12 |
+| 0.061–0.166 | 576 | 14.55 | 5.15 | 11.91 | 12.63 | 13.00 | 1.54 |
+| 0.166–0.797 (well-conditioned) | 576 | 14.54 | 5.97 | 12.73 | 13.28 | 13.71 | **0.83** |
+
+* **Where X fixes a point, the X-only Student is within 0.8 nats of the full-world label.** That label knows every hidden body.
+* The remaining point-stratum gap sits on near-pencil rows: 30% of the stratum has σ_min < 0.05. There X determines a line, and the label's depth comes from geometry outside the window.
+  * This is the regime of the depth counterfactuals (§7). Their floor, 0.15 nats on average over a narrow family, is a lower bound; the true X-only floor on pencil rows is unknown.
+* `docs/fig/zoom_F1_F5.png` shows three point-determined dev rows drawn at random (seed 0, not selected on outcome):
+  * F5 narrows the posterior streak across the window-to-source direction;
+  * on pencil-like rows, mass still spreads *along* it.
+
 **What the head learned.**
 * F1's facet head had widened the planes: median s0 = 1.27 voxels, ε ≈ 6·10⁻⁴.
 * F5's head makes them sharp: s0 ≈ 10⁻³, so the width now comes only from the fitted angular term; ε ≈ 10⁻⁵.

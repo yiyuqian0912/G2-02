@@ -5,6 +5,7 @@ python -m slab.figures posteriors <out.png> <row_idx,...> <name=run_dir> ...   m
 python -m slab.figures curves <out.png> <name=run_dir> ...                     dev learning curves
 python -m slab.figures by_nf <out.png> <name=eval.npz> ...                     information gain by facet count
 python -m slab.figures scaling <out.png> <name:n_scenes=eval.npz> ...          learning curve over training worlds
+python -m slab.figures zoom <out.png> <row_idx,...> <name=run_dir[@override]> ... zoom on the true source (depth in plane)
 """
 import json, sys
 from pathlib import Path
@@ -159,11 +160,57 @@ def cf_panel(out, cfd_dir, analysis_json, run_dir, which="median"):
     fig.tight_layout(rect=(0, 0.05, 1, 1)); fig.savefig(out, dpi=160, facecolor=SURFACE)
 
 
+def zoom(out, rows, runs, half=12):
+    """Zoomed max-projections around the true source (±half cells), projected along the axis least aligned with the
+    window-to-source direction, so the ill-conditioned depth direction lies in the image plane."""
+    import torch
+    from .data import LabTable, collate, to_dev
+    from .evaluate import lab_model
+    from .density import NC, NF
+    T = LabTable(); dev = "cuda"
+    models = {n: lab_model(d.split("@")[0], dev, override=json.loads(d.split("@")[1]) if "@" in d else None) for n, d in runs.items()}
+    fig, axes = plt.subplots(len(rows), 1 + len(models), figsize=(2.3 * (1 + len(models)), 2.4 * len(rows)), facecolor=SURFACE,
+                             squeeze=False)
+    for ri, i in enumerate(rows):
+        B = to_dev(collate(T, np.array([i]), "onehot"), dev)
+        r = T.rows[i]
+        s = np.array([r["sx"], r["sy"], r["sz"]]) * 128
+        c = (np.array([r["ox"], r["oy"], r["oz"]]) + r["Lp"] / 2) / 8
+        t = s - c; ax_proj = int(np.argmin(np.abs(t))); keep = [a for a in range(3) if a != ax_proj]
+        cells, q, _ = T.label(i)
+        vols = {}
+        lab = np.zeros(128 ** 3); lab[cells] = q; vols["certified label"] = lab.reshape(128, 128, 128)
+        for n, f in models.items():
+            with torch.no_grad():
+                lp = f(B)[0]
+            vols[n] = lp.exp().view(NC, NC, NC, NF, NF, NF).permute(0, 3, 1, 4, 2, 5).reshape(128, 128, 128).float().cpu().numpy()
+        lo = np.clip(np.floor(s[keep]).astype(int) - half, 0, 128 - 2 * half)
+        for ci, (n, v) in enumerate(vols.items()):
+            ax = axes[ri, ci]
+            img = np.log10(np.maximum(v.max(ax_proj), 1e-9))[lo[0]:lo[0] + 2 * half, lo[1]:lo[1] + 2 * half]
+            ax.imshow(img.T, origin="lower", cmap=BLUES, vmin=-5, vmax=0, extent=(lo[0], lo[0] + 2 * half, lo[1], lo[1] + 2 * half))
+            d2 = t[keep] / np.linalg.norm(t[keep]) * half * 0.8           # depth direction (window -> source), in-plane part
+            ax.annotate("", xy=(s[keep[0]] + d2[0] * 0.5, s[keep[1]] + d2[1] * 0.5), xytext=(s[keep[0]] - d2[0] * 0.5, s[keep[1]] - d2[1] * 0.5),
+                        arrowprops=dict(arrowstyle="->", color=SERIES[1], lw=1.0))
+            ax.plot(s[keep[0]], s[keep[1]], marker="x", color=SERIES[7], ms=7, mew=1.6)
+            ax.set_xticks([]); ax.set_yticks([])
+            for sp in ax.spines.values():
+                sp.set_color(GRID)
+            if ri == 0:
+                ax.set_title(n, fontsize=9, color=INK)
+        axes[ri, 0].set_ylabel(f"L{int(r['Lp'])}, {int(T.nf[i])} facets", fontsize=8, color=INK2)
+    fig.text(0.5, 0.005, f"log10 cell mass, max-projected; {2 * half}x{2 * half} cells (8 voxels each) around the true source (red ×); "
+             "orange arrow: window-to-source (depth) direction", ha="center", fontsize=7, color=INK2)
+    fig.tight_layout(rect=(0, 0.02, 1, 1)); fig.savefig(out, dpi=160, facecolor=SURFACE)
+
+
 if __name__ == "__main__":
     kind, out = sys.argv[1], sys.argv[2]
     if kind == "posteriors":
         rows = [int(x) for x in sys.argv[3].split(",")]
         posteriors(out, rows, dict(a.split("=", 1) for a in sys.argv[4:]))
+    elif kind == "zoom":                          # zoom <out> <rows> name=run_dir[@override_json] ...
+        zoom(out, [int(x) for x in sys.argv[3].split(",")], dict(a.split("=", 1) for a in sys.argv[4:]))
     elif kind == "curves":
         curves(out, dict(a.split("=", 1) for a in sys.argv[3:]))
     elif kind == "by_nf":

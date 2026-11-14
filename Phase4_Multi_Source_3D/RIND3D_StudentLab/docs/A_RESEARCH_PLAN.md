@@ -150,6 +150,10 @@ Everything else (ablations, scaling, generalisation arms) stays dev-only.
   * It replaces F1 only if it beats F1 s0 on dev T* by more than twice the F1 seed spread (2 × 0.03 = 0.06 nats). Otherwise F1 is used.
 * If the selected arm is not F1, it is also evaluated on confirm T*/B1K (C1′: selected − G0 s0, descriptive), and both C1 seeds stay F1.
 
+**Amendment A2 (written 2026-11-14 ~10:30, after the F5 dev results; the confirm split still unopened).**
+* F5 s0 evaluated with M = 4 sub-points at test time ("F5q4") is added to confirm as a **secondary, descriptive** comparison: F5q4 − F5 and F5q4 − F1 on T*/B1K.
+* It is dev-selected (+0.12 on dev), so its confirm result is a check of that selection, not a pre-registered test.
+
 ## 8. Carrying the protocol to the 100K (no production change proposed here)
 
 * **Facets are a per-channel function of X.** They come from the stored crop and response, so they can be computed for any release without touching the contract.

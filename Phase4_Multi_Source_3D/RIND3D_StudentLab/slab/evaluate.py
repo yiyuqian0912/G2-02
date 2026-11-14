@@ -118,7 +118,8 @@ def main():
     np.savez_compressed(outp, **res)
     if split == "confirm":
         with open(OUT / "CONFIRM_LOG.jsonl", "a") as f:
-            f.write(json.dumps(dict(target=tgt, sets=sets, time=time.strftime("%Y-%m-%dT%H:%M:%S"))) + "\n")
+            f.write(json.dumps(dict(target=tgt, sets=sets, tag=tag, override=arg("--override", "{}"), ckpt=arg("--ckpt", "final.pt"),
+                                    time=time.strftime("%Y-%m-%dT%H:%M:%S"))) + "\n")
     print(json.dumps(dict(out=str(outp))))
 
 
