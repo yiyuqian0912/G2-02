@@ -69,3 +69,32 @@ FastLabel moved from `RIND3D_Dataset1K/rind3d_1k/fastlabel/` (`git mv`) into `ri
 | 100K container (slot 0, rendered into scratch) | 14/14 channels certified and deterministic; true source in every support; Gate A 188/188; TV vs exact 0.0000 / 0.0007 |
 | tests | Posterior 16 passed (7 new), Dataset1K 9 passed, Generator 337 passed / 18 skipped, `smoke_checks.py` all OK |
 | Gate A, production port (`gate_a.py`) | 1K smoke windows (test) and 2 windows of the 100K container: 0 field differences, 0 batch disagreements, 0 false violations. The full 27-window run is not repeated (same GPU and driver); it is **required on H20** |
+
+## 7. RIND3D-100K integration (2026-11-14, laptop RTX 3060; branch `yushu/3d-100k-integration` → `yushu/3d`)
+
+**What changed.**
+* `yushu/3d-100k-h20` (`5560a20`) was merged into `yushu/3d`. The merge is textually conflict-free; that branch only added `RIND3D_Dataset100K/`.
+* The two reviewed patches were applied: durability, and FastLabel as the engine.
+* Contract v2 was implemented (`rind3d_100k/sampling.py`, `physical.select_side_v2`):
+  * declared κ, natural T* sampling, the L64 coverage slot;
+  * exact-m rate streams;
+  * FastLabel as the default labeller.
+* The M2 loader was ported.
+
+| check | result |
+|---|---|
+| `RIND3D_Posterior/tests` | 16 passed |
+| `RIND3D_Dataset1K/tests` | 9 passed |
+| `RIND3D_Dataset100K/tests` (new) | 21 passed, including the GPU reproduction of a v2 fixture scene and its FastLabel labels |
+| `RIND3D_Generator/tests` | 306 passed, 17 skipped in the integration worktree. The 34 tests of `test_cpu_cuda_experiment.py` / `test_shadow_experiment.py` need locally built experiment natives (untracked build artifacts): 31 passed, 3 skipped in the primary worktree. The Generator tree is identical (`cea09c8`) |
+| `RIND3D_HANDOFF/smoke_checks.py` (1K) | 10/10 OK |
+| `RIND3D_Dataset100K/scripts/smoke_test.py` | **SMOKE PASS**, all 9 steps: environment; Posterior + 100K pytest; TPE label fixtures (CPU / GPU); v1 physical fixtures; v2 physical fixtures; FastLabel v2 fixtures (12/12 digests); Gate A smoke (196 legal candidates, 0 differences); node run under v2 with FastLabel labels and label validation; journal recovery |
+| v2 scenes, slots 0–3 | accepted, 4.1–4.5 s per scene (v1: 3.7 s); `validate_scene` ok; the exact-m rate stream dominates the tile count |
+| κ draw, 20,000 slots | frequencies 0.153 / 0.151 / 0.148 / 0.549; lag-1 correlation −0.012 |
+| crash test (`run_node` slots 0–8, SIGKILL of the coordinator at 2 scenes / 31 labels, resume) | resume completed 8 scenes and 203 labels, 0 failures, no duplicate accepted slot; `verify_root --labels` ok (physics 0 mismatches; certificates, true source in support and n_tasks valid) |
+| `coverage_report.py` (8 scenes) | k histogram 1 / 0 / 0 / 7; T* Kish ESS fractions 0.92 (L64), 0.98 (L128), 0.99 (L256); max / median weight ≤ 1.35; coverage share of the L64 weight 0.29 (small sample) |
+| `compare_engines.py` (26 tasks, L ≤ 128) | all within bounds; max TV 0.0067 |
+| `student_smoke.py` | 48 loader examples (natural and coverage, both certified statuses) → pilot features → Student (2.0 M parameters). Weighted CE 14.55 (≈ ln 128³ untrained), finite; gradient norm 1.91 |
+| `report.py --costs` + `estimate.py` | run end to end. Laptop projection: 25.4 labels per scene, 7.0 labels/s with 8 workers. Not an H20 number |
+
+**Not executed (H20 pending):** every section of `RIND3D_Dataset100K/docs/H20_CANARY_RUNBOOK.md`.
