@@ -39,12 +39,24 @@ Long jobs run in tmux and save logs/checkpoints. Resume is at saved epoch bounda
 
 See the [v6 guide](Phase2_Multi_Source/docs/SEQUENTIAL_COUNT_SHAPE.zh-CN.md), [Phase2 document index](Phase2_Multi_Source/docs/README.zh-CN.md), and [data installation guide](Phase2_Multi_Source/dataset_update/README.zh-CN.md). Historical entry points remain for reproducibility.
 
+## Three-dimensional phases
+
+**Phase3: RIND3D v0.1, single source.** [`Phase3_Single_Source_3D/`](Phase3_Single_Source_3D/README.md) reads the released RIND3D v0.1 dataset: 1,000 certified scenes and 256,000 observation windows.
+* It provides restricted local-observation loading, certified physical queries, an interactive scene viewer and an exploratory adaptive-octree teacher, in its own `uv` environment.
+* [Download RIND3D-v0.1.tar.zst](https://drive.google.com/file/d/1PmMp39En-uc4QTgACd_EpS4mTZ3wO7yx/view?usp=drivesdk): 633,273,091 bytes, SHA256 `1f5a2ff2bd9ac4a479a074b33e0d06f160706e4369b199144ee117693913ee1e`. Setup and viewer instructions are in the Phase3 README.
+
+**Phase4: RIND3D-100K, multiple sources.** RIND3D-100K studies global source localization from limited local observations in three-dimensional multi-source worlds.
+* The pipeline includes certified physical rendering, efficient probabilistic labelling with FastLabel, and Student training.
+* See [`Phase4_Multi_Source_3D/README.md`](Phase4_Multi_Source_3D/README.md).
+
 ## Repository
 
 | Path | Purpose |
 |---|---|
 | `Phase1_Single_Source_Single_Intensity/` | Single-contribution physics, models, training, evaluation and visualization |
 | `Phase2_Multi_Source/` | Multi-source data, residual labels, decomposition models, evaluation and active observation research |
+| `Phase3_Single_Source_3D/` | RIND3D v0.1 data adapter, scene viewer, certified physical queries and exploratory single-source teacher |
+| `Phase4_Multi_Source_3D/` | RIND3D-100K: generator, certified posterior labels (tau-pencil, FastLabel), 100K dataset pipeline, Student research |
 | `docs/` | Research chain, status and compact numerical evidence |
 | `tools/` | Repository checks and reproducible server packages |
 | `Literature_Review/` | Team literature reviews |

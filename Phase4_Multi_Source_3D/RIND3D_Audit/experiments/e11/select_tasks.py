@@ -1,10 +1,11 @@
 """E11 task selection: uninformative (all-lit / all-dark) channels and solid-separated informative channels from
 TRAIN-split scenes (never test), for a FastLabel certification-feasibility probe. Read-only.
 Output lines: scene_dir window source L type."""
+import os as _os; _P4 = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '../../..'))   # Phase4 root
 import json, sys
 from pathlib import Path
 import numpy as np
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K")
+sys.path.insert(0, _os.path.join(_P4, "RIND3D_Dataset1K"))
 from rind3d_1k.loader import split_of
 ROOT = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1/scenes")
 rng = np.random.default_rng(13)

@@ -9,11 +9,12 @@ Labels: FastLabel v3.4 computed in memory (never written), or the stored release
 Usage: python e12_soundness_prior_mc.py <tasks_file> <M> > out/e12_soundness.jsonl
 tasks_file lines: scene_dir window source source_of_label(fastlabel|release)
 """
+import os as _os; _P4 = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '../..'))   # Phase4 root
 import json, sys, time
 from pathlib import Path
 import numpy as np
 
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K"); sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Posterior/src")
+sys.path.insert(0, _os.path.join(_P4, "RIND3D_Dataset1K")); sys.path.insert(0, _os.path.join(_P4, "RIND3D_Posterior/src"))
 from rind3d_1k.fastlabel import label_task
 from rind3d_1k.fastlabel import pipeline as PL, gpuverify as GV
 from rind3d_1k.fastlabel.window import fast_cls3

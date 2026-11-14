@@ -1,8 +1,15 @@
 # RIND3D handoff: repository map, setup, entry points
 
-This branch (`yushu/3d`) belongs to the shared G2-02 repository. **It is the canonical RIND3D-100K pre-production branch**: the shared physics and labelling modules, the 1K reference pipeline (kept for regression) and the 100K production pipeline (`RIND3D_Dataset100K/`, integrated 2026-11-14). The 2D project (`Phase1_Single_Source_Single_Intensity`,
-`Phase2_Multi_Source`) and the early 3D Phase 3 code (`Phase3_Single_Source_3D`) come from `main` and are not part of
-the RIND3D pipeline described here. The RIND3D code lives in the `RIND3D_*` directories.
+This is Phase4 of the shared G2-02 repository. **All paths in this directory are relative to `Phase4_Multi_Source_3D/`**, the Phase4 root.
+
+**Branch.** `yushu/3d` is the canonical RIND3D-100K pre-production branch. It holds:
+* the shared physics and labelling modules;
+* the 1K reference pipeline, kept for regression;
+* the 100K production pipeline (`RIND3D_Dataset100K/`, integrated 2026-11-14).
+
+**Other phases.** Phase1 (`Phase1_Single_Source_Single_Intensity/`) and Phase2 (`Phase2_Multi_Source/`) are the 2D project, maintained on `main`. Phase3 (`Phase3_Single_Source_3D/`) is the RIND3D v0.1 single-source reader, viewer and teacher experiments. All three sit at the repository root and are not part of the pipeline described here. Phase3 depends on `RIND3D_Generator/` through its uv path sources.
+
+**Layout.** The RIND3D components moved from the repository root into `Phase4_Multi_Source_3D/` on 2026-11-14; their internal layout is unchanged.
 
 | directory | role | status |
 |---|---|---|
@@ -14,16 +21,17 @@ the RIND3D pipeline described here. The RIND3D code lives in the `RIND3D_*` dire
 | `RIND3D_Audit/` | the scientific foundations audit (01–10) with its toy-world and fixture experiments | reference |
 | `RIND3D_HANDOFF/` | this directory: implementation facts, cleanup manifest, validation record, 100K readiness and FastLabel integration plan (`100K_FASTLABEL_INTEGRATION.md`, `patches/`), figure sources of the Chinese design document (`figures/`), its review (`DOC_REVIEW_2026-11-13.md`), `env.sh`, `smoke_checks.py` | handoff |
 | `docs/RIND3D_数据集设计与技术说明.md` | the Chinese design and technical document, with figures in `docs/assets/` | handoff |
-| `docs/RIND3D*`, `docs/RIND3D_INTEGRATION.md` | the 2026-11-02 integration of the RIND3D v0.1 release into G2-02 (Phase 3 reader) | historical context |
+| `docs/RIND3D/`, `docs/RIND3D_INTEGRATION.md` | RIND3D goals, semantics and history; the 2026-11-02 integration of the RIND3D v0.1 release into G2-02 (Phase 3 reader) | historical context |
 
 **Related branches:**
 * `yushu/3d-100k-h20` (`5560a20`): the historical development branch of the 100K v1 profile. It was merged into `yushu/3d` on 2026-11-14 and is not developed further.
 * `yushu/gaussian-b2-native`: the Gaussian-B2 geometry research line (local branch).
 * `main`: the shared 2D project.
 
-**Archive of the full pre-consolidation research state:**
-* tag `archive/rind3d-research-2026-11-13`, commit `0270712`;
-* branch `archive/yushu-3d-research-2026-11-13`.
+**Archives** (pre-Phase4 layout: their paths start at the repository root, e.g. `RIND3D_Research/`, `RIND3D_HANDOFF/`):
+* the full pre-consolidation research state: tag `archive/rind3d-research-2026-11-13` (commit `0270712`) and branch `archive/yushu-3d-research-2026-11-13`;
+* the former 100K branch: tag `archive/rind3d-100k-h20-2026-11-14`;
+* `yushu/3d` before the Phase4 reorganization: tag `archive/yushu-3d-pre-phase4-2026-11-14` (`e55e7d9`).
 
 ```bash
 git fetch origin --tags
@@ -62,6 +70,7 @@ git checkout archive/rind3d-research-2026-11-13 -- RIND3D_Research              
 ## Tests
 
 ```bash
+cd Phase4_Multi_Source_3D                                                  # from the repository root
 source RIND3D_HANDOFF/env.sh
 (cd RIND3D_Dataset1K && $RIND3D_LABEL_PY -m pytest -q tests)                 # loader, FastLabel (GPU), supervisor
 (cd RIND3D_Posterior && $RIND3D_LABEL_PY -m pytest -q tests)                 # tau-pencil digests, FastLabel core (GPU)

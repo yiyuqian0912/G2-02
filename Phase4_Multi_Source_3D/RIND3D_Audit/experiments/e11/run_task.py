@@ -1,9 +1,10 @@
 """E11: run rind3d_1k.fastlabel.label_task on one (scene, window, source) and print a JSON summary line.
 The label is NOT written anywhere (label_task returns it in memory). Uses the GPU verifier.
 Usage: python run_task.py <scene_dir> <window> <source> <L> <type>"""
+import os as _os; _P4 = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '../../..'))   # Phase4 root
 import json, sys, time
 import numpy as np
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K"); sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Posterior/src")
+sys.path.insert(0, _os.path.join(_P4, "RIND3D_Dataset1K")); sys.path.insert(0, _os.path.join(_P4, "RIND3D_Posterior/src"))
 from rind3d_1k.fastlabel import label_task
 sc, w, s, L, typ = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), sys.argv[5]
 t0 = time.time()

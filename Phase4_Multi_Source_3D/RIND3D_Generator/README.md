@@ -2,7 +2,7 @@
 
 This is the self-contained generation and certified physics source for **RIND3D — 3D Physical Reasoning Dataset**. RIND3D v0.1 is the completed initial release: 1,000 certified scenes and 256,000 observation windows. `Lite-Core-1K` describes its internal production profile, not a separate dataset brand.
 
-The completed data is downloaded separately. Do not regenerate it for Phase 3 development; follow [the Phase 3 guide](../Phase3_Single_Source_3D/README.md). No response fields, private source labels, credentials, native binaries or old campaign outputs are committed here.
+The completed data is downloaded separately. Do not regenerate it for Phase 3 development; follow [the Phase 3 guide](../../Phase3_Single_Source_3D/README.md). No response fields, private source labels, credentials, native binaries or old campaign outputs are committed here.
 
 ## Architecture and scope
 

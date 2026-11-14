@@ -3,6 +3,7 @@ process; per-scene caches), every informative channel of K random train scenes, 
 
   runner.py <n_scenes> <workers> <seed> <out.jsonl> [--kw json]
 """
+import os as _os; _P4 = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '../../..'))   # Phase4 root
 import json, os, sys, time, subprocess, threading
 import multiprocessing as mp
 from pathlib import Path
@@ -35,7 +36,7 @@ def _work(t):
 
 def main():
     import numpy as np
-    sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K")
+    sys.path.insert(0, _os.path.join(_P4, "RIND3D_Dataset1K"))
     from rind3d_1k.loader import split_of
     k, nw, seed, out = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
     kw = json.loads(sys.argv[sys.argv.index("--kw") + 1]) if "--kw" in sys.argv else {}

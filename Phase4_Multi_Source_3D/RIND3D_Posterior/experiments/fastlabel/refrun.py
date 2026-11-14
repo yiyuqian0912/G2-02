@@ -1,7 +1,8 @@
 """Reference label (production engine v3.1, tier 1) for a random task; stores the label for TV checks."""
+import os as _os; _P4 = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '../../..'))   # Phase4 root
 import sys, json, time
 from pathlib import Path
-sys.path[:0] = ["/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K", "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Posterior/src"]
+sys.path[:0] = [_os.path.join(_P4, "RIND3D_Dataset1K"), _os.path.join(_P4, "RIND3D_Posterior/src")]
 import numpy as np
 from rind3d_1k.labels import SceneObs
 from rind3d_posterior import label_window

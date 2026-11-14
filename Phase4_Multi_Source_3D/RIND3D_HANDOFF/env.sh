@@ -1,6 +1,7 @@
 # RIND3D environment for the 1K reference pipeline. Source it from bash:  source RIND3D_HANDOFF/env.sh
 # Every variable can be overridden before sourcing; the defaults are the values of the original development machine.
 _here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# RIND3D_REPO: the Phase4 root (Phase4_Multi_Source_3D/ in the G2-02 repository), which holds every RIND3D_* component
 export RIND3D_REPO="${RIND3D_REPO:-$(cd "$_here/.." && pwd)}"
 export RIND3D_1K_DATA="${RIND3D_1K_DATA:-/home/yushu/Projects/RIND/RIND3D_1K_data}"       # release_1k_v1, natural_supplement_v1, pilot_*
 # labeller interpreter: Python 3.12 with numpy, numba, scipy, zstandard, the built rind3d package (RIND3D_Generator)

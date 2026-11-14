@@ -51,13 +51,13 @@ The viewer uses the public reader, NumPy, SciPy and vendored Three.js. It needs 
 
 ```bash
 uv sync --extra dev --extra train --extra physics
-RIND_PYTHON="$PWD/.venv/bin/python" ../RIND3D_Generator/scripts/build.sh
+RIND_PYTHON="$PWD/.venv/bin/python" ../Phase4_Multi_Source_3D/RIND3D_Generator/scripts/build.sh
 uv run python examples/physical_query.py --index 0
 uv run python examples/physical_query.py --index 0 --rerender
 uv run python examples/octree_smoke.py --output results/octree.json
 ```
 
-Native build prerequisites and dependency licenses are in [RIND3D_Generator](../RIND3D_Generator/README.md). Arbitrary source/receiver point queries use certified native CPU or the original canonical reference, in bounded Cartesian batches. They do **not** generate a complete field. Whole observation windows can additionally use the certified CUDA renderer with `--raster-backend cuda_certified --rerender`; this requires both an NVIDIA driver and NVRTC, separately from CPU PyTorch. Arbitrary-point CUDA is not provided in this adapter. Source acceptance, clearance, closed-segment contact and tangency semantics are preserved; unresolved physical results fail closed. See [PhysicalOracle](docs/PHYSICAL_ORACLE.md).
+Native build prerequisites and dependency licenses are in [RIND3D_Generator](../Phase4_Multi_Source_3D/RIND3D_Generator/README.md). Arbitrary source/receiver point queries use certified native CPU or the original canonical reference, in bounded Cartesian batches. They do **not** generate a complete field. Whole observation windows can additionally use the certified CUDA renderer with `--raster-backend cuda_certified --rerender`; this requires both an NVIDIA driver and NVRTC, separately from CPU PyTorch. Arbitrary-point CUDA is not provided in this adapter. Source acceptance, clearance, closed-segment contact and tangency semantics are preserved; unresolved physical results fail closed. See [PhysicalOracle](docs/PHYSICAL_ORACLE.md).
 
 The octree starts with exactly eight 512³ source-space cubes, samples k=4 points per visited cube, evaluates sparse physical mismatch, then splits one selected cube into eight 256³ children. Defaults cap the diagnostic at 64 candidate attempts and 4,096 source/receiver pairs. Both breadth-first and exploratory cost-variation policies are available. Unvisited/uncertain cells are retained; no homogeneity or complete probability target is claimed. [Mathematical design](docs/ADAPTIVE_TEACHER.md) explains volume weighting and the distinction between physical cost variation and neural gradients.
 

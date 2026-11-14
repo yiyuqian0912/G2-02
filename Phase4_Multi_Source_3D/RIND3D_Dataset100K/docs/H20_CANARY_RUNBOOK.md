@@ -1,5 +1,7 @@
 # RIND3D-100K: H20 production gate and canary runbook
 
+**Paths.** Commands are relative to `Phase4_Multi_Source_3D/` in the G2-02 repository, or to the root of the handoff package; both have the same layout.
+
 **Scope.** This runbook covers everything that must pass on the 16 × H20 target before the 100K campaign under contract v2 (`contract/RIND3D_100K_CONTRACT_v2.json`). It is run in order and stops at the first failure.
 
 **Status.** Every check below is **PENDING**: none has been executed on an H20. Mark a check PASS only after running it on the target machine, and record the command output in the canary report (§9).

@@ -14,6 +14,16 @@
 
 方法、证据、负结果、指标口径与研究限制见[完整报告](docs/RIND_RESEARCH_CHAIN.zh-CN.md)。
 
+## 三维阶段
+
+**Phase3：RIND3D v0.1 三维单源。** [`Phase3_Single_Source_3D/`](Phase3_Single_Source_3D/README.md) 读取已发布的 RIND3D v0.1 数据：1,000 个认证三维场景、256,000 个观测窗口。
+* 提供受限局部观测加载、认证物理查询、交互式场景查看器和探索性的自适应八叉树教师，使用独立的 `uv` 环境。
+* [下载 RIND3D-v0.1.tar.zst](https://drive.google.com/file/d/1PmMp39En-uc4QTgACd_EpS4mTZ3wO7yx/view?usp=drivesdk)：633,273,091 字节，SHA256 `1f5a2ff2bd9ac4a479a074b33e0d06f160706e4369b199144ee117693913ee1e`。安装与查看器用法见 Phase3 README。
+
+**Phase4：RIND3D-100K 三维多源。** 研究在三维多源世界中如何仅凭有限的局部观测推断源的全局位置。
+* 流水线包括认证的物理渲染、FastLabel 高效概率标注和 Student 训练。
+* 详见 [`Phase4_Multi_Source_3D/README.md`](Phase4_Multi_Source_3D/README.md)。
+
 ## 目录职责
 
 | 路径 | 内容 |
@@ -24,6 +34,8 @@
 | `Phase2_Multi_Source/research/layered_residual/` | 逐层教师、共享候选渲染、历史定位实验与浏览器 |
 | `Phase2_Multi_Source/research/active_observation/` | 新增像素预算、移动/扩窗环境及参考策略 |
 | `Phase2_Multi_Source/dataset_update/` | 安装数据、随机强度派生、重复几何安全拼接 |
+| `Phase3_Single_Source_3D/` | RIND3D v0.1 数据接口、场景查看器、认证物理查询与单源教师实验 |
+| `Phase4_Multi_Source_3D/` | RIND3D-100K：生成器、认证后验标注（tau-pencil、FastLabel）、100K 数据流水线与 Student 研究 |
 | 各阶段的 `configs/`、`tests/`、`docs/` | 版本化实验、回归测试、方法及运行文档 |
 | `docs/` | 跨阶段研究报告、状态和紧凑证据 |
 | `tools/` | 仓库检查、从正式源码构建服务器包 |

@@ -3,9 +3,10 @@
 * HOLDOUT: 2 other train scenes per family, chosen with an independent seed, used only for the final assessment.
 * GATEA: one informative window per (family, side) of the DEV scenes, random source channel.
 Writes bench_plan.json."""
+import os as _os; _P4 = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '../../..'))   # Phase4 root
 import json, sys
 import numpy as np
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K")
+sys.path.insert(0, _os.path.join(_P4, "RIND3D_Dataset1K"))
 from rind3d_1k.loader import split_of
 R = "/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1/scenes"
 used = {0, 1, 2, 3, 623, 905, 949, 954}          # release-label scenes and scenes already used in earlier runs (run4*)

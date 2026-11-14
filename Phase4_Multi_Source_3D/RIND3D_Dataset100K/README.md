@@ -62,6 +62,8 @@
 
 ## Quick start (development machine)
 
+Run from the Phase4 root, `Phase4_Multi_Source_3D/`, in the G2-02 repository. The commands are the same from the root of an H20 handoff package.
+
 ```bash
 bash RIND3D_Dataset100K/handoff/env/setup_env.sh && source r3d_env.sh
 python -m pytest -q RIND3D_Dataset100K/tests

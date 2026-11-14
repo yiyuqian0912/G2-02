@@ -69,13 +69,13 @@ htmlcov/
 *.rindi
 *.private.*
 .build/
-RIND3D_Generator/outputs/
-RIND3D_Generator/experiments/lite_quality/fixtures/
+Phase4_Multi_Source_3D/RIND3D_Generator/outputs/
+Phase4_Multi_Source_3D/RIND3D_Generator/experiments/lite_quality/fixtures/
 Phase3_Single_Source_3D/data/
 Phase3_Single_Source_3D/checkpoints/
 Phase3_Single_Source_3D/results/
 Phase3_Single_Source_3D/.rind3d-viewer.local.json
 
 # RIND3D-100K local caches and benchmark scratch
-RIND3D_Dataset100K/.cache*/
+Phase4_Multi_Source_3D/RIND3D_Dataset100K/.cache*/
 r3d_env.sh

@@ -372,7 +372,7 @@ wheels = [
 [[package]]
 name = "rind-dataset"
 version = "0.1.0"
-source = { editable = "../RIND3D_Generator/vendor/canonical_geometry" }
+source = { editable = "../Phase4_Multi_Source_3D/RIND3D_Generator/vendor/canonical_geometry" }
 dependencies = [
     { name = "numcodecs" },
     { name = "numpy" },
@@ -430,8 +430,8 @@ requires-dist = [
     { name = "psutil", marker = "extra == 'dev'", specifier = ">=6" },
     { name = "pybind11", marker = "extra == 'dev'", specifier = ">=3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9" },
-    { name = "rind3d", marker = "extra == 'physics'", editable = "../RIND3D_Generator" },
-    { name = "rind3d-reader", directory = "../RIND3D_Generator/reader" },
+    { name = "rind3d", marker = "extra == 'physics'", editable = "../Phase4_Multi_Source_3D/RIND3D_Generator" },
+    { name = "rind3d-reader", directory = "../Phase4_Multi_Source_3D/RIND3D_Generator/reader" },
     { name = "scipy", marker = "extra == 'viewer'", specifier = ">=1.13" },
     { name = "torch", marker = "sys_platform == 'linux' and extra == 'train'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch", marker = "sys_platform != 'linux' and extra == 'train'", specifier = ">=2.4" },
@@ -441,7 +441,7 @@ provides-extras = ["physics", "train", "dev", "viewer"]
 [[package]]
 name = "rind3d"
 version = "0.3.0"
-source = { editable = "../RIND3D_Generator" }
+source = { editable = "../Phase4_Multi_Source_3D/RIND3D_Generator" }
 dependencies = [
     { name = "numpy" },
     { name = "pyarrow" },
@@ -460,8 +460,8 @@ requires-dist = [
     { name = "pybind11", marker = "extra == 'dev'", specifier = ">=3,<4" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9" },
     { name = "pyyaml", specifier = ">=6" },
-    { name = "rind-dataset", editable = "../RIND3D_Generator/vendor/canonical_geometry" },
-    { name = "rind3d-reader", directory = "../RIND3D_Generator/reader" },
+    { name = "rind-dataset", editable = "../Phase4_Multi_Source_3D/RIND3D_Generator/vendor/canonical_geometry" },
+    { name = "rind3d-reader", directory = "../Phase4_Multi_Source_3D/RIND3D_Generator/reader" },
     { name = "scipy", specifier = ">=1.13" },
     { name = "torch", marker = "sys_platform == 'linux' and extra == 'train'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch", marker = "sys_platform != 'linux' and extra == 'train'", specifier = ">=2.4" },
@@ -473,7 +473,7 @@ provides-extras = ["dev", "benchmark", "train"]
 [[package]]
 name = "rind3d-reader"
 version = "0.1.0"
-source = { directory = "../RIND3D_Generator/reader" }
+source = { directory = "../Phase4_Multi_Source_3D/RIND3D_Generator/reader" }
 dependencies = [
     { name = "numpy" },
     { name = "zstandard" },

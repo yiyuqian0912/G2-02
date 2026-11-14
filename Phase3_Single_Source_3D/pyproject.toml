@@ -19,9 +19,9 @@ viewer = ["scipy>=1.13"]
 rind3d-download = "rind_phase3.download:main"
 
 [tool.uv.sources]
-rind3d-reader = {path = "../RIND3D_Generator/reader"}
-rind3d = {path = "../RIND3D_Generator", editable = true}
-rind-dataset = {path = "../RIND3D_Generator/vendor/canonical_geometry", editable = true}
+rind3d-reader = {path = "../Phase4_Multi_Source_3D/RIND3D_Generator/reader"}
+rind3d = {path = "../Phase4_Multi_Source_3D/RIND3D_Generator", editable = true}
+rind-dataset = {path = "../Phase4_Multi_Source_3D/RIND3D_Generator/vendor/canonical_geometry", editable = true}
 torch = [{index = "pytorch-cpu", marker = "sys_platform == 'linux'"}]
 
 [[tool.uv.index]]

@@ -14,10 +14,11 @@ Checks per fixture:
   * connected components (26-connectivity) of the engine support at 128^3 and of the MC-feasible 8^3 blocks.
 Run one fixture: nice -n 19 python e8_extreme_fixtures.py <fixture> > out/e8_<fixture>.json
 """
+import os as _os; _P4 = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '../..'))   # Phase4 root
 import json, sys, time
 import numpy as np
 
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Posterior/src")
+sys.path.insert(0, _os.path.join(_P4, "RIND3D_Posterior/src"))
 N, L = 32, 4
 ORIGIN = np.array([4, 14, 14])          # window box [0.125, 0.25] x [0.4375, 0.5625]^2
 

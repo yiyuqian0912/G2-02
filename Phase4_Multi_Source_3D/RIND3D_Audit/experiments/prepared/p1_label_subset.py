@@ -10,10 +10,11 @@ Estimated cost: 200 scenes x ~160 informative channels = ~32k labels; at the HOL
 15 workers) about 45 min of the full laptop. Disk: ~47 KB/label delta-encoded, here raw npz ~0.1-2 MB for broad labels
 -> budget ~10 GB. The delta budget of these research labels is separate from the 1K release budget (state it).
 """
+import os as _os; _P4 = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), '../../..'))   # Phase4 root
 import argparse, json, sys, time
 from pathlib import Path
 import numpy as np
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K"); sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Posterior/src")
+sys.path.insert(0, _os.path.join(_P4, "RIND3D_Dataset1K")); sys.path.insert(0, _os.path.join(_P4, "RIND3D_Posterior/src"))
 from rind3d_1k.loader import split_of
 ROOT = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1/scenes")
 

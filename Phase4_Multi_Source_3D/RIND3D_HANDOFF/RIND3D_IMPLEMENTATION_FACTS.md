@@ -9,6 +9,8 @@ marked **[proj]** (projection) or **[derived]** (read-only aggregation of releas
 * **D**: designed or proposed, not implemented;
 * **U**: unresolved.
 
+**Paths.** Every path below is relative to `Phase4_Multi_Source_3D/`. The RIND3D components moved there from the repository root on 2026-11-14.
+
 **Abbreviations:**
 * `G` = `RIND3D_Generator/src/rind3d`
 * `N` = `RIND3D_Generator/native`

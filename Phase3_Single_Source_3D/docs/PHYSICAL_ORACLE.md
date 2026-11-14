@@ -1,6 +1,6 @@
 # Certified teacher queries
 
-`PhysicalOracle` reuses the canonical decoder, exact convex geometry context and native parametric clipping/GMP implementation in `RIND3D_Generator`. It does not voxelize geometry or implement another visibility engine. The original canonical CGAL/Arb service remains the independent point-reference backend. Scope is the current nine world-contained convex-union families; unsupported geometry is rejected explicitly, and existing generator READY gates remain unchanged.
+`PhysicalOracle` reuses the canonical decoder, exact convex geometry context and native parametric clipping/GMP implementation in `Phase4_Multi_Source_3D/RIND3D_Generator`. It does not voxelize geometry or implement another visibility engine. The original canonical CGAL/Arb service remains the independent point-reference backend. Scope is the current nine world-contained convex-union families; unsupported geometry is rejected explicitly, and existing generator READY gates remain unchanged.
 
 ```python
 from rind_phase3 import RIND3D
