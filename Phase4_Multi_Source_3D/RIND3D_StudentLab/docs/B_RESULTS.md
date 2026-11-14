@@ -110,4 +110,147 @@ On train-split rows, 3.8% of large facets miss the source by more than 4 voxels 
 
 **Training.** Same data, schedule, 8k steps and T*-MIS weights as G0.
 
-(table filled in §3 below as seeds complete)
+| arm | T* IG | B1K IG | KL(q_G ‖ p) | HPD-MAE | IG at L64 / L128 / L256 |
+|---|---|---|---|---|---|
+| G0 s0 / s1 | 3.90 / 3.87 | 3.83 / 3.80 | 6.37 / 6.41 | 0.046 / 0.041 | 3.56 / 3.89 / 4.26 |
+| **F1 s0** | **7.72 [7.48, 7.94]** | 7.73 | **2.58** | 0.053 | 6.08 / 7.36 / 9.71 |
+| **F1 s1** | **7.71 [7.48, 7.94]** | 7.74 | 2.57 | 0.055 | 6.09 / 7.35 / 9.70 |
+
+**Paired differences** (F1 − G0 under the same seed):
+
+| | T* | B1K |
+|---|---|---|
+| seed 0 | **+3.81 [3.67, 3.95]** | +3.90 |
+| seed 1 | **+3.84 [3.70, 3.98]** | +3.94 |
+
+* F1 s1 − F1 s0 = −0.00 [−0.02, +0.01].
+* F1 − P0 = +0.51 [0.46, 0.57]: the learned head and the generic field together add half a nat over the non-learned factor.
+* F1 − P1 (post-hoc product) = +0.29 [0.24, 0.35]: joint training beats a post-hoc combination.
+
+**By facet count** (F1 s0, T* IG; `docs/fig/ig_by_facets.png`):
+
+| facets | 0 | 1 | 2 | 3 | ≥ 4 |
+|---|---|---|---|---|---|
+| G0 | 0.44 | 2.62 | 4.30 | 4.72 | 5.19 |
+| P0 | 0.00 | 4.12 | 7.99 | 10.25 | 11.63 |
+| F1 | 0.04 | 4.66 | 8.78 | 10.46 | 11.80 |
+| label | 6.4 | 7.1 | 11.0 | 14.0 | 14.5 |
+
+**Readings.**
+* G0 saturates near 5 nats whatever the geometry.
+* The projective models scale with the number of facets, as the facet law predicts: one facet gives a plane, two a line, three or more a point.
+
+**Training dynamics** (`docs/fig/curves_G0_F1.png`).
+* F1 reaches its dev NLL plateau (≈ 6.0) by step 1,000.
+* G0 is still descending at step 8,000 (12.9 → 10.4). The G0long arm (32k steps) tests whether it ever catches up.
+
+**Posteriors** (`docs/fig/posteriors_F1_G0.png`; median-IG dev rows, chosen by rule).
+* G0 predicts coarse-cell-scale bands.
+* F1 reproduces the label's one-cell-thin sheets and lines and a near-point at L256 with 4 facets.
+* F1's worst dev row (IG −16) is a thin_slabs window: F1 trusted an occluder-interface facet (§2.2).
+
+**Out of distribution** (dev; never trained on):
+
+| | solid-separated | all-lit | all-dark |
+|---|---|---|---|
+| F1 − G0, s0 | −0.21 [−0.34, −0.06] | 0.00 | +0.09 |
+| F1 − G0, s1 | −0.04 [−0.22, +0.12] | +0.09 | +0.03 |
+
+F1's generic field co-adapts with the facet factor: almost every boundary-mixed training row has facets. On facet-free windows it can be weaker than G0, which is the motivation for F3's facet dropout.
+
+## 7. Q5: hidden worlds with an identical observation (counterfactuals, brief §8)
+
+Two exact constructions on dev rows (`scripts/counterfactual.py`, `scripts/counterfactual_depth.py`). Every edited world
+is labelled with the production FastLabel v3.4 pipeline, and the true source is in every counterfactual support (100%).
+
+**(a) Remove every body disjoint from H = conv({s} ∪ window box)** (2-voxel margin). By construction X is unchanged
+(crop and response). 240 rows; 7 with nothing removable; 233 labelled.
+
+| | L64 | L128 | L256 | all |
+|---|---|---|---|---|
+| TV(q_G, q_G′): median / mean | 4·10⁻⁴ / 0.034 | 10⁻⁸ / 0.064 | 0 / 0.018 | 10⁻⁸ / 0.039 |
+| JSD(q_G, q_G′), mean (nats) | 0.013 | 0.027 | 0.009 | 0.016 |
+| pairs with TV > 0.5 | 0% | 5% | 3% | 2.6% |
+
+Geometry outside the source–window hull is practically irrelevant to the full-world posterior: 90% of pairs agree
+within the 0.05 certificate tolerance. The pairwise floor of any X-only Student is about 0.02 nats, against
+pair-averaged KL of 2.70 (F1), 3.27 (P0) and 6.52 (G0).
+
+**(b) Scale every hidden caster about the source**, O′ = s + λ(O − s) with λ ∈ {0.6, 0.8, 1.25, 1.6}. The shadow
+cone from s is invariant, but the hidden depth changes. A world is accepted only if:
+* O′ stays outside the box and inside the cube;
+* s stays legal;
+* **the exact FastLabel verifier confirms that s reproduces the stored observation on every FREE receiver**. It
+  rejected one candidate whose response changed on 58 voxels.
+
+Counts:
+* 120 rows; 34 have no hidden caster (every shadow comes from visible bodies, 16 of 40 at L256);
+* 231 accepted worlds;
+* 86 rows with a set of 3.7 X-identical worlds on average.
+
+| | L64 | L128 | L256 | all |
+|---|---|---|---|---|
+| mean entropy range across the set (nats) | 1.05 | 0.59 | 0.48 | 0.74 |
+| floor: generalised JSD of the set, mean / median | 0.21 / 0.24 | 0.11 / 0.04 | 0.12 / 0.00 | **0.15 / 0.07** |
+| G0: mean KL to the set | 5.00 | 6.06 | 8.18 | 6.24 |
+| F1: mean KL to the set = floor + KL(mixture ‖ p) | 2.28 | 2.66 | 2.54 | **2.48 = 0.15 + 2.33** |
+
+**Readings.**
+* Hidden caster depth is a real, irreducible source of uncertainty: the same X admits posteriors whose entropy differs by up to ~1 nat (`docs/fig/counterfactual_depth_max.png`).
+* F1's single prediction covers the whole family, a band on the X-determined plane.
+* In this tested range the floor is small (0.15 nats) next to F1's excess (2.33). The family is a lower bound on the full set of X-equivalent worlds (caster shapes, larger depth ranges), so the true floor is higher.
+
+**Where the residual is X-measurable.**
+* Windows with ≥ 3 large facets (2,050 dev rows): the least-squares intersection of the X-measured planes lies a median 1.4–1.7 voxels from the true source, and in the source's own 8-voxel label cell in 52–58% of rows.
+* There the label carries 14.0–14.4 nats and F1 11.3–12.0.
+
+**Conclusion.** Much of F1's remaining 2.3–2.6-nat KL is model error, not hidden-world uncertainty:
+* wide kernels hedge against unreliable facets;
+* the cell integral is approximate.
+
+This motivates F3 (occluder hypothesis) and F4 (consensus).
+
+## 4. Q2: what must be built in?
+
+### 4.1 Information vs operator: G1 (the decisive control)
+
+**G1** is G0 plus the same X-measured facets as F1, entered as K extra key/value tokens of every cross-attention block. The facet embedding covers:
+* the centroid (Fourier features);
+* the normal;
+* the plane offset n·μ;
+* size and fit quality.
+
+G1 has **the information F1 has, but no geometric decoding operator**.
+
+| arm | T* IG | B1K IG | KL | IG by facets: 1 / 2 / 3 / ≥ 4 |
+|---|---|---|---|---|
+| G0 s0 | 3.90 | 3.83 | 6.37 | 2.62 / 4.30 / 4.72 / 5.19 |
+| **G1 s0** (facet tokens) | **3.81 [3.68, 3.95]** | 3.75 | 6.46 | 2.59 / 4.19 / 4.65 / 4.95 |
+| F1 s0 (facet factor) | 7.72 | 7.73 | 2.58 | 4.66 / 8.78 / 10.46 / 11.80 |
+
+**Paired differences:**
+* G1 − G0 = **−0.09 [−0.13, −0.06]**;
+* F1 − G1 = **+3.91 [3.76, 4.04]**.
+
+**Conclusion.** Giving a generic decoder the exact shadow planes does not help at all. Access to the projective information is not the bottleneck; the operator that turns it into a global constraint is.
+
+* A cross-attention decoder can form logits that are linear in n·s, but its output is a soft average of token values, read out by smooth position features: Fourier frequencies ≤ 8 over the cube, a 16³ coarse grid, and a fine head that is linear in the query embedding.
+* A sheet one cell (8 voxels) thick, 700 voxels from the evidence, needs a function that is sharp in d = n·(s − μ). The architecture has no inductive path to it at 1K data scale.
+* The explicit factor log(ε + exp(−d²/2σ²)) supplies exactly that function. Its parameters are the X-measured planes.
+
+### 4.2 Which learned parts matter? (explicit-facet family, seed 0, dev T*)
+
+| arm | generic field | facet head | T* IG | Δ vs P0 | KL | HPD-MAE |
+|---|---|---|---|---|---|---|
+| P0 | none (uniform-legal) | fixed (ε = 10⁻³, s0 = 0.5, κ = 1), no training | 7.20 | — | 3.11 | 0.024 |
+| F1only | none | learned | 7.45 [7.22, 7.68] | +0.25 [0.20, 0.29] | 2.86 | 0.033 |
+| F1fix | learned jointly | fixed | 7.64 [7.42, 7.86] | +0.44 [0.39, 0.49] | 2.66 | 0.048 |
+| F1 | learned jointly | learned | 7.72 | +0.52 | 2.58 | 0.053 |
+
+**Readings.**
+* **Geometry carries the result.** P0 − G0 = +3.30 nats with no learning at all. Every learned component together adds +0.5.
+* **The generic field adds along-plane information** (+0.27 = F1 − F1only): prior, visibility and sidedness.
+* **Learned facet reliability adds +0.08 to +0.25.** It adds more when no generic field can absorb errors.
+* With the current descriptors the head cannot recognise occluder-interface facets, which motivates F3 and F4.
+* **Calibration.** HPD-MAE rises from 0.024 (P0) to 0.053 (F1), still within the pilot's 0.03–0.05 range.
+* (F1fix uses facets with ≥ 24 inliers and P0 those with ≥ 100.)

@@ -11,6 +11,10 @@ the validated production code. Nothing here changes the 1K release, its labels, 
 | `slab/` | data layer (splits, sets, facets), flat density, models, training, evaluation, analysis |
 | `scripts/build_facets.py` | X-measurable interface facets for every row of the feature table |
 | `scripts/validate_facets.py` | facet-law check |
+| `scripts/run_queue.py` | sequential train + dev evaluation of the arms listed in `queue_main.txt` |
+| `scripts/counterfactual.py`, `scripts/counterfactual_depth.py` | X-identical counterfactual worlds (bodies outside the source–window hull removed; hidden casters scaled about the source, verified exactly), relabelled with FastLabel |
+| `scripts/analyze_counterfactual.py` | label divergence across X-identical worlds; JSD floors vs Students |
+| `slab/figures.py` | posterior projections, curves, IG by facet count, scaling, counterfactual panels |
 | `configs/` | arm configurations |
 | `tests/test_lab.py` | normalisation, plane factor, synthetic facet law |
 
@@ -21,6 +25,9 @@ the validated production code. Nothing here changes the 1K release, its labels, 
 **Data.**
 * Inputs: `$RIND3D_1K_DATA` (default `~/Projects/RIND/RIND3D_1K_data`): `release_1k_v1`, `natural_supplement_v1`, `pilot_features_v1`.
 * Outputs: `$RIND3D_LAB_OUT` (default `$RIND3D_1K_DATA/studentlab_v1`): facet table, runs, evaluations. They are outside Git.
+
+The counterfactual scripts need the labeller interpreter (rind3d built, CUDA): `source ../r3d_env.sh` of a built
+Phase4 checkout, as in `RIND3D_HANDOFF/env.sh`.
 
 **Workflow.**
 

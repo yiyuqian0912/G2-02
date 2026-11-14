@@ -4,6 +4,7 @@ order, one-hue sequential blue for magnitudes).
 python -m slab.figures posteriors <out.png> <row_idx,...> <name=run_dir> ...   max-projections of label / models
 python -m slab.figures curves <out.png> <name=run_dir> ...                     dev learning curves
 python -m slab.figures by_nf <out.png> <name=eval.npz> ...                     information gain by facet count
+python -m slab.figures scaling <out.png> <name:n_scenes=eval.npz> ...          learning curve over training worlds
 """
 import json, sys
 from pathlib import Path
@@ -101,6 +102,63 @@ def posteriors(out, rows, runs):
     fig.tight_layout(rect=(0, 0.02, 1, 1)); fig.savefig(out, dpi=160, facecolor=SURFACE)
 
 
+def scaling(out, groups):
+    """groups: {model label: {n_scenes: eval.npz}}; IG (side-balanced T*, scene-bootstrap 95% band) vs training worlds."""
+    from .analyze import load, boot
+    fig, ax = plt.subplots(figsize=(6.4, 3.8), facecolor=SURFACE); _style(ax)
+    for i, (name, pts) in enumerate(groups.items()):
+        xs = sorted(pts); m, lo, hi = [], [], []
+        for x in xs:
+            d = load(pts[x])["tstar"]; b = boot(d["ig"], d["scene"], d["Lp"], n=500)
+            m.append(b["mean"]); lo.append(b["lo"]); hi.append(b["hi"])
+        ax.fill_between(xs, lo, hi, color=SERIES[i], alpha=0.18, lw=0)
+        ax.plot(xs, m, color=SERIES[i], lw=2, marker="o", ms=5, label=name)
+        ax.annotate(f"{m[-1]:.2f}", (xs[-1], m[-1]), textcoords="offset points", xytext=(6, -3), fontsize=8, color=INK)
+    ax.set_xscale("log", base=2); ax.set_xticks([86, 171, 342, 684]); ax.set_xticklabels(["86", "171", "342", "684"])
+    ax.set_xlabel("independent training worlds (scenes)", color=INK2); ax.set_ylabel("dev T* information gain (nats)", color=INK2)
+    ax.legend(frameon=False, fontsize=8, labelcolor=INK)
+    fig.tight_layout(); fig.savefig(out, dpi=160, facecolor=SURFACE)
+
+
+def cf_panel(out, cfd_dir, analysis_json, run_dir, which="median"):
+    """Depth counterfactual panel: the stored label and the X-identical worlds' labels (casters scaled by λ about the
+    source), and the single prediction an X-only Student makes for all of them."""
+    import torch
+    from .data import LabTable, collate, to_dev
+    from .evaluate import lab_model
+    from .density import NC, NF
+    A = json.load(open(analysis_json))["rows"]
+    A = [r for r in A if r["jsd"] > 1e-3]
+    A.sort(key=lambda r: r["jsd"]); r = A[len(A) // 2] if which == "median" else A[-1]
+    T = LabTable(); i = r["i"]; row = T.rows[i]
+    key = (int(row["scene"]), int(row["window"]), int(row["source"]))
+    vols = []
+    cells, q, _ = T.label(i); v = np.zeros(128 ** 3); v[cells] = q; vols.append(("world G (λ = 1)", v))
+    for lam in r["lams"][1:]:
+        z = np.load(Path(cfd_dir) / f"cfd_{key[0]:06d}_w{key[1]:03d}_s{key[2]}_l{lam:g}.npz")
+        v = np.zeros(128 ** 3); np.add.at(v, z["cell"].astype(np.int64), z["lo"]); vols.append((f"casters × {lam:g} about s", v / v.sum()))
+    f = lab_model(run_dir, "cuda"); B = to_dev(collate(T, np.array([i]), "onehot"), "cuda")
+    with torch.no_grad():
+        lp = f(B)[0]
+    pv = lp.exp().view(NC, NC, NC, NF, NF, NF).permute(0, 3, 1, 4, 2, 5).reshape(-1).float().cpu().numpy()
+    vols.append(("F1 (one prediction: same X)", pv))
+    F = T.F[i]; ax_proj = int(np.argmin(np.abs(F[0, 3:6]))) if T.nf[i] > 0 else 2
+    keep = [a for a in range(3) if a != ax_proj]
+    fig, axes = plt.subplots(1, len(vols), figsize=(2.4 * len(vols), 2.7), facecolor=SURFACE, squeeze=False)
+    s = np.array([row["sx"], row["sy"], row["sz"]]) * 128; o = np.array([row["ox"], row["oy"], row["oz"]]) / 8; L = row["Lp"] / 8
+    for ax, (t, v) in zip(axes[0], vols):
+        img = np.log10(np.maximum(v.reshape(128, 128, 128).max(ax_proj), 1e-9))
+        ax.imshow(img.T, origin="lower", cmap=BLUES, vmin=-7, vmax=0, extent=(0, 128, 0, 128))
+        ax.add_patch(plt.Rectangle((o[keep[0]], o[keep[1]]), L, L, fill=False, ec=SERIES[1], lw=1.2))
+        ax.plot(s[keep[0]], s[keep[1]], marker="x", color=SERIES[7], ms=7, mew=1.6)
+        ax.set_xticks([]); ax.set_yticks([]); ax.set_title(t, fontsize=8, color=INK)
+        for sp in ax.spines.values():
+            sp.set_color(GRID)
+    fig.text(0.5, 0.01, f"L{int(row['Lp'])} window, {int(T.nf[i])} facets; JSD of the worlds = {r['jsd']:.2f} nats; every panel has the same "
+             "observation X. log10 mass, max-projected; orange: window; red ×: true source", ha="center", fontsize=7, color=INK2)
+    fig.tight_layout(rect=(0, 0.05, 1, 1)); fig.savefig(out, dpi=160, facecolor=SURFACE)
+
+
 if __name__ == "__main__":
     kind, out = sys.argv[1], sys.argv[2]
     if kind == "posteriors":
@@ -110,3 +168,10 @@ if __name__ == "__main__":
         curves(out, dict(a.split("=", 1) for a in sys.argv[3:]))
     elif kind == "by_nf":
         by_nf(out, dict(a.split("=", 1) for a in sys.argv[3:]))
+    elif kind == "cf":                            # cf <out> <cfd_dir> <analysis.json> <run_dir> [median|max]
+        cf_panel(out, sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6] if len(sys.argv) > 6 else "median")
+    elif kind == "scaling":                       # name:n=eval.npz ...
+        g = {}
+        for a in sys.argv[3:]:
+            k, v = a.split("=", 1); nm, n = k.rsplit(":", 1); g.setdefault(nm, {})[int(n)] = v
+        scaling(out, g)

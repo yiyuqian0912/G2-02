@@ -46,7 +46,13 @@ class LabTable(Table):
         idx = np.flatnonzero(sets[name])
         cap = {"b1k": 4000, "alllit": 2500}.get(name)
         if cap and len(idx) > cap:                                         # declared subsample, seed fixed
-            idx = np.sort(np.random.default_rng(20261114).choice(idx, cap, replace=False))
+            # rows with a certified OOD reference label (confirm split only) are always kept; on dev there are none, and
+            # the draw is then identical to a plain subsample of idx
+            ref = np.array([self.label_path(i).exists() or (self.label_path(i).parent.parent / "ood" / self.label_path(i).name).exists()
+                            for i in idx]) if name == "alllit" else np.zeros(len(idx), bool)
+            rest = idx[~ref]
+            pick = np.random.default_rng(20261114).choice(rest, cap - int(ref.sum()), replace=False)
+            idx = np.sort(np.concatenate([idx[ref], pick]))
         return idx
 
 

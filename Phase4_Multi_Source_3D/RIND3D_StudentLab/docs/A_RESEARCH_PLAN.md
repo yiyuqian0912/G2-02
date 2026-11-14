@@ -143,3 +143,13 @@ these comparisons only, with the frozen final checkpoints.
 | C4 | G0 s0 − pilot FL_MIS_s0 | T* | reproduction on the pilot's own evaluation scenes |
 
 Everything else (ablations, scaling, generalisation arms) stays dev-only.
+
+## 8. Carrying the protocol to the 100K (no production change proposed here)
+
+* **Facets are a per-channel function of X.** They come from the stored crop and response, so they can be computed for any release without touching the contract.
+  * Measured cost: 194,532 rows in 30 min on 11 laptop cores (~0.1 core-s per row; L256 dominates).
+  * At ~12 M 100K channels: ~35 core-hours, a small fraction of the label budget.
+  * Storage is 8 × 12 float32 per channel (≈ 4.6 GB for 12 M rows), against ~1.5 TB for pooled 4×32³ inputs. The input features, not the facets, are the scaling problem: compute them on the fly.
+* **The evaluation protocol is unchanged.** Side-balanced T* IG with scene bootstrap, dev / confirm / sealed test.
+  * A 100K run should keep the dev scenes of this study as an anchor set, so that 1K and 100K numbers stay comparable.
+* **What the 1K cannot answer** (H4): whether a generic decoder eventually learns the projective operator with ~100× more worlds. The Q4 learning curves give the slope at 86–684 worlds; G0long gives the step budget.
