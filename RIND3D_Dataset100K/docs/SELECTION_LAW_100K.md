@@ -1,5 +1,20 @@
 # RIND3D-100K: generative and selection law, per-channel posterior target, training weights
 
+> **Contract v2 (production, provisional).** The law of this document is the v1 law: adaptive κ and m-balanced thinning. Contract v2 replaces two of its parts:
+> * **source count:** K ~ κ, declared;
+> * **window acceptance:** natural acceptance of every admissible window, plus an optional coverage stream (`rind3d_100k/sampling.py`, `RIND3D_StudentResearch/J_COMPLEXITY_COVERAGE.md` §3–5).
+>
+> **Labels.** Theorem A1 (`A_TASK_DEFINITION.md`) holds for every stream, because the acceptance depends on s_j only through r_j. The labels need no change.
+>
+> **Training weights** (`loader.flatten(population="Tstar")`): the balance heuristic, per natural proposal,
+> w(m) = 1 / Σ_s n_s c_s(m) / Λ_s.
+> * natural stream: c = 1 and Λ = P_A;
+> * coverage stream: c(m) and Λ_cov = Σ_m c(m) P(A, m);
+> * both are estimated from the exact-m rate stream. P_A may also be estimated with the natural stream's quota estimator (combined_rb).
+> * Where a side has only the natural stream, w = P_A / n_nat.
+>
+> `tests/test_sampling.py` checks the unbiasedness identity E[#windows(m)] · w(m) = P(A, m) exactly.
+
 **Status markers:**
 * **[P]** derived here;
 * **[M]** measured on the development canaries (laptop);

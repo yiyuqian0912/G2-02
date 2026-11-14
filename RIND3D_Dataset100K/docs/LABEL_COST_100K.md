@@ -1,5 +1,7 @@
 # Report D — Posterior-label cost under the 100K workflow (measured on the laptop)
 
+> **Historical cost basis (TPE, contract v1).** The production labeller under contract v2 is FastLabel (`../RIND3D_Posterior/docs/FASTLABEL_CORE.md`). Its cost is measured in the canary (`docs/H20_CANARY_RUNBOOK.md` §9).
+
 **Setup:**
 * engine: TPE v3.1, tier 1 (nq_cap 2²⁵, ne_cap 2²⁶, gpu_cap 2²²);
 * workers: 11 CPU + 4 GPU-assisted on the laptop (8C/16T, RTX 3060 6 GB); this is the 1K production layout;

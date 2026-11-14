@@ -1,5 +1,12 @@
 # FastLabel for RIND3D-100K: adapter, integration plan, durability review (2026-11-13)
 
+> **Applied 2026-11-14.** Both patches and the integration order below are done on `yushu/3d`:
+> * the 100K pipeline is merged;
+> * FastLabel is the default engine of contract v2;
+> * the durability fixes are in `rind3d_100k/storage.py`.
+>
+> This document is kept as the review record; the patch files are historical. The production gate is `RIND3D_Dataset100K/docs/H20_CANARY_RUNBOOK.md`.
+
 **Scope.** This document prepares the work; it changes nothing on the 100K side.
 * Branch `yushu/3d-100k-h20` (`5560a20`) was **not modified, merged or launched**.
 * Both patches below were developed and tested on a scratch export of `5560a20`. `git apply --check` passes on the branch.

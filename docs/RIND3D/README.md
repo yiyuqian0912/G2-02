@@ -34,11 +34,13 @@ Each entry below has a status:
   * the scene-rejection bound;
   * the training-weight estimation.
 
-## RIND3D-100K (branch `yushu/3d-100k-h20`)
+## RIND3D-100K (`RIND3D_Dataset100K/` on this branch)
 
-This branch adds the local-only 100K production profile for a 16 × H20 server: `RIND3D_Dataset100K/README.md`.
-* **Contract:** 100K scenes, 1024³, 4 / 4 / 4 windows, 1–4 sources, balanced effective layers.
+The local-only 100K production pipeline for a 16 × H20 server, integrated into `yushu/3d` on 2026-11-14 (`RIND3D_Dataset100K/README.md`). The former branch `yushu/3d-100k-h20` is historical.
+* **Contract v2 (provisional):**
+  * 100K scenes at 1024³, 4 / 4 / 4 windows, 1–4 sources;
+  * declared κ and natural T* sampling, with an optional L64 coverage slot;
+  * FastLabel posteriors.
 * **Pipeline:** exact local rendering, proven equal to the full-field pipeline.
-* **Node coordinator:** multi-GPU and supervised.
-* **Tested handoff package:** clean extract → setup → smoke PASS.
-* **Measured reports:** A–F. The go / no-go is provisional until the server is accessed.
+* **Node coordinator:** multi-GPU, supervised, with durable storage.
+* **Production gate:** `RIND3D_Dataset100K/docs/H20_CANARY_RUNBOOK.md`. Everything on the H20 is pending.

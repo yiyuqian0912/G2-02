@@ -1,6 +1,6 @@
 # RIND3D handoff: repository map, setup, entry points
 
-This branch (`yushu/3d`) belongs to the shared G2-02 repository. The 2D project (`Phase1_Single_Source_Single_Intensity`,
+This branch (`yushu/3d`) belongs to the shared G2-02 repository. **It is the canonical RIND3D-100K pre-production branch**: the shared physics and labelling modules, the 1K reference pipeline (kept for regression) and the 100K production pipeline (`RIND3D_Dataset100K/`, integrated 2026-11-14). The 2D project (`Phase1_Single_Source_Single_Intensity`,
 `Phase2_Multi_Source`) and the early 3D Phase 3 code (`Phase3_Single_Source_3D`) come from `main` and are not part of
 the RIND3D pipeline described here. The RIND3D code lives in the `RIND3D_*` directories.
 
@@ -9,6 +9,7 @@ the RIND3D pipeline described here. The RIND3D code lives in the `RIND3D_*` dire
 | `RIND3D_Generator/` | package `rind3d` plus native C++. Canonical convex-polyhedra geometry (vendor `rind`), certified visibility (CPU native, CPU reference, `cuda_certified`), RINDPack storage, exact CountIndex, the v0.1 geometry families and acceptance gate. This is an imported, hash-tracked source tree (`provenance/ORIGINAL_SOURCE.json`): keep it byte-stable. `experiments/{shadow_volumes,cpu_cuda,lite_quality}` are acceptance-test dependencies | production (used by 1K and 100K) |
 | `RIND3D_Posterior/` | package `rind3d_posterior`: the exact tau-pencil labeller (`label_window`), CPU and GPU-pass variants, TV bound; **FastLabel v3.4 core** (`rind3d_posterior.fastlabel`: `label_window_fast`, adapters `window_from_1k` / `window_from_100k`, exact GPU verifier, Gate A `gate_a.py`; `docs/FASTLABEL_CORE.md`). `experiments/fastlabel/` keeps the FastLabel research record (REPORT, CERTIFICATE_AUDIT, GPUVERIFY) and the research Gate A harness (`validate_verify.py`) | production (exact labels; current 100K labeller; FastLabel core) |
 | `RIND3D_Dataset1K/` | package `rind3d_1k`: physical stage, selection law and controller, label orchestration (`labels.py`, `supervise.py`), the 1K FastLabel entry points (`rind3d_1k/fastlabel/`, a compatibility layer over the core), the **loader** (`loader.py`), release validation; `scripts/`, `backfill/` (run, monitor, verify), `docs/`, `tests/` | production for the 1K (validated at 1K scale) |
+| `RIND3D_Dataset100K/` | package `rind3d_100k`: **the 100K production entry point**. Contract v2 (`contract/RIND3D_100K_CONTRACT_v2.json`, provisional): declared κ, natural T* sampling, optional L64 coverage slot, exact-m rate streams. Also: FastLabel labels (tau-pencil as reference), the multi-GPU coordinator, durable storage, validators, the M2-style loader, fixtures, the smoke test, coverage / engine / Student smoke tools, and the H20 runbook `docs/H20_CANARY_RUNBOOK.md` | pre-production (validated on the laptop; the H20 gate is pending) |
 | `RIND3D_StudentResearch/` | scientific decisions A–J for the current design, plus their tools: NAT-1K natural-window generator (`natural/`), the Student reference implementation (`pilot/`), the OOD benchmark (`ood/`), the all-dark S6 prototype (`s6/`), analyses E13–E19 (`experiments/`) | reference / research prototypes |
 | `RIND3D_Audit/` | the scientific foundations audit (01–10) with its toy-world and fixture experiments | reference |
 | `RIND3D_HANDOFF/` | this directory: implementation facts, cleanup manifest, validation record, 100K readiness and FastLabel integration plan (`100K_FASTLABEL_INTEGRATION.md`, `patches/`), figure sources of the Chinese design document (`figures/`), its review (`DOC_REVIEW_2026-11-13.md`), `env.sh`, `smoke_checks.py` | handoff |
@@ -16,7 +17,7 @@ the RIND3D pipeline described here. The RIND3D code lives in the `RIND3D_*` dire
 | `docs/RIND3D*`, `docs/RIND3D_INTEGRATION.md` | the 2026-11-02 integration of the RIND3D v0.1 release into G2-02 (Phase 3 reader) | historical context |
 
 **Related branches:**
-* `yushu/3d-100k-h20`: the RIND3D-100K production implementation (`RIND3D_Dataset100K/`, local-only rendering, multi-GPU coordinator, 16×H20 handoff). It is **not merged**; see `100K_READINESS.md`.
+* `yushu/3d-100k-h20` (`5560a20`): the historical development branch of the 100K v1 profile. It was merged into `yushu/3d` on 2026-11-14 and is not developed further.
 * `yushu/gaussian-b2-native`: the Gaussian-B2 geometry research line (local branch).
 * `main`: the shared 2D project.
 
@@ -55,6 +56,8 @@ git checkout archive/rind3d-research-2026-11-13 -- RIND3D_Research              
 | training examples | `rind3d_1k.loader.flatten(ds, population="Tstar"|"Tstar_mis"|"B1K", ...)` |
 | Student pilot | `RIND3D_StudentResearch/pilot/build_features.py`, `run_arms.py`, `final_analysis.sh` |
 | smoke checks | `$RIND3D_LABEL_PY RIND3D_HANDOFF/smoke_checks.py` |
+| **100K node** (contract v2, FastLabel) | `$RIND3D_LABEL_PY RIND3D_Dataset100K/scripts/run_node.py --root <root> --slots a:b --gpus all`; then `verify_root.py <root> --labels` and `coverage_report.py <root>` |
+| **100K H20 gate** | `RIND3D_Dataset100K/docs/H20_CANARY_RUNBOOK.md`; `RIND3D_Dataset100K/scripts/smoke_test.py --work <dir>` |
 
 ## Tests
 
@@ -63,6 +66,7 @@ source RIND3D_HANDOFF/env.sh
 (cd RIND3D_Dataset1K && $RIND3D_LABEL_PY -m pytest -q tests)                 # loader, FastLabel (GPU), supervisor
 (cd RIND3D_Posterior && $RIND3D_LABEL_PY -m pytest -q tests)                 # tau-pencil digests, FastLabel core (GPU)
 (cd RIND3D_Generator && OMP_NUM_THREADS=1 $RIND3D_LABEL_PY -m pytest -q tests) # geometry, rendering, RINDPack, counts
+(cd RIND3D_Dataset100K && $RIND3D_LABEL_PY -m pytest -q tests)               # 100K sampling, weights, storage, loader, GPU fixtures
 $RIND3D_LABEL_PY RIND3D_HANDOFF/smoke_checks.py                              # re-render, certificates, loader, seals
 ```
 

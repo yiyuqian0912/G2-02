@@ -1,5 +1,13 @@
 # RIND3D-100K on a 16 × H20 server: operator guide
 
+> **Updated 2026-11-14.** The production contract is v2:
+> * declared κ;
+> * natural T* sampling with an optional L64 coverage slot;
+> * FastLabel labels;
+> * durable storage.
+>
+> **The ordered production gate is `docs/H20_CANARY_RUNBOOK.md`.** Where this guide describes the balancing controller or TPE as the labeller (§1, §4, §5), that describes contract v1, kept for regression. The smoke test now also checks the v2 physical fixtures, the FastLabel fixtures and Gate A (steps 4b–4d).
+
 **Status:** a validated development package. Nothing here has run on an H20 yet.
 * Every number measured on the development laptop is labelled *[laptop]*: RTX 3060 Laptop 6 GB, Ryzen 7 5800H 8C/16T, 31 GB.
 * Every projection is labelled *[projection]*.

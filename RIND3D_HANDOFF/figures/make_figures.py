@@ -590,7 +590,7 @@ def fig03(out):
             ax.text(x + 0.975, y + 0.70, "Coverage" if cov else "Natural", fontsize=6.6, ha="center", va="center")
             ax.text(x + 0.975, y + 0.33, "仅 K = 4 场景" if cov else "自然窗口", fontsize=5.8, ha="center", va="center",
                     color=C["ink2"])
-    fig.text(0.035, 0.915, "每个窗口尺寸 4 个配额（推荐候选：3 + 1）", fontsize=7.3, va="bottom")
+    fig.text(0.035, 0.915, "每个窗口尺寸 4 个配额（合同 v2，暂定：3 + 1）", fontsize=7.3, va="bottom")
     ax.text(0.0, 0.75, "Natural：合法候选按自然律接受。Coverage：按 m 以 c(m) = (1/8, 1/4, 1/2, 1) 接受；\n"
                         "记录来源、接受概率、m 与通道掩码，训练时用平衡启发式权重恢复 T*。", fontsize=5.9, color=C["ink2"],
             va="top", linespacing=1.35)

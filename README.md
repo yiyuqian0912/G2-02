@@ -2,14 +2,18 @@
 
 [中文说明](README.zh-CN.md) · [Project status](docs/PROJECT_STATUS.zh-CN.md)
 
-> **RIND3D (3D, this branch `yushu/3d`).** Multi-source 1024³ physical worlds with source-separated binary responses and
-> certified 128³ global source posteriors. The code is in `RIND3D_Generator/` (geometry, certified rendering, storage),
-> `RIND3D_Posterior/` (exact tau-pencil labels), `RIND3D_Dataset1K/` (1K pipeline, FastLabel, loader) and
-> `RIND3D_StudentResearch/` (task definition, Student reference, studies). Start at
-> [`RIND3D_HANDOFF/README.md`](RIND3D_HANDOFF/README.md); implementation facts are in
-> [`RIND3D_HANDOFF/RIND3D_IMPLEMENTATION_FACTS.md`](RIND3D_HANDOFF/RIND3D_IMPLEMENTATION_FACTS.md). The 100K
-> production branch is `yushu/3d-100k-h20`. The pre-consolidation research archive is the tag
-> `archive/rind3d-research-2026-11-13`. The 2D project below is unchanged.
+> **RIND3D (3D, this branch `yushu/3d`: the canonical RIND3D-100K pre-production branch).** Multi-source 1024³ physical
+> worlds with source-separated binary responses and certified 128³ global source posteriors.
+> * **100K production entry point:** [`RIND3D_Dataset100K/`](RIND3D_Dataset100K/README.md). It contains local-only rendering, contract v2 (declared κ, natural T* sampling, an optional L64 coverage slot), FastLabel labels and the multi-GPU coordinator. The H20 gate is [`docs/H20_CANARY_RUNBOOK.md`](RIND3D_Dataset100K/docs/H20_CANARY_RUNBOOK.md).
+> * **Shared modules:**
+>   * `RIND3D_Generator/`: geometry, certified rendering and storage;
+>   * `RIND3D_Posterior/`: the exact tau-pencil labeller and the FastLabel core;
+>   * `RIND3D_Dataset1K/`: the 1K reference pipeline and loader, kept for regression;
+>   * `RIND3D_StudentResearch/`: the task definition, the Student reference and studies.
+> * **Where to start:** [`RIND3D_HANDOFF/README.md`](RIND3D_HANDOFF/README.md), and the facts in [`RIND3D_HANDOFF/RIND3D_IMPLEMENTATION_FACTS.md`](RIND3D_HANDOFF/RIND3D_IMPLEMENTATION_FACTS.md).
+> * **Historical references:** `yushu/3d-100k-h20` (the former separate 100K branch) and the tag `archive/rind3d-research-2026-11-13`.
+>
+> The 2D project below is unchanged.
 
 RIND studies source localization from local responses in a two-dimensional occluded environment. Sources have positive intensities, binary visibility and additive contributions without distance attenuation. The main student does not receive full-scene obstacle geometry.
 

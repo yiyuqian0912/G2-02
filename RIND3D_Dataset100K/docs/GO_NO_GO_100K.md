@@ -1,5 +1,7 @@
 # Report F — RIND3D-100K go / no-go (provisional: the H20 server has not been accessed)
 
+> **Historical (contract v1, tau-pencil labels).** The current production gate is `docs/H20_CANARY_RUNBOOK.md` (contract v2, FastLabel).
+
 **Every H20 number here is a projection from laptop measurements.** It must be replaced by the server bring-up
 measurements (README_H20 §4 → ESTIMATE.json) before any production decision.
 

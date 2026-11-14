@@ -45,7 +45,7 @@ Reruns are byte-identical: no timestamps, fixed SVG hash salt, deterministic dat
 |---|---|---|
 | `01_research_task` | 研究任务：完整世界（几何与全部源，仅标注阶段可见）、Student 输入（单个窗口、单个源的响应）与监督标签（128³ 网格上的全局后验 q_F） | 1K 场景 7 窗口 12 源 1；精确 tau-pencil 标签 |
 | `02_dataset_spec` | 一个 100K 场景：凸多面体、源与 12 个窗口按真实比例绘制；三种窗口尺寸相对 1024 体素世界与 128³ 标签网格的尺度 | 100K 合同 v1 slot 0 |
-| `03_sampling_coverage` | 推荐的配额安排（3 + 1，仅 K = 4 场景的一个 64³ 配额为 Coverage）；自然窗口中 m = 4 的比例 | 1K 世界模拟（E19）中的比例 |
+| `03_sampling_coverage` | 合同 v2 的配额安排（暂定 3 + 1，仅 K = 4 场景的一个 64³ 配额为 Coverage）；自然窗口中 m = 4 的比例 | 1K 世界模拟（E19）中的比例 |
 | `04_response_types` | 四类局部响应：三维剖切、二维切片与 6-邻接定义；底部为已存标签的支持格数与耗时 | 1K 场景 7 窗口 6（源 1、2）与窗口 12（源 1、3）；逐位复核 |
 | `05_local_rendering` | 完整响应场与 100K 局部按需计算：一个源的整面响应、全部配额候选的结果、每场景接收点评估数 | 100K slot 0：认证渲染器整面，`log_L*`，`meta.work` |
 | `06_storage` | 100K 存储：每场景容器、窗口内分源响应、每个 mixed 通道一份标签、loader 展开 | 结构图（`rind3d_100k/storage.py`） |

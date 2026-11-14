@@ -38,6 +38,15 @@ def warmup_task(t, engine, kw):
         P[0, i, ax] = sg; P[0, i, 3] = -0.51 if sg > 0 else 0.49     # cube [0.49, 0.51]^3
     try:
         label_window(P, K, cls, np.array([700, 700, 700]), 1024, engine=engine if engine in ("cpu", "gpu") else "cpu")
+        if engine == "fastlabel":                 # FastLabel's own numba kernels (no GPU work here)
+            from rind3d_posterior.fastlabel import engine as FE, gpuverify as GV
+            from rind3d_posterior.fastlabel.window import cls_from_packed, LazyWindow2
+            zyx = np.transpose(cls, (2, 1, 0))
+            c2 = cls_from_packed(np.packbits((zyx == 1).ravel()), np.packbits((zyx == 2).ravel()), 64)
+            win = LazyWindow2(c2, np.array([700, 700, 700]), 1024); win.boundary_mask(); win.top_items()
+            GV.leaf_codes(c2, False); GV.leaf_codes(c2, True)
+            geom = FE.Geom(P.astype(float), K); roots, _ = FE.stage1(geom, win)
+            xc, xk = FE.point_items(win, 256, 128, 0); FE.stage2(geom, win, xc, xk, roots)
         return dict(ok=True, s=time.perf_counter() - t0)
     except Exception as e:
         return dict(ok=False, error=repr(e)[:300], s=time.perf_counter() - t0)

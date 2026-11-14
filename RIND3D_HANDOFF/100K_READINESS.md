@@ -1,5 +1,12 @@
 # RIND3D-100K readiness notes (2026-11-13)
 
+> **Superseded 2026-11-14.** The 100K pipeline is integrated into `yushu/3d`:
+> * contract v2 implements §3's settled items: declared κ, natural sampling without m-thinning, full rate-stream m counts, δ = 0.01 / N_planned with N_planned = 4.8 M, the M2-style loader;
+> * contract v2 also implements the L64 3+1 coverage option;
+> * §4 is done.
+>
+> Open: §5, now `RIND3D_Dataset100K/docs/H20_CANARY_RUNBOOK.md`, and the κ / coverage freeze. This file is kept as the pre-integration review.
+
 **Source:** a read-only review of branch `yushu/3d-100k-h20` at `5560a20` (`RIND3D_Dataset100K/`), plus the design studies on `yushu/3d`. **Nothing on the 100K branch was changed, merged or launched.**
 
 ## 1. What is implemented on the 100K branch

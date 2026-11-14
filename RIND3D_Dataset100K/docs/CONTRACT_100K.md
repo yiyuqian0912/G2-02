@@ -1,5 +1,31 @@
 # Report B — RIND3D-100K dataset contract v1
 
+> **Superseded for production by contract v2 (2026-11-14).** This document describes contract v1, which is kept for regression. The production profile is `contract/RIND3D_100K_CONTRACT_v2.json`:
+> * declared κ instead of the adaptive controller;
+> * natural T* sampling instead of m-balanced thinning;
+> * an optional L64 coverage slot;
+> * exact-m rate streams;
+> * FastLabel labels.
+>
+> See `README.md` and `docs/H20_CANARY_RUNBOOK.md`.
+
+## Contract v2 (`rind3d-100k-contract-v2`, provisional): changes from v1
+
+| field | v1 | v2 |
+|---|---|---|
+| source count | adaptive controller (15% floor per k, m-balance optimisation) | declared κ = (0.15, 0.15, 0.15, 0.55), drawn per slot from the keyed stream 56000; independent of the geometry, the sources and the attempt |
+| window acceptance | U < c(m, L, k), m-balanced tables from the controller | natural: every admissible proposal (c = 1). Coverage (L64, K = 4 only): 1 of the 4 slots from separate keyed streams (58000 + L, 59000 + L) with c(m) = (1/8, 1/4, 1/2, 1), cap 2000, natural fallback |
+| rate stream | exact m only for the first 8 proposals | exact m for every proposal: P̂_A = rate_A / rate_n, Λ̂_cov = Σ c(m) rate_m / rate_n |
+| provenance | windows (m, mask) and side logs | plus per-window stream, proposal index, U and c-row; per-side stream records (accepted, proposals, fallback); `meta.sampling` (κ, k, its draw u) |
+| planning | epoch barrier (plans use earlier outcomes) | declared plans: no barrier |
+| labels | tau-pencil TPE v3.1 | FastLabel v3.4 (n_tasks = 4.8 M, the upper bound 100,000 × 12 × 4; base seed 20261216); TPE is the reference engine |
+| seed | 20261215 | 20261216 |
+| storage | container, journal, consolidated labels | plus fsync'd appends, directory fsync, sha256 records of consolidated labels |
+
+**Status.** κ and the coverage table are the recommended defaults (`RIND3D_StudentResearch/J_COMPLEXITY_COVERAGE.md`). They are pending the canary review (`docs/H20_CANARY_RUNBOOK.md` §7). A change of either is a new contract id.
+
+---
+
 * **Machine-readable form:** `contract/RIND3D_100K_CONTRACT_v1.json`, id `rind3d-100k-contract-v1`.
 * **Status:** frozen draft. Development canaries only; production requires the go / no-go of GO_NO_GO_100K.md.
 * **Relation to 1K:** a new production profile. RIND3D 1K (contract v1, 16/24/24) is unchanged and remains its own

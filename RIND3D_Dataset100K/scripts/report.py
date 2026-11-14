@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Campaign report for a RIND3D-100K root: report.py <root> [--out REPORT.json]
+"""Campaign report for a RIND3D-100K root: report.py <root> [--out REPORT.json] [--costs costs.jsonl]
+
+--costs writes one JSON line per journal label (L, cpu, wall, status, path, engine): the --cost-samples input of
+estimate.py. For contract v2 the T* weights and coverage statistics are in coverage_report.py.
 
 * **Physical:** attempts, accepted, rejected by reason, failed; rejection rate r and the selection-law bound
   r/(1 - r) with a one-sided 99% Clopper-Pearson upper limit; k and family histograms.
@@ -37,8 +40,9 @@ def pct(a):
 
 def main():
     root = Path(sys.argv[1])
-    from rind3d_100k.storage import journal_index, read_record, decode_payload
-    recs = [json.loads(l) for l in (root / "manifest" / "physical.jsonl").read_text().splitlines() if l.strip()]
+    from rind3d_100k.storage import journal_index, read_record, decode_payload, read_jsonl
+    recs = read_jsonl(root / "manifest" / "physical.jsonl")
+    cost_out = open(sys.argv[sys.argv.index("--costs") + 1], "w") if "--costs" in sys.argv else None
     acc = {r["slot"]: r for r in recs if r["status"] == "accepted"}
     attempts = len(recs); rej = collections.Counter(r.get("reason") for r in recs if r["status"] == "rejected")
     failed = collections.Counter(r.get("kind") or (r.get("error") or "")[:60] for r in recs if r["status"] == "failed")
@@ -59,6 +63,8 @@ def main():
     for key, loc in idx.items():
         meta = decode_payload(read_record(loc)[1])["meta"]
         costs[str(meta["L"])].append(meta["cpu"]); walls_l[str(meta["L"])].append(meta["wall"]); status[meta["status"]] += 1
+        if cost_out is not None:
+            cost_out.write(json.dumps({kk: meta.get(kk) for kk in ("L", "cpu", "wall", "status", "path", "engine")}) + "\n")
         if meta.get("fallback"):
             fallbacks[meta["fallback"][:40]] += 1
     fails = collections.Counter()
