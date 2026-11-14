@@ -216,34 +216,6 @@ G1 has **the information F1 has, but no geometric decoding operator**.
 * **Calibration.** HPD-MAE rises from 0.024 (P0) to 0.053 (F1), still within the pilot's 0.03–0.05 range.
 * (F1fix uses facets with ≥ 24 inliers and P0 those with ≥ 100.)
 
-### 4.4 Can the planes be learned from the Student's own input? (F2)
-
-**F2.** The same generic field as G0, plus a plane operator whose planes are *learned* from the pooled input (4 × 32³ per channel), with no RANSAC facets:
-* slot attention over the top 3,072 pooled boundary cells;
-* weighted PCA planes (eigh plus shifted power iterations);
-* a self-supervised planarity loss computed on X only;
-* the same facet head and plane factor as F1.
-
-| arm | planes from | T* IG | KL | IG L64 / L128 / L256 | IG by facet count 1 / 2 / 3 / ≥ 4 |
-|---|---|---|---|---|---|
-| G0 | — | 3.90 | 6.37 | 3.56 / 3.89 / 4.26 | 2.62 / 4.30 / 4.72 / 5.19 |
-| **F2** | pooled input (learned) | **5.62 [5.45, 5.81]** | 4.66 | 5.48 / 5.59 / 5.78 | 4.00 / 6.30 / 6.94 / 6.43 |
-| F1 | full-resolution crop (RANSAC) | 7.72 | 2.58 | 6.08 / 7.36 / 9.71 | 4.66 / 8.78 / 10.46 / 11.80 |
-
-**Paired differences:**
-* F2 − G0 = **+1.71 [1.60, 1.83]**: the operator alone, on the same input as G0.
-* F1 − F2 = **+2.10 [1.95, 2.24]**: plane precision.
-
-Solid-separated: F2 − G0 = −0.16, the same co-adaptation as F1.
-
-**Readings.**
-* **The decoding operator is the larger single ingredient.** On G0's own input, a learned plane operator gains 1.7 nats, whereas G1 (the exact planes as tokens, without the operator) loses 0.09.
-* **The input representation is the second bottleneck.**
-  * The pooled input discretises a 64–256-voxel window into 32³ cells (2–8 voxels per cell).
-  * F2 is flat in window size and saturates at ~6.5 nats with ≥ 3 planes. F1 instead rises to 9.7 at L256, where full-resolution facets are most precise (§2.1).
-  * Sub-voxel plane geometry must come from full-resolution X. Any 100K Student should either carry X-measured facets (cheap: §8 of the plan) or a full-resolution boundary encoder.
-* F2 costs ~2× the step time of F1 (slot attention and PCA). Its dev NLL plateaued at 8.6 from step 6k, so more steps would not close the gap.
-
 ### 4.3 The cell integral: a non-learned probe (motivated by the failure analysis, §9)
 
 **Probe.** `scripts/quadrature_probe.py`: P0's fixed facet factor, with one change.
@@ -289,6 +261,34 @@ Solid-separated: F2 − G0 = −0.16, the same co-adaptation as F1.
 * **Arm F5** = F1 + amplitude-consistent sparse quadrature, M = 2 (M = 4 would cost several times more per step).
   * The fused kernels are tested against a torch reference of the same rule, values and gradients, with and without the amplitude.
   * F5 is the only change relative to F1. It was added before any F3–F5 dev result (amendment A1 of the plan).
+
+### 4.4 Can the planes be learned from the Student's own input? (F2)
+
+**F2.** The same generic field as G0, plus a plane operator whose planes are *learned* from the pooled input (4 × 32³ per channel), with no RANSAC facets:
+* slot attention over the top 3,072 pooled boundary cells;
+* weighted PCA planes (eigh plus shifted power iterations);
+* a self-supervised planarity loss computed on X only;
+* the same facet head and plane factor as F1.
+
+| arm | planes from | T* IG | KL | IG L64 / L128 / L256 | IG by facet count 1 / 2 / 3 / ≥ 4 |
+|---|---|---|---|---|---|
+| G0 | — | 3.90 | 6.37 | 3.56 / 3.89 / 4.26 | 2.62 / 4.30 / 4.72 / 5.19 |
+| **F2** | pooled input (learned) | **5.62 [5.45, 5.81]** | 4.66 | 5.48 / 5.59 / 5.78 | 4.00 / 6.30 / 6.94 / 6.43 |
+| F1 | full-resolution crop (RANSAC) | 7.72 | 2.58 | 6.08 / 7.36 / 9.71 | 4.66 / 8.78 / 10.46 / 11.80 |
+
+**Paired differences:**
+* F2 − G0 = **+1.71 [1.60, 1.83]**: the operator alone, on the same input as G0.
+* F1 − F2 = **+2.10 [1.95, 2.24]**: plane precision.
+
+Solid-separated: F2 − G0 = −0.16, the same co-adaptation as F1.
+
+**Readings.**
+* **The decoding operator is the larger single ingredient.** On G0's own input, a learned plane operator gains 1.7 nats, whereas G1 (the exact planes as tokens, without the operator) loses 0.09.
+* **The input representation is the second bottleneck.**
+  * The pooled input discretises a 64–256-voxel window into 32³ cells (2–8 voxels per cell).
+  * F2 is flat in window size and saturates at ~6.5 nats with ≥ 3 planes. F1 instead rises to 9.7 at L256, where full-resolution facets are most precise (§2.1).
+  * Sub-voxel plane geometry must come from full-resolution X. Any 100K Student should either carry X-measured facets (cheap: §8 of the plan) or a full-resolution boundary encoder.
+* F2 costs ~2× the step time of F1 (slot attention and PCA). Its dev NLL plateaued at 8.6 from step 6k, so more steps would not close the gap.
 
 ### 4.5 F5: the Student with an exact-enough cell integral
 
@@ -471,6 +471,49 @@ unchanged to ±0.01, so selection bias is negligible.
   * It scores negative IG on solid-separated and all-lit windows, i.e. worse than the uniform-legal prior.
   * One-hot gradients reward sharp mass at the source. Nothing in them teaches the model to stay diffuse where X is uninformative.
 * **Scale caveat.** At 100K worlds the one-hot noise averages over ~150× more sources. The early-stopped gap would be expected to shrink further, but this cannot be tested here. The data-scaling arms (§6) give the local slope.
+
+## 6. Q4 (H4): how do the models scale with independent worlds?
+
+**Design.**
+* G0 and F1 were trained on 1/8, 1/4 and 1/2 of the 684 training scenes: 86, 171 and 342 scenes, with 14,781, 30,489 and 61,070 pooled rows.
+* At each fraction both models see the same scenes. Each fraction is a separate seeded draw, so the subsets are **not nested**.
+* Everything else matches §3: 8k steps × 32, seed 0, MIS weights, dev T*.
+* **Deviation from the plan:** one seed per point, not two. Scene-bootstrap bands are reported.
+
+**Which checkpoint.** At small fractions F1 overfits after ~1k steps: F1sc125's dev NLL rises from 6.21 at step 1k to 6.49 at step 8k. Scoring the final step would therefore mix "less data" with "more passes over it".
+* Each point is the checkpoint with the lowest dev NLL. As in §5, that selection uses 1,024 of the 5,218 dev T* rows.
+* For G0_s0 and F1_s0 the final step is that minimum: G0_s0 has no `best.pt` but its dev curve falls monotonically, and F1_s0's `best.pt` scores identically to its final checkpoint.
+* With the final checkpoints instead, F1 would be 7.10 / 7.41 / 7.59 / 7.72 nats: early stopping recovers 0.34 nats at 1/8.
+
+| training scenes | G0 T* IG | F1 T* IG | F1 − G0 | G0 HPD-MAE | F1 HPD-MAE |
+|---|---|---|---|---|---|
+| 86 (1/8) | 1.69 [1.56, 1.84] | 7.45 [7.19, 7.69] | 5.76 [5.53, 5.98] | 0.340 | 0.092 |
+| 171 (1/4) | 2.71 [2.56, 2.86] | 7.50 [7.26, 7.74] | 4.78 [4.60, 4.97] | 0.287 | 0.088 |
+| 342 (1/2) | 3.47 [3.35, 3.60] | 7.63 [7.39, 7.86] | 4.15 [3.99, 4.31] | 0.130 | 0.035 |
+| 684 (all) | 3.90 [3.78, 4.04] | 7.72 [7.48, 7.94] | 3.81 [3.67, 3.95] | 0.046 | 0.053 |
+
+| gain per doubling (paired) | 86 → 171 | 171 → 342 | 342 → 684 |
+|---|---|---|---|
+| G0 | +1.02 [0.89, 1.16] | +0.76 [0.65, 0.88] | +0.43 [0.37, 0.49] |
+| F1 | +0.05 [−0.03, 0.13] | +0.13 [0.07, 0.19] | +0.09 [0.06, 0.13] |
+
+Paired across fractions means on identical dev rows. The training subsets differ, so the uncertainty from the subset draw is not in these intervals.
+
+![dev T* IG vs training worlds](fig/scaling.png)
+
+**Readings.**
+* **H4 holds: the projective Student is far more data-efficient.**
+  * With 86 worlds, F1 already scores 7.45 nats: 96% of its full-data score, and 1.9× G0 trained on all 684.
+  * Over an 8× increase in data, F1 gains 0.27 nats and G0 gains 2.21.
+  * The projective operator is built in, so the data only has to teach the reliability head and the along-plane field.
+* **G0's returns diminish at a fixed step budget.** Its gain per doubling falls 1.02 → 0.76 → 0.43, and the F1 − G0 gap shrinks by 0.98, then 0.63, then 0.34.
+  * A log-linear extrapolation of G0 to F1's level is not supported by these points.
+  * The slope is also confounded with compute. At 684 scenes, 8k × 32 samples are ~2 passes over the pool, and G0long (§3) gains +0.91 from 4× more steps at the same data. Part of the flattening is under-training, not data saturation.
+  * What these points do show: at fixed compute, more worlds do not make the generic decoder discover the projective operator at 1K scale. Whether ~100× more worlds *and* matched compute would close the gap cannot be tested here.
+* **G0 is also much worse calibrated at small data.** HPD-MAE is 0.34 at 86 scenes against 0.05 at 684, because G0 memorises the few training sources. F1's calibration error stays below 0.1 at every fraction.
+* **Large windows show the difference most clearly.** At 1/8, G0's L256 IG (0.95) is below its L64 IG (2.11), while F1's L256 IG is its highest (9.39). Large windows carry the most plane information (§2.3). A generic decoder needs data to use it; the projective factor uses it from the start.
+* **The facet-free weakness does not depend on data.** Solid-separated F1 − G0, final checkpoints: −0.16 [−0.52, 0.28], −0.17 [−0.36, 0.01], −0.15 [−0.27, −0.04] and −0.21 [−0.34, −0.06] at 1/8 → 1. The co-adaptation of the generic field (§3) is structural, not a small-data effect.
+* **Scale caveat.** These are 86–684-world results on the 1K release, one seed per point. They give the local slope at 1K scale, not 100K-scale behaviour.
 
 ## 7. Q5: hidden worlds with an identical observation (counterfactuals, brief §8)
 
