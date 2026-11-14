@@ -4,6 +4,7 @@ phi(s) = sum_k logaddexp(LE_k, L1_k - u_k(s)),  u = d^2 / (2 sigma^2),  d = n.(C
 sigma^2 = c0 + S0 + r2 * STH.  Parameters per (b, k): P = [mu(3), n(3), S0, STH, LE, L1] (float32).
 Cell centres C are generated from the (c, f) index (no memory reads). The backward reduces, per block of cells, the
 gradients of the 10 parameters; partial sums (B, n_blocks, K, 10) are summed in torch (deterministic)."""
+import math
 import torch
 import triton
 import triton.language as tl
@@ -227,3 +228,135 @@ def plane_factor2_torch(mu, n_lit, s0, sth, eps_logit, pi_logit, log_rho, mask, 
         inner = torch.logaddexp(p[:, 10:11] - d * d / (2 * s2), p[:, 11:12] + torch.nn.functional.logsigmoid(d * p[:, 12:13]))
         out = out + torch.logaddexp(p[:, 8:9], p[:, 9:10] + inner)
     return out.view(-1, NC ** 3, NF ** 3)
+
+
+# ---------------------------------------------------------------- sub-cell quadrature of the single-hypothesis factor
+# The cell-centre factor inflates every plane's variance by the cell term 8^2/12 independently, which over-spreads the
+# product of several nearly coplanar-normal planes along the ill-conditioned (depth) direction. The quadrature version
+# integrates the product over the cell with M^3 midpoint sub-points and the residual sub-cell variance (8/M)^2/12:
+#   phi_cell = logmeanexp_j sum_k phi_k(x_j).
+# Backward: d phi_cell / d S_j = exp(S_j - phi_cell - log M^3) (forward output saved); partial sums per (block, j, k).
+@triton.jit
+def _phi(x, y, z, base):
+    mx = tl.load(base + 0); my = tl.load(base + 1); mz = tl.load(base + 2)
+    nx = tl.load(base + 3); ny = tl.load(base + 4); nz = tl.load(base + 5)
+    s0 = tl.load(base + 6); sth = tl.load(base + 7); le = tl.load(base + 8); l1 = tl.load(base + 9)
+    return mx, my, mz, nx, ny, nz, s0, sth, le, l1
+
+
+@triton.jit
+def _fwdq(P, OUT, K: tl.constexpr, NCELL: tl.constexpr, C0: tl.constexpr, BLOCK: tl.constexpr, M: tl.constexpr):
+    b = tl.program_id(0); blk = tl.program_id(1)
+    j = blk * BLOCK + tl.arange(0, BLOCK)
+    x0, y0, z0 = _centre(j)
+    lse = tl.full([BLOCK], -1e30, tl.float32)
+    for qa in tl.static_range(M):
+        for qb in tl.static_range(M):
+            for qc in tl.static_range(M):
+                x = x0 + ((qa + 0.5) / M - 0.5) * 8.0
+                y = y0 + ((qb + 0.5) / M - 0.5) * 8.0
+                z = z0 + ((qc + 0.5) / M - 0.5) * 8.0
+                S = tl.zeros([BLOCK], tl.float32)
+                for k in tl.static_range(K):
+                    mx, my, mz, nx, ny, nz, s0, sth, le, l1 = _phi(x, y, z, P + (b * K + k) * 10)
+                    dx = x - mx; dy = y - my; dz = z - mz
+                    d = nx * dx + ny * dy + nz * dz
+                    s2 = C0 + s0 + (dx * dx + dy * dy + dz * dz) * sth
+                    S += _lae(le, l1 - d * d / (2.0 * s2))
+                lse = _lae(lse, S)
+    tl.store(OUT + b * NCELL + j, lse - tl.log(M * M * M * 1.0))
+
+
+@triton.jit
+def _bwdq(P, G, OUTF, PART, K: tl.constexpr, NCELL: tl.constexpr, C0: tl.constexpr, BLOCK: tl.constexpr,
+          NBLK: tl.constexpr, M: tl.constexpr):
+    b = tl.program_id(0); blk = tl.program_id(1)
+    j = blk * BLOCK + tl.arange(0, BLOCK)
+    x0, y0, z0 = _centre(j)
+    g = tl.load(G + b * NCELL + j)
+    lse = tl.load(OUTF + b * NCELL + j) + tl.log(M * M * M * 1.0)
+    for qa in tl.static_range(M):
+        for qb in tl.static_range(M):
+            for qc in tl.static_range(M):
+                x = x0 + ((qa + 0.5) / M - 0.5) * 8.0
+                y = y0 + ((qb + 0.5) / M - 0.5) * 8.0
+                z = z0 + ((qc + 0.5) / M - 0.5) * 8.0
+                S = tl.zeros([BLOCK], tl.float32)
+                for k in tl.static_range(K):
+                    mx, my, mz, nx, ny, nz, s0, sth, le, l1 = _phi(x, y, z, P + (b * K + k) * 10)
+                    dx = x - mx; dy = y - my; dz = z - mz
+                    d = nx * dx + ny * dy + nz * dz
+                    s2 = C0 + s0 + (dx * dx + dy * dy + dz * dz) * sth
+                    S += _lae(le, l1 - d * d / (2.0 * s2))
+                gq = g * tl.exp(S - lse)
+                q = (qa * M + qb) * M + qc
+                for k in tl.static_range(K):
+                    mx, my, mz, nx, ny, nz, s0, sth, le, l1 = _phi(x, y, z, P + (b * K + k) * 10)
+                    dx = x - mx; dy = y - my; dz = z - mz
+                    d = nx * dx + ny * dy + nz * dz
+                    r2 = dx * dx + dy * dy + dz * dz
+                    s2 = C0 + s0 + r2 * sth
+                    u = d * d / (2.0 * s2)
+                    w = 1.0 / (1.0 + tl.exp(le - (l1 - u)))
+                    gw = gq * w
+                    ds = d / s2; us = u / s2
+                    o = PART + (((b * NBLK + blk) * (M * M * M) + q) * K + k) * 10
+                    tl.store(o + 0, tl.sum(gw * (ds * nx - 2.0 * us * sth * dx), 0))
+                    tl.store(o + 1, tl.sum(gw * (ds * ny - 2.0 * us * sth * dy), 0))
+                    tl.store(o + 2, tl.sum(gw * (ds * nz - 2.0 * us * sth * dz), 0))
+                    tl.store(o + 3, tl.sum(-gw * ds * dx, 0))
+                    tl.store(o + 4, tl.sum(-gw * ds * dy, 0))
+                    tl.store(o + 5, tl.sum(-gw * ds * dz, 0))
+                    tl.store(o + 6, tl.sum(gw * us, 0))
+                    tl.store(o + 7, tl.sum(gw * us * r2, 0))
+                    tl.store(o + 8, tl.sum(gq * (1.0 - w), 0))
+                    tl.store(o + 9, tl.sum(gw, 0))
+
+
+class PlaneFactorQFn(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, P, M):
+        P = P.contiguous().float(); B, K, _ = P.shape
+        out = torch.empty(B, NCELL, device=P.device, dtype=torch.float32)
+        c0 = (8.0 / M) ** 2 / 12.0
+        _fwdq[(B, NCELL // BLOCK)](P, out, K=K, NCELL=NCELL, C0=c0, BLOCK=BLOCK, M=M)
+        ctx.save_for_backward(P, out); ctx.M = M
+        return out.view(B, NC ** 3, NF ** 3)
+
+    @staticmethod
+    def backward(ctx, g):
+        P, out = ctx.saved_tensors; M = ctx.M; B, K, _ = P.shape; nblk = NCELL // BLOCK
+        part = torch.empty(B, nblk, M ** 3, K, 10, device=P.device, dtype=torch.float32)
+        _bwdq[(B, nblk)](P, g.contiguous().float(), out, part, K=K, NCELL=NCELL, C0=(8.0 / M) ** 2 / 12.0, BLOCK=BLOCK,
+                         NBLK=nblk, M=M)
+        return part.sum((1, 2)), None
+
+
+def plane_factor_q_fused(mu, n, s0, sth, eps_logit, mask, M=2):
+    """Sub-cell quadrature version of plane_factor_fused (M^3 midpoint sub-points per 8-voxel cell)."""
+    with torch.autocast("cuda", enabled=False):
+        le = torch.nn.functional.logsigmoid(eps_logit.float()); l1 = torch.nn.functional.logsigmoid(-eps_logit.float())
+        le = torch.where(mask, le, torch.zeros_like(le)); l1 = torch.where(mask, l1, torch.full_like(l1, -1e4))
+        P = torch.cat([mu.float(), n.float(), (s0.float() ** 2)[..., None], (sth.float() ** 2)[..., None], le[..., None], l1[..., None]], -1)
+        return PlaneFactorQFn.apply(P, M)
+
+
+def plane_factor_q_torch(mu, n, s0, sth, eps_logit, mask, M=2):
+    """Reference implementation (tests): explicit sub-points, torch autograd."""
+    from .density import cell_centres
+    le = torch.nn.functional.logsigmoid(eps_logit); l1 = torch.nn.functional.logsigmoid(-eps_logit)
+    C = cell_centres(mu.device).view(-1, 3); c0 = (8.0 / M) ** 2 / 12.0
+    offs = (torch.arange(M, device=mu.device, dtype=torch.float32) + 0.5) / M * 8.0 - 4.0
+    lse = None
+    for a in offs:
+        for b in offs:
+            for c in offs:
+                X = C + torch.stack([a, b, c])
+                S = 0
+                for k in range(mu.shape[1]):
+                    D = X[None] - mu[:, k, None]; d = (D * n[:, k, None]).sum(-1); r2 = (D * D).sum(-1)
+                    s2 = c0 + s0[:, k, None] ** 2 + r2 * sth[:, k, None] ** 2
+                    phi = torch.logaddexp(le[:, k, None].expand_as(d), l1[:, k, None] - d * d / (2 * s2))
+                    S = S + torch.where(mask[:, k, None], phi, torch.zeros_like(phi))
+                lse = S if lse is None else torch.logaddexp(lse, S)
+    return (lse - math.log(M ** 3)).view(-1, NC ** 3, NF ** 3)

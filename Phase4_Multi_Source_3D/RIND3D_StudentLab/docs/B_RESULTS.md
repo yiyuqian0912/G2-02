@@ -254,3 +254,37 @@ G1 has **the information F1 has, but no geometric decoding operator**.
 * With the current descriptors the head cannot recognise occluder-interface facets, which motivates F3 and F4.
 * **Calibration.** HPD-MAE rises from 0.024 (P0) to 0.053 (F1), still within the pilot's 0.03–0.05 range.
 * (F1fix uses facets with ≥ 24 inliers and P0 those with ≥ 100.)
+
+## 5. Q3 (H1): does posterior supervision still matter once the inductive bias is right?
+
+Same architectures, same rows and MIS weights, 8k steps, seed 0. The only change is the target: a one-hot at the true
+source cell ("OH") instead of the certified q_G. `best.pt` is the step with the lowest true-source NLL on 1,024 of
+the 5,218 dev T* rows. On the 4,194 rows that did not take part in that selection, the paired differences are
+unchanged to ±0.01, so selection bias is negligible.
+
+| arm | target | checkpoint | T* IG | sep IG | all-lit IG | all-dark IG | T* KL | HPD-MAE |
+|---|---|---|---|---|---|---|---|---|
+| G0 | posterior | final | 3.90 | 0.57 | −0.05 | 0.22 | 6.37 | 0.046 |
+| OHG0 | one-hot | final | 0.75 | −2.14 | −2.91 | −2.28 | 9.54 | 0.456 |
+| OHG0 | one-hot | best (step 2k) | 1.37 | −0.70 | −1.06 | −0.47 | 8.89 | 0.278 |
+| F1 | posterior | final | 7.72 | 0.37 | −0.05 | 0.30 | 2.58 | 0.053 |
+| OHF1 | one-hot | final | 5.14 | −2.54 | −3.03 | −2.53 | 5.09 | 0.393 |
+| OHF1 | one-hot | best (step 1k) | 7.23 | −0.44 | −0.62 | −0.06 | 3.04 | 0.134 |
+
+| paired T* IG difference | final | best one-hot checkpoint |
+|---|---|---|
+| G0 − OHG0 | 3.16 [2.92, 3.38] | 2.53 [2.41, 2.67] |
+| F1 − OHF1 | 2.57 [2.35, 2.79] | **0.48 [0.39, 0.59]** |
+
+**Readings.**
+* **H1 holds under both inductive biases.** Posterior supervision wins on every set, at every checkpoint.
+* **Its size depends on the architecture.** With early stopping the gap falls from 2.5 nats (G0) to 0.5 (F1). The projective operator supplies most of what the dense label was teaching.
+* **One-hot training memorises.** OHF1 train loss falls to ~2 nats while dev NLL rises from 6.4 (step 1k) to 8.3 (step 8k). OHG0 behaves the same way from step 2k on.
+  * There are 684 training worlds with one source each. Many windows share a source, so a one-hot target lets the network learn the world → source map.
+  * The certified posterior q_G is the conditional expectation of the one-hot target given the full world and the observation, i.e. a Rao–Blackwellised target. Since p*(s | X) = E[q_G | X], both targets have the same population optimum, but q_G removes the source-sampling noise that one-hot training fits.
+* **Early-stopped one-hot F1 reaches exactly what geometry alone gives.** OHF1-best scores 7.23 against P0's 7.20, the non-learned facet estimator. Under one-hot supervision, the learned parts add nothing beyond the X-measured planes before they start to overfit. Posterior labels are what make the learned along-plane field (+0.27, §4.2) and the reliability head learnable at this scale.
+* **Calibration and OOD are where one-hot hurts most.**
+  * Even the best OHF1 checkpoint has HPD-MAE 0.134, against 0.053.
+  * It scores negative IG on solid-separated and all-lit windows, i.e. worse than the uniform-legal prior.
+  * One-hot gradients reward sharp mass at the source. Nothing in them teaches the model to stay diffuse where X is uninformative.
+* **Scale caveat.** At 100K worlds the one-hot noise averages over ~150× more sources. The early-stopped gap would be expected to shrink further, but this cannot be tested here. The data-scaling arms (§6) give the local slope.

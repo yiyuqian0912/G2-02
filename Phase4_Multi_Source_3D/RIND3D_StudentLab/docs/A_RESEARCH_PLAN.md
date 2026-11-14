@@ -144,6 +144,12 @@ these comparisons only, with the frozen final checkpoints.
 
 Everything else (ablations, scaling, generalisation arms) stays dev-only.
 
+**Amendment A1 (written 2026-11-14 ~09:10, before any dev result of F3, F4 or F5 existed; the confirm split still unopened).**
+* A new arm, **F5 = F1 + sub-cell quadrature of the facet product**, was added after the failure analysis (`docs/B_RESULTS.md` §9), on dev evidence from F1, G0 and P0 only.
+* The best-projective-arm rule of C3 becomes: among F3, F4 and F5, pick the one with the largest dev T* IG.
+  * It replaces F1 only if it beats F1 s0 on dev T* by more than twice the F1 seed spread (2 × 0.03 = 0.06 nats). Otherwise F1 is used.
+* If the selected arm is not F1, it is also evaluated on confirm T*/B1K (C1′: selected − G0 s0, descriptive), and both C1 seeds stay F1.
+
 ## 8. Carrying the protocol to the 100K (no production change proposed here)
 
 * **Facets are a per-channel function of X.** They come from the stored crop and response, so they can be computed for any release without touching the contract.

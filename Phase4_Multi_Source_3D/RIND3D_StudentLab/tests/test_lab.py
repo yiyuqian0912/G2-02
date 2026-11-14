@@ -120,3 +120,29 @@ def test_triton_two_hypothesis_factor_matches_torch():
     assert torch.allclose(out, ref, atol=2e-3), float((out - ref).abs().max())
     for a, b in zip(go, gr):
         assert torch.allclose(a, b, rtol=3e-3, atol=1e-2 * float(b.abs().max()) + 1e-6), (a, b)
+
+
+def test_triton_quadrature_factor_matches_torch():
+    """Sub-cell quadrature kernel (values and gradients) vs explicit sub-points; the reference runs on the CPU."""
+    if not torch.cuda.is_available():
+        return
+    from slab.plane_triton import plane_factor_q_fused, plane_factor_q_torch, plane_factor_fused
+    torch.manual_seed(3)
+    B, K, M = 1, 3, 2
+    mu = torch.rand(B, K, 3) * 1024; n = torch.nn.functional.normalize(torch.randn(B, K, 3), dim=-1)
+    s0 = torch.rand(B, K) + 0.2; sth = torch.rand(B, K) * 1e-2; e = torch.randn(B, K) * 3
+    mask = torch.tensor([[True, False, True]])
+    g = torch.randn(B, 4096, 512)
+    leaves = [t.clone().requires_grad_() for t in (mu, n, s0, sth, e)]
+    ref = plane_factor_q_torch(*leaves, mask, M=M)
+    gr = torch.autograd.grad((ref * g).sum(), leaves)
+    cl = [t.cuda().requires_grad_() for t in (mu, n, s0, sth, e)]
+    out = plane_factor_q_fused(*cl, mask.cuda(), M=M)
+    go = torch.autograd.grad((out * g.cuda()).sum(), cl)
+    assert torch.allclose(out.cpu(), ref, atol=2e-3), float((out.cpu() - ref).abs().max())
+    for a, b in zip(go, gr):
+        assert torch.allclose(a.cpu(), b, rtol=3e-3, atol=1e-2 * float(b.abs().max()) + 1e-6), (a, b)
+    # M = 1 is the cell-centre factor
+    o1 = plane_factor_q_fused(*[t.cuda() for t in (mu, n, s0, sth, e)], mask.cuda(), M=1)
+    o0 = plane_factor_fused(*[t.cuda() for t in (mu, n, s0, sth, e)], mask.cuda())
+    assert torch.allclose(o1, o0, atol=1e-4)
