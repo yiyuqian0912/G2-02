@@ -142,7 +142,20 @@ On train-split rows, 3.8% of large facets miss the source by more than 4 voxels 
 
 **Training dynamics** (`docs/fig/curves_G0_F1.png`).
 * F1 reaches its dev NLL plateau (≈ 6.0) by step 1,000.
-* G0 is still descending at step 8,000 (12.9 → 10.4). The G0long arm (32k steps) tests whether it ever catches up.
+* G0 is still descending at step 8,000 (12.9 → 10.4).
+
+**G0long: is the generic Student merely under-trained?** The same G0, with a 4× step budget (32k steps, cosine schedule over 32k):
+
+| arm | steps | T* IG | B1K IG | KL | HPD-MAE (signed) | IG by facets 1 / 2 / 3 / ≥ 4 |
+|---|---|---|---|---|---|---|
+| G0 | 8k | 3.90 | 3.83 | 6.37 | 0.046 (−0.038) | 2.62 / 4.30 / 4.72 / 5.19 |
+| **G0long** | 32k | **4.81 [4.67, 4.95]** | 4.75 | 5.48 | 0.110 (−0.110) | 3.32 / 5.38 / 5.75 / 6.08 |
+| F1 | 8k | 7.72 | 7.73 | 2.58 | 0.053 (−0.053) | 4.66 / 8.78 / 10.46 / 11.80 |
+
+* G0long − G0 = +0.91 [0.85, 0.97]: G0 was under-trained.
+* But the dev curve flattens (9.60 → 9.54 over the last 6k steps), and F1 − G0long is still **+2.90 [2.77, 3.04]**.
+* The extra steps buy sharpness, not correctness. G0long is over-confident: its nominal 50% HPD regions contain the source 34% of the time.
+* With 4× compute, the generic decoder recovers under a quarter of the gap. At 1K worlds it does not discover the projective operator by optimisation alone. Whether more *data* does is Q4 (§6).
 
 **Posteriors** (`docs/fig/posteriors_F1_G0.png`; median-IG dev rows, chosen by rule).
 * G0 predicts coarse-cell-scale bands.
