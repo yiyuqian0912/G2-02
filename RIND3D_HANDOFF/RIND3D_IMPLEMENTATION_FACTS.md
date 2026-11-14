@@ -13,7 +13,7 @@ marked **[proj]** (projection) or **[derived]** (read-only aggregation of releas
 * `G` = `RIND3D_Generator/src/rind3d`
 * `N` = `RIND3D_Generator/native`
 * `D1K` = `RIND3D_Dataset1K/rind3d_1k`
-* `FL` = `D1K/fastlabel`
+* `FL` = `TPE/fastlabel` (FastLabel core; until 2026-11-13 `D1K/fastlabel`, which is now a compatibility layer; see `RIND3D_Posterior/docs/FASTLABEL_CORE.md`)
 * `TPE` = `RIND3D_Posterior/src/rind3d_posterior`
 * `SR` = `RIND3D_StudentResearch`
 * `100K` = branch `yushu/3d-100k-h20`, directory `RIND3D_Dataset100K/rind3d_100k`
@@ -263,11 +263,11 @@ Measured Kish ESS of the pilot-train pool: B1K 69%, T* release-only 10.8%, T*-MI
 ### 6.2 FastLabel v3.4: production at 1K
 
 **Entry points.**
-* `FL/pipeline.label_task(scene_dir, w, s, **cfg)`.
+* `FL/pipeline.label_window_fast(task, **cfg)`, with `task` from `FL/inputs.window_from_1k` or `window_from_100k`; the 1K entry point `D1K/fastlabel.label_task(scene_dir, w, s, **cfg)` wraps it.
 * `RIND3D_Dataset1K/scripts/run_labels.py <root> 15 0 --engine fastlabel --scene-order` (one GPU semaphore).
 * `backfill/run_backfill.sh`.
 
-**Algorithm** (`FL/pipeline.py:124-255`).
+**Algorithm** (`FL/pipeline.py:127-260`).
 * Phase 1 builds an outer bound B ⊇ F on a receiver subset X′: 256 boundary + 128 interior items; rounds ≥ 2 add violated receivers through `engine_p2x` plus an outer-bound filter.
 * If B is a single cell: done (`certified`, support certificate).
 * Otherwise, sample uniformly in B (pieces ∝ volume, Delaunay tetrahedra, barycentric folding) and test each point **exactly** for membership in F with the batched GPU verifier (`FL/verify.cu`). The verifier uses:
@@ -277,7 +277,7 @@ Measured Kish ESS of the pilot-train pool: B1K 69%, T* release-only 10.8%, T*-MI
 * Failing points contribute their violated receivers to the next round.
 * Up to R = 12 rounds.
 
-**Gate A** (`RIND3D_Posterior/experiments/fastlabel/GPUVERIFY.md:62-84`; harness `validate_verify.py`).
+**Gate A** (`RIND3D_Posterior/experiments/fastlabel/GPUVERIFY.md:62-84`; research harness `validate_verify.py`; production port `FL/gate_a.py`, same candidates and checks).
 * 27 windows, 2,684 candidates.
 * The verifier's dump fields equal the certified renderer's on all of them.
 * Required on any new GPU type.

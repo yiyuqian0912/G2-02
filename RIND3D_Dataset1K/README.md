@@ -20,7 +20,7 @@
 
 **Two stages, both resumable:**
 1. **Physical stage** (producer venv with the certified rind3d natives): `scripts/run_physical.py`. It writes geometry, sources, certified per-source full fields, count indices, quota selection with thinning, the rate streams and the window observations.
-2. **Label stage** (labeller venv: numba, CuPy): `scripts/run_labels.py`. It writes one certified posterior per (window, source): `--engine fastlabel` (FastLabel v3.4, `rind3d_1k/fastlabel`, the engine of the 1K backfill) or the exact tau-pencil engine of `../RIND3D_Posterior`.
+2. **Label stage** (labeller venv: numba, CuPy): `scripts/run_labels.py`. It writes one certified posterior per (window, source): `--engine fastlabel` (FastLabel v3.4, the engine of the 1K backfill; core `rind3d_posterior.fastlabel`, 1K entry points `rind3d_1k/fastlabel`) or the exact tau-pencil engine of `../RIND3D_Posterior`.
 
 **Read these first:**
 * `docs/SELECTION_LAW_1K.md`: the generative process, the per-channel posterior theorem, the weights and the error budget.

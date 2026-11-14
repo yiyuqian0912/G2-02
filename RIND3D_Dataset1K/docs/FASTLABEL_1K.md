@@ -3,6 +3,11 @@
 **Status:** integrated and tested (`tests/test_fastlabel.py`). The 1K backfill was approved and launched on 2026-11-13
 (`backfill/run_backfill.sh`; report: RIND3D_StudentResearch/D_BACKFILL_REPORT.md).
 
+**Code location (since 2026-11-13):** the implementation is the scene-format independent core
+`rind3d_posterior.fastlabel` (`RIND3D_Posterior/docs/FASTLABEL_CORE.md`). `rind3d_1k.fastlabel` keeps the 1K entry
+points (`label_task(scene_dir, w, s)`, `set_gpu_lock`, the SceneObs-based helpers) as a thin compatibility layer. Labels
+are byte-identical to the backfill (equivalence record in FASTLABEL_CORE.md).
+
 ## What it computes
 
 The target is unchanged: q_F, the cell masses on the 128³ grid of Uniform(F_W^j) (CONTRACT_1K.md, SELECTION_LAW_1K.md).

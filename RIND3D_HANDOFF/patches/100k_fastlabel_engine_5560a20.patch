@@ -1,0 +1,185 @@
+diff --git a/RIND3D_Dataset100K/rind3d_100k/coordinator.py b/RIND3D_Dataset100K/rind3d_100k/coordinator.py
+index 70124ed..c374041 100644
+--- a/RIND3D_Dataset100K/rind3d_100k/coordinator.py
++++ b/RIND3D_Dataset100K/rind3d_100k/coordinator.py
+@@ -251,13 +251,25 @@ class Coordinator:
+             g = gpus[i % len(gpus)]
+             specs.append(dict(name=f"phys{i}", kind="phys", fn="rind3d_100k.worker:physical_task", engine="gpu",
+                               kw=cfg, env=dict(base_env, CUDA_VISIBLE_DEVICES=g)))
+-        for i in range(nlg):
+-            g = gpus[i % len(gpus)]
+-            specs.append(dict(name=f"lgpu{i}", kind="label", gpu=True, fn="rind3d_100k.labels:label_task", engine="gpu",
+-                              kw=lkw, env=dict(base_env, CUDA_VISIBLE_DEVICES=g)))
+-        for i in range(nlc):
+-            specs.append(dict(name=f"lcpu{i}", kind="label", gpu=False, fn="rind3d_100k.labels:label_task", engine="cpu",
+-                              kw=lkw, env=dict(base_env, CUDA_VISIBLE_DEVICES="")))
++        if o.get("label_engine", "tpe") == "fastlabel":
++            # every FastLabel worker needs CUDA (exact verifier); one semaphore per GPU serialises its submissions.
++            # All label workers (GPU and CPU budget) become FastLabel workers, round-robin over the GPUs.
++            lkw["fastlabel"] = dict(o.get("fastlabel") or {})
++            sems = {g: mp.get_context("spawn").Semaphore(1) for g in gpus}
++            for i in range(nlg + nlc):
++                g = gpus[i % len(gpus)]
++                specs.append(dict(name=f"lfl{i}", kind="label", gpu=i < nlg, fn="rind3d_100k.labels:label_task",
++                                  engine="fastlabel", kw=lkw, env=dict(base_env, CUDA_VISIBLE_DEVICES=g),
++                                  init=("rind3d_posterior.fastlabel:set_gpu_lock", (sems[g],))))
++            nlg, nlc = nlg + nlc, 0
++        else:
++            for i in range(nlg):
++                g = gpus[i % len(gpus)]
++                specs.append(dict(name=f"lgpu{i}", kind="label", gpu=True, fn="rind3d_100k.labels:label_task", engine="gpu",
++                                  kw=lkw, env=dict(base_env, CUDA_VISIBLE_DEVICES=g)))
++            for i in range(nlc):
++                specs.append(dict(name=f"lcpu{i}", kind="label", gpu=False, fn="rind3d_100k.labels:label_task", engine="cpu",
++                                  kw=lkw, env=dict(base_env, CUDA_VISIBLE_DEVICES="")))
+         layout = dict(resources=res, gpus=gpus, physical_workers=nphys, label_gpu_workers=nlg, label_cpu_workers=nlc,
+                       slots=[self.a, self.b], options={k: v for k, v in o.items() if k != "prior_manifest"})
+         self.log(dict(event="start", **layout))
+diff --git a/RIND3D_Dataset100K/rind3d_100k/labels.py b/RIND3D_Dataset100K/rind3d_100k/labels.py
+index d96c15e..beef4d5 100644
+--- a/RIND3D_Dataset100K/rind3d_100k/labels.py
++++ b/RIND3D_Dataset100K/rind3d_100k/labels.py
+@@ -48,12 +48,45 @@ def tasks_for_scene(root, slot, include_uninformative=False):
+     return out
+ 
+ 
++def _fastlabel_task(root, slot, w, s, L, inf, key, kw):
++    """FastLabel v3.4 (rind3d_posterior.fastlabel) on the scene container. Journal arrays are per-cell (dcell, lo, hi) as
++    for the tau-pencil engine; the label status and tv_bound are the CERTIFICATE's (statistical labels: lo = hi =
++    vol(B ∩ cell), status certified_stat, tv_bound = eps; never re-derived from lo/hi)."""
++    import hashlib, json
++    from rind3d_posterior.fastlabel import label_window_fast, window_from_100k, DEFAULTS, VERSION
++    cfg = dict(kw.get("fastlabel") or {})
++    if cfg.get("delta") is None and not cfg.get("n_tasks"):
++        raise ValueError("fastlabel: n_tasks (planned label count of the campaign) must be set")
++    c0 = time.process_time(); t0 = time.perf_counter()
++    lab = label_window_fast(window_from_100k(scene_path(root, slot), w, s), **cfg)
++    cpu = time.process_time() - c0; wall = time.perf_counter() - t0
++    m = lab["meta"]; eff = dict(DEFAULTS); eff.update(cfg)
++    u, inv = np.unique(np.asarray(lab["cell"], np.int64), return_inverse=True)
++    Lc = np.bincount(inv, weights=np.asarray(lab["lo"], np.float64), minlength=len(u))
++    Uc = np.bincount(inv, weights=np.asarray(lab["hi"], np.float64), minlength=len(u))
++    arrays = dict(dcell=np.diff(u, prepend=0).astype(np.int32), lo=Lc, hi=Uc)
++    meta = dict(key=key, slot=int(slot), window=int(w), source=int(s), L=int(L), informative=bool(inf),
++                tv_bound=float(lab["tv_bound"]), status=lab["status"], engine="fastlabel", fallback=None,
++                engine_version=VERSION, config_sha256=hashlib.sha256(json.dumps(eff, sort_keys=True, default=str).encode()).hexdigest(),
++                path=m["path"], certificate=m.get("certificate"), cpu=cpu, wall=wall, n_records=int(len(lab["cell"])),
++                n_cells=int(len(u)), vol_lo=float(Lc.sum()), vol_hi=float(Uc.sum()),
++                rounds=[{k: x.get(k) for k in ("round", "items", "records", "tested", "K")} for x in m.get("rounds", [])],
++                verifier={k: v for k, v in (m.get("verifier") or {}).items() if not k.endswith("_s")}, pid=os.getpid())
++    if lab["status"] != "certified_stat":
++        from rind3d_posterior.rpl.bound import tv_bound
++        meta["tv_bound_cells"] = float(tv_bound(Lc, Uc)) if Lc.sum() > 0 else 1.0
++    return dict(key=key, arrays=arrays, meta=meta)
++
++
+ def label_task(t, engine, kw):
+     """Supervisor worker entry. t = (root, slot, window, source, L, informative). Returns dict(key, arrays, meta)
+-    or dict(key, error). GPU out-of-memory falls back to the exact CPU engine, recorded in meta."""
++    or dict(key, error). GPU out-of-memory falls back to the exact CPU engine, recorded in meta.
++    engine "fastlabel": FastLabel v3.4 (needs CUDA in the worker; never mixed with the CuPy engine in one process)."""
+     root, slot, w, s, L, inf = t
+     key = task_key(slot, w, s)
+     try:
++        if engine == "fastlabel":
++            return _fastlabel_task(root, slot, w, s, L, inf, key, kw)
+         S = _CACHE.get(slot)
+         if S is None:
+             _CACHE.clear(); S = _CACHE[slot] = SceneFile(scene_path(root, slot))
+diff --git a/RIND3D_Dataset100K/rind3d_100k/loader.py b/RIND3D_Dataset100K/rind3d_100k/loader.py
+index 38e406f..688cd61 100644
+--- a/RIND3D_Dataset100K/rind3d_100k/loader.py
++++ b/RIND3D_Dataset100K/rind3d_100k/loader.py
+@@ -114,7 +114,7 @@ def flatten(ds, informative_only=True, certified_only=True, max_tv=0.05, weight=
+                 if informative_only and not rec["informative"][j]:
+                     continue
+                 lab = rec["posteriors"][j]
+-                if certified_only and not (lab.get("status") == "certified" and lab.get("tv_bound", 1) <= max_tv):
++                if certified_only and not (lab.get("status") in ("certified", "certified_stat") and lab.get("tv_bound", 1) <= max_tv):
+                     continue
+                 yield dict(scene_id=rec["scene_id"], window=w, source=j, L=rec["L"], origin=rec["origin"],
+                            solid=rec["solid"], response=rec["responses"][j], label=lab,
+diff --git a/RIND3D_Dataset100K/rind3d_100k/pool.py b/RIND3D_Dataset100K/rind3d_100k/pool.py
+index 78cd3d7..dea6366 100644
+--- a/RIND3D_Dataset100K/rind3d_100k/pool.py
++++ b/RIND3D_Dataset100K/rind3d_100k/pool.py
+@@ -17,7 +17,7 @@ import time
+ from multiprocessing.connection import wait
+ 
+ 
+-def _worker_main(conn, fn_path, engine, kw, env, nice, sys_path):
++def _worker_main(conn, fn_path, engine, kw, env, nice, sys_path, init=None):
+     os.environ.update({k: str(v) for k, v in env.items()})
+     for p in reversed(sys_path):
+         if p not in sys.path:
+@@ -25,6 +25,9 @@ def _worker_main(conn, fn_path, engine, kw, env, nice, sys_path):
+     signal.signal(signal.SIGINT, signal.SIG_IGN)
+     if nice:
+         os.nice(nice)
++    if init is not None:                      # (fn_path, args), e.g. the per-GPU FastLabel semaphore
++        imod, iname = init[0].split(":")
++        getattr(importlib.import_module(imod), iname)(*init[1])
+     mod, name = fn_path.split(":")
+     fn = getattr(importlib.import_module(mod), name)
+     while True:
+@@ -36,7 +39,7 @@ def _worker_main(conn, fn_path, engine, kw, env, nice, sys_path):
+ 
+ class WorkerPool:
+     def __init__(self, ctx, specs, sys_path=(), nice=0, rss_limit_bytes=None):
+-        """specs: list of dict(name, kind, fn, engine, kw, env)."""
++        """specs: list of dict(name, kind, fn, engine, kw, env[, init=(fn_path, args)])."""
+         self.ctx, self.sys_path, self.nice = ctx, list(sys_path), nice
+         self.rss_limit = rss_limit_bytes
+         self.slots = []
+@@ -48,7 +51,7 @@ class WorkerPool:
+     def _spawn(self, s):
+         a, b = self.ctx.Pipe()
+         p = self.ctx.Process(target=_worker_main, daemon=True,
+-                             args=(b, s["fn"], s["engine"], s["kw"], s["env"], self.nice, self.sys_path))
++                             args=(b, s["fn"], s["engine"], s["kw"], s["env"], self.nice, self.sys_path, s.get("init")))
+         p.start(); b.close()
+         s.update(proc=p, conn=a, task=None, t0=None, limit=None, restarts=s.get("restarts", -1) + 1)
+ 
+diff --git a/RIND3D_Dataset100K/rind3d_100k/validate.py b/RIND3D_Dataset100K/rind3d_100k/validate.py
+index 6797432..8e81b4f 100644
+--- a/RIND3D_Dataset100K/rind3d_100k/validate.py
++++ b/RIND3D_Dataset100K/rind3d_100k/validate.py
+@@ -131,6 +131,11 @@ def validate_labels(root, slot, scene_rec, cons_rec=None):
+     for i, m in enumerate(metas):
+         if m["status"] == "certified" and m["tv_bound"] > 0.05:
+             errs.append(f"{m['key']} certified with tv {m['tv_bound']}")
++        if m["status"] == "certified_stat":
++            c = m.get("certificate") or {}
++            if c.get("kind") != "statistical" or not (c.get("eps", 1) <= 0.05 and m["tv_bound"] == c.get("eps")) or \
++                    not (0 < c.get("delta_label", 1) < 1) or c.get("K", 1) > c.get("a2", -1):
++                errs.append(f"{m['key']} certified_stat without a valid statistical certificate")
+         nseg = offs[i + 1] - offs[i]
+         if ("n_cells" in m and nseg != m["n_cells"]) or ("n_cells" not in m and not 0 < nseg <= m["n_records"]):
+             errs.append(f"{m['key']} cell count")       # legacy piece-format records: at most one cell per piece
+diff --git a/RIND3D_Dataset100K/scripts/run_node.py b/RIND3D_Dataset100K/scripts/run_node.py
+index df86ae1..4ac6f9f 100755
+--- a/RIND3D_Dataset100K/scripts/run_node.py
++++ b/RIND3D_Dataset100K/scripts/run_node.py
+@@ -64,6 +64,9 @@ def main():
+     ap.add_argument("--stop-grace", type=float); ap.add_argument("--phys-timeout", type=float)
+     ap.add_argument("--prior-manifest"); ap.add_argument("--epoch-scenes", type=int); ap.add_argument("--progress-s", type=float)
+     ap.add_argument("--label-sample", help="benchmark only: n64,n128,n256,seed stratified sample of label tasks")
++    ap.add_argument("--label-engine", choices=("tpe", "fastlabel"), help="label engine (default tpe)")
++    ap.add_argument("--fastlabel-n-tasks", type=int, help="planned label count of the campaign (delta = 0.01 / n)")
++    ap.add_argument("--fastlabel-base-seed", type=int, help="base seed of the FastLabel label streams")
+     a = ap.parse_args()
+     conf = json.loads(Path(a.config).read_text()) if a.config else {}
+     contract = json.loads(Path(conf.get("contract", a.contract)).read_text())
+@@ -82,7 +85,11 @@ def main():
+              stop_grace=a.stop_grace or conf.get("stop_grace", 600), phys_timeout=a.phys_timeout or conf.get("phys_timeout", 1800),
+              prior_manifest=a.prior_manifest or conf.get("prior_manifest"), progress_s=a.progress_s or conf.get("progress_s", 30),
+              label_slots=parse_range(a.label_slots or conf.get("label_slots"), None),
+-             label_sample=[int(x) for x in a.label_sample.split(",")] if a.label_sample else None)
++             label_sample=[int(x) for x in a.label_sample.split(",")] if a.label_sample else None,
++             label_engine=a.label_engine or conf.get("label_engine", "tpe"),
++             fastlabel={k: v for k, v in dict(n_tasks=a.fastlabel_n_tasks or conf.get("fastlabel_n_tasks"),
++                                              base_seed=a.fastlabel_base_seed or conf.get("fastlabel_base_seed")).items()
++                        if v is not None})
+     default_env(a.root)
+     from rind3d_100k.coordinator import Coordinator
+     sys.exit(Coordinator(a.root, contract, o).run())

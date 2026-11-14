@@ -59,7 +59,7 @@ Also cleared from the working tree: bytecode caches and empty directories under 
 |---|---|
 | geometry, rendering, storage | `rind3d` |
 | exact labels | `rind3d_posterior.label_window` |
-| FastLabel | `rind3d_1k.fastlabel`, the production copy of the research pipeline v3.4 |
+| FastLabel | `rind3d_posterior.fastlabel` (core, since 2026-11-13; `rind3d_1k.fastlabel` is its 1K compatibility layer), the production copy of the research pipeline v3.4 |
 | loader | `rind3d_1k.loader` (populations, estimators, explicit fallback) |
 | natural windows | `RIND3D_StudentResearch/natural/natural_supplement.py`, kept in place: it is a 1K-derived tool, and the 100K will sample natural windows natively |
 | Student | `RIND3D_StudentResearch/pilot/` (reference implementation, pilot scale) |
@@ -97,7 +97,7 @@ Each change adds a dated status note, or corrects an interface description, and 
 
 ## 5. Remaining ambiguity / unresolved choices
 
-1. **Should FastLabel move into `RIND3D_Posterior` as a package next to the tau-pencil engine?** It currently sits inside `rind3d_1k`, which ties it to the 1K scene layout. The 100K port would need either that move or an adapter. Left as is (no change without an integration decision; `100K_READINESS.md`).
+1. **Should FastLabel move into `RIND3D_Posterior` as a package next to the tau-pencil engine?** Resolved 2026-11-13: moved to `rind3d_posterior.fastlabel` with 1K and 100K adapters, byte-identical outputs (`RIND3D_Posterior/docs/FASTLABEL_CORE.md`).
 2. **`RIND3D_StudentResearch` mixes decision documents with reusable tools** (NAT-1K generator, Student reference, OOD, S6). A later split into `RIND3D_Student/` and `RIND3D_Tools/` is possible. It was not done, to avoid renaming without a concrete ambiguity.
-3. **The Gate A harness depends on the FastLabel research modules**, not the production package. Porting it to `rind3d_1k.fastlabel` would let the research code be archived fully.
+3. **The Gate A harness depends on the FastLabel research modules**, not the production package. Resolved 2026-11-13: production port `rind3d_posterior/fastlabel/gate_a.py`; the research harness stays as the record of the recorded runs.
 4. **`RIND3D_Generator` contains many research modules inside the `rind3d` package** (`*_research.py`, campaign tooling, `legacy/`). They are kept because the package's CLI and tests import them, and the tree is provenance-tracked.

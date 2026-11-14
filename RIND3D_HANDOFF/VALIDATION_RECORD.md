@@ -55,3 +55,17 @@ All checks ran on the development laptop: RTX 3060 Laptop GPU, NVIDIA driver 620
 * **The 100K branch.** Not run or modified. Its state is in `100K_READINESS.md`. Its own `smoke_test.py` was not executed.
 * **Gate A** (`validate_verify.py`). Not re-run: same GPU and driver family as the recorded run. It is required on any new device type (H20).
 * **CPU-only hosts.** Not tested. The CUDA tests skip there by design.
+
+## 6. FastLabel core promotion (2026-11-13, branch `yushu/3d-fastlabel-core`)
+
+FastLabel moved from `RIND3D_Dataset1K/rind3d_1k/fastlabel/` (`git mv`) into `rind3d_posterior.fastlabel`, with scene-format adapters and a 1K compatibility layer. Recovery point: tag `archive/pre-fastlabel-core-2026-11-13` → `b4f264a`. Details: `RIND3D_Posterior/docs/FASTLABEL_CORE.md`.
+
+| check | result |
+|---|---|
+| old (`b4f264a` export) vs new, 47 train-split tasks × 2 runs each, every backfill (path, L, stage, round) stratum plus forced exact and validation branches | **byte-identical** task-file arrays and meta, and full `label_task` meta (timing excluded), in all 4 runs |
+| new vs stored backfill labels, 42 production-config tasks | **byte-identical**, certificate metadata included |
+| `DEFAULTS` sha256 | unchanged (`d4eb92d9…`) |
+| runtime, warm | 55.4 s old vs 55.6 s new (median per-task ratio 1.003) |
+| 100K container (slot 0, rendered into scratch) | 14/14 channels certified and deterministic; true source in every support; Gate A 188/188; TV vs exact 0.0000 / 0.0007 |
+| tests | Posterior 16 passed (7 new), Dataset1K 9 passed, Generator 337 passed / 18 skipped, `smoke_checks.py` all OK |
+| Gate A, production port (`gate_a.py`) | 1K smoke windows (test) and 2 windows of the 100K container: 0 field differences, 0 batch disagreements, 0 false violations. The full 27-window run is not repeated (same GPU and driver); it is **required on H20** |

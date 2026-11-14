@@ -7,8 +7,8 @@ the RIND3D pipeline described here. The RIND3D code lives in the `RIND3D_*` dire
 | directory | role | status |
 |---|---|---|
 | `RIND3D_Generator/` | package `rind3d` plus native C++. Canonical convex-polyhedra geometry (vendor `rind`), certified visibility (CPU native, CPU reference, `cuda_certified`), RINDPack storage, exact CountIndex, the v0.1 geometry families and acceptance gate. This is an imported, hash-tracked source tree (`provenance/ORIGINAL_SOURCE.json`): keep it byte-stable. `experiments/{shadow_volumes,cpu_cuda,lite_quality}` are acceptance-test dependencies | production (used by 1K and 100K) |
-| `RIND3D_Posterior/` | package `rind3d_posterior`: the exact tau-pencil labeller (`label_window`), CPU and GPU-pass variants, TV bound. `experiments/fastlabel/` keeps the FastLabel research record (REPORT, CERTIFICATE_AUDIT, GPUVERIFY) and the Gate A verifier harness (`validate_verify.py`); `experiments/twophase/twophase.py` is a harness dependency | production (exact labels; current 100K labeller) |
-| `RIND3D_Dataset1K/` | package `rind3d_1k`: physical stage, selection law and controller, label orchestration (`labels.py`, `supervise.py`), **FastLabel v3.4** (`rind3d_1k/fastlabel/`), the **loader** (`loader.py`), release validation; `scripts/`, `backfill/` (run, monitor, verify), `docs/`, `tests/` | production for the 1K (validated at 1K scale) |
+| `RIND3D_Posterior/` | package `rind3d_posterior`: the exact tau-pencil labeller (`label_window`), CPU and GPU-pass variants, TV bound; **FastLabel v3.4 core** (`rind3d_posterior.fastlabel`: `label_window_fast`, adapters `window_from_1k` / `window_from_100k`, exact GPU verifier, Gate A `gate_a.py`; `docs/FASTLABEL_CORE.md`). `experiments/fastlabel/` keeps the FastLabel research record (REPORT, CERTIFICATE_AUDIT, GPUVERIFY) and the research Gate A harness (`validate_verify.py`) | production (exact labels; current 100K labeller; FastLabel core) |
+| `RIND3D_Dataset1K/` | package `rind3d_1k`: physical stage, selection law and controller, label orchestration (`labels.py`, `supervise.py`), the 1K FastLabel entry points (`rind3d_1k/fastlabel/`, a compatibility layer over the core), the **loader** (`loader.py`), release validation; `scripts/`, `backfill/` (run, monitor, verify), `docs/`, `tests/` | production for the 1K (validated at 1K scale) |
 | `RIND3D_StudentResearch/` | scientific decisions A–J for the current design, plus their tools: NAT-1K natural-window generator (`natural/`), the Student reference implementation (`pilot/`), the OOD benchmark (`ood/`), the all-dark S6 prototype (`s6/`), analyses E13–E19 (`experiments/`) | reference / research prototypes |
 | `RIND3D_Audit/` | the scientific foundations audit (01–10) with its toy-world and fixture experiments | reference |
 | `RIND3D_HANDOFF/` | this directory: implementation facts, cleanup manifest, validation record, 100K readiness, `env.sh`, `smoke_checks.py` | handoff |
@@ -46,6 +46,8 @@ git checkout archive/rind3d-research-2026-11-13 -- RIND3D_Research              
 |---|---|
 | physical scenes (1K reference) | `$RIND3D_LABEL_PY RIND3D_Dataset1K/scripts/run_physical.py ...` (see `RIND3D_Dataset1K/docs/REPRODUCE.md`) |
 | exact labels (tau-pencil) | `RIND3D_Dataset1K/scripts/run_labels.py <root> <workers> <gpu_workers>`; API `rind3d_posterior.label_window` |
+| FastLabel API (any scene format) | `rind3d_posterior.fastlabel.label_window_fast(window_from_1k(scene_dir, w, s))` or `window_from_100k(container, w, s)` |
+| Gate A (verifier vs certified renderer) | `$RIND3D_LABEL_PY -m rind3d_posterior.fastlabel.gate_a out.jsonl 1k:<scene_dir>:<w>:<s> ...` |
 | FastLabel labels | `RIND3D_Dataset1K/backfill/run_backfill.sh`, i.e. `run_labels.py <root> 15 0 --engine fastlabel --scene-order --retry-failed`; set `n_tasks` for any new campaign |
 | verify labels and seals | `RIND3D_Dataset1K/backfill/verify_backfill.py <root> <pre_integrity.json> <out.json> [workers] [n_tasks]` |
 | natural-window supplement | `RIND3D_StudentResearch/natural/natural_supplement.py <release> <out> a:b`, then `run_nat_labels.sh` |
@@ -58,7 +60,7 @@ git checkout archive/rind3d-research-2026-11-13 -- RIND3D_Research              
 ```bash
 source RIND3D_HANDOFF/env.sh
 (cd RIND3D_Dataset1K && $RIND3D_LABEL_PY -m pytest -q tests)                 # loader, FastLabel (GPU), supervisor
-(cd RIND3D_Posterior && $RIND3D_LABEL_PY -m pytest -q tests)                 # tau-pencil regression digests
+(cd RIND3D_Posterior && $RIND3D_LABEL_PY -m pytest -q tests)                 # tau-pencil digests, FastLabel core (GPU)
 (cd RIND3D_Generator && OMP_NUM_THREADS=1 $RIND3D_LABEL_PY -m pytest -q tests) # geometry, rendering, RINDPack, counts
 $RIND3D_LABEL_PY RIND3D_HANDOFF/smoke_checks.py                              # re-render, certificates, loader, seals
 ```

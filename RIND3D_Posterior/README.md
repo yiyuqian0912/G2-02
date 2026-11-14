@@ -1,8 +1,10 @@
 # rind3d-posterior: certified single-source global posterior labels for RIND3D
 
-> **2026-11-13.** Production FastLabel lives in `../RIND3D_Dataset1K/rind3d_1k/fastlabel/` (statistical certificates on top of
-> this engine's outer bounds). `experiments/fastlabel/` keeps its research record (`REPORT.md`, `CERTIFICATE_AUDIT.md`,
-> `GPUVERIFY.md`) and the Gate A verifier harness (`validate_verify.py`); benchmark outputs and the earlier
+> **2026-11-13.** Production FastLabel v3.4 lives in this package, `rind3d_posterior.fastlabel` (statistical certificates on
+> top of this engine's outer bounds; scene-format adapters for the 1K and the 100K; Gate A in `fastlabel/gate_a.py`; see
+> `docs/FASTLABEL_CORE.md`). `../RIND3D_Dataset1K/rind3d_1k/fastlabel/` is its 1K compatibility layer.
+> `experiments/fastlabel/` keeps its research record (`REPORT.md`, `CERTIFICATE_AUDIT.md`,
+> `GPUVERIFY.md`) and the research Gate A harness (`validate_verify.py`); benchmark outputs and the earlier
 > `RIND3D_Research/posterior_labels` studies (METHOD.md, Phase-1/2 docs) are in the archive tag `archive/rind3d-research-2026-11-13`.
 
 This package is the maintained form of the tau-pencil engine (TPE), Phases 1–2.

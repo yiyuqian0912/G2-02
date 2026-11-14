@@ -1,0 +1,212 @@
+diff --git a/RIND3D_Dataset100K/rind3d_100k/coordinator.py b/RIND3D_Dataset100K/rind3d_100k/coordinator.py
+index fcd522b..70124ed 100644
+--- a/RIND3D_Dataset100K/rind3d_100k/coordinator.py
++++ b/RIND3D_Dataset100K/rind3d_100k/coordinator.py
+@@ -38,15 +38,15 @@ import numpy as np
+ 
+ from .controller import plan_epoch, epoch_of
+ from .pool import WorkerPool, _rss
+-from .storage import (Journal, journal_index, read_record, decode_payload, labels_path, task_key, atomic_write)
++from .storage import (Journal, journal_index, read_record, decode_payload, labels_path, task_key, atomic_write,
++                      append_line, read_jsonl)
+ from .labels import decode_cells
+ 
+ HERE = Path(__file__).resolve().parent.parent
+ 
+ 
+ def _jsonl(path):
+-    p = Path(path)
+-    return [json.loads(l) for l in p.read_text().splitlines() if l.strip()] if p.exists() else []
++    return read_jsonl(path)
+ 
+ 
+ def detect_resources():
+@@ -213,7 +213,12 @@ class Coordinator:
+                  offsets=np.array(offs, np.int64),
+                  metas=np.frombuffer(json.dumps(metas).encode(), np.uint8),
+                  status=np.frombuffer(json.dumps(status).encode(), np.uint8))
+-        atomic_write(labels_path(self.root, slot), buf.getvalue())
++        p = labels_path(self.root, slot)
++        sha = atomic_write(p, buf.getvalue())
++        from collections import Counter
++        append_line(self.root / "labels" / "consolidated.jsonl",
++                    json.dumps(dict(slot=int(slot), path=str(p.relative_to(self.root)), sha256=sha, bytes=len(buf.getvalue()),
++                                    statuses=dict(Counter(status.values())), time=time.strftime("%Y-%m-%dT%H:%M:%S"))))
+         self.scene_tasks.pop(slot, None)
+ 
+     # ------------------------------------------------------------------ main loop
+@@ -357,8 +362,7 @@ class Coordinator:
+                             fr = dict(key=key, slot=t[1], window=t[2], source=t[3], L=t[4], kind=kind if kind != "result" else "error",
+                                       worker=sl["name"], engine=sl["engine"], time=time.strftime("%Y-%m-%dT%H:%M:%S"),
+                                       **({kk: v for kk, v in payload.items() if kk in ("error", "trace", "exitcode", "wall", "limit", "rss")}))
+-                            with open(self.fail_path, "a") as f:
+-                                f.write(json.dumps(fr) + "\n")
++                            append_line(self.fail_path, json.dumps(fr))
+                             self.failed[key] = fr; self.n_fail += 1
+                         open_ = self.scene_tasks.get(t[1])
+                         if open_ is not None:
+@@ -375,8 +379,7 @@ class Coordinator:
+ 
+     def record(self, rec):
+         rec.setdefault("time", time.strftime("%Y-%m-%dT%H:%M:%S"))
+-        with open(self.man_path, "a") as f:
+-            f.write(json.dumps(rec, default=str) + "\n")
++        append_line(self.man_path, json.dumps(rec, default=str))      # after the container's atomic_write (worker)
+         self.recs.setdefault(int(rec["slot"]), []).append(rec)
+ 
+     def log(self, d):
+diff --git a/RIND3D_Dataset100K/rind3d_100k/storage.py b/RIND3D_Dataset100K/rind3d_100k/storage.py
+index 68dada2..6591ab7 100644
+--- a/RIND3D_Dataset100K/rind3d_100k/storage.py
++++ b/RIND3D_Dataset100K/rind3d_100k/storage.py
+@@ -8,6 +8,7 @@
+ * `labels/journal/<writer>.r3lj`: append-only binary label journal (coordinator only)
+ * `labels/journal/<writer>.idx`: task keys of the journal, for fast resume
+ * `labels/scenes/<shard>/<slot:06d>.labels.npz`: consolidated labels of a scene
++* `labels/consolidated.jsonl`: one record per consolidation (slot, path, sha256, bytes, statuses); last record wins
+ * `labels/failures.jsonl`: crash / timeout / error / memory records (quarantine)
+ * `STOP`: safe stop request
+ 
+@@ -53,15 +54,53 @@ def labels_path(root, slot):
+     return Path(root) / "labels" / "scenes" / f"{shard_of(slot):04d}" / f"{int(slot):06d}.labels.npz"
+ 
+ 
++def fsync_dir(path):
++    """Make a rename or a file creation in directory `path` durable (POSIX: the entry lives in the directory)."""
++    fd = os.open(str(path), os.O_RDONLY)
++    try:
++        os.fsync(fd)
++    finally:
++        os.close(fd)
++
++
+ def atomic_write(path, data):
++    """tmp, fsync, rename, fsync(dir): after return, the file and its name survive a crash."""
+     path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
+     tmp = path.with_name(path.name + f".tmp{os.getpid()}")
+     with open(tmp, "wb") as f:
+         f.write(data); f.flush(); os.fsync(f.fileno())
+     os.replace(tmp, path)
++    fsync_dir(path.parent)
+     return hashlib.sha256(data).hexdigest()
+ 
+ 
++def append_line(path, line):
++    """Durable append of one newline-terminated text record (single writer)."""
++    path = Path(path); new = not path.exists()
++    with open(path, "a") as f:
++        f.write(line.rstrip("\n") + "\n"); f.flush(); os.fsync(f.fileno())
++    if new:
++        fsync_dir(path.parent)
++
++
++def read_jsonl(path):
++    """Records of an append-only JSONL file. A torn final line (crash during an append: no trailing newline) is
++    ignored; any other unparsable line is an error."""
++    p = Path(path)
++    if not p.exists():
++        return []
++    text = p.read_text()
++    lines = text.split("\n")
++    tail = lines.pop()                      # "" if the file ends with a newline, else the torn last record
++    out = [json.loads(l) for l in lines if l.strip()]
++    if tail.strip():
++        try:
++            out.append(json.loads(tail))
++        except json.JSONDecodeError:
++            pass
++    return out
++
++
+ def sha256_file(p):
+     h = hashlib.sha256()
+     with open(p, "rb") as f:
+@@ -195,11 +234,12 @@ def journal_index(root):
+     if not d.exists():
+         return out
+     for p in sorted(d.glob("*.idx")):
+-        jp = str(p.with_suffix(".r3lj"))
+-        for line in p.read_text().splitlines():
++        jp = p.with_suffix(".r3lj"); size = jp.stat().st_size if jp.exists() else 0
++        lines = p.read_text().split("\n")[:-1]           # complete (newline-terminated) lines only
++        for line in lines:
+             f = line.split("\t")
+-            if len(f) == 3 and f[0] not in out:
+-                out[f[0]] = (jp, int(f[1]), int(f[2]))
++            if len(f) == 3 and f[0] not in out and int(f[1]) + int(f[2]) <= size:
++                out[f[0]] = (str(jp), int(f[1]), int(f[2]))
+     return out
+ 
+ 
+diff --git a/RIND3D_Dataset100K/rind3d_100k/validate.py b/RIND3D_Dataset100K/rind3d_100k/validate.py
+index d025655..6797432 100644
+--- a/RIND3D_Dataset100K/rind3d_100k/validate.py
++++ b/RIND3D_Dataset100K/rind3d_100k/validate.py
+@@ -107,13 +107,18 @@ def physics_spot_check(S, n_points=512, n_windows=3, independent_points=32, seed
+     return out
+ 
+ 
+-def validate_labels(root, slot, scene_rec):
++def validate_labels(root, slot, scene_rec, cons_rec=None):
++    """cons_rec: the slot's last labels/consolidated.jsonl record; its sha256 must match the file."""
+     p = labels_path(root, slot)
+     if not p.exists():
+         return dict(slot=int(slot), ok=None, note="labels not consolidated")
++    errs = []
++    if cons_rec is None:
++        errs.append("no consolidation record (sha256 unknown)")
++    elif sha256_file(p) != cons_rec["sha256"]:
++        errs.append("consolidated labels sha256 mismatch")
+     z = np.load(p)
+     status = json.loads(z["status"].tobytes()); metas = json.loads(z["metas"].tobytes()); offs = z["offsets"]
+-    errs = []
+     W = scene_rec["windows"]; k = int(scene_rec["k"])
+     want = {task_key(slot, w, j) for w in range(len(W)) for j in range(k)}
+     if set(status) != want:
+diff --git a/RIND3D_Dataset100K/scripts/verify_root.py b/RIND3D_Dataset100K/scripts/verify_root.py
+index 15e2006..b0423ca 100755
+--- a/RIND3D_Dataset100K/scripts/verify_root.py
++++ b/RIND3D_Dataset100K/scripts/verify_root.py
+@@ -8,7 +8,8 @@
+   --physics-every-th scene, legality of sources on every --deep-every-th);
+ * label journals: every record parses and its checksum verifies (torn tails reported); keys unique or duplicates
+   identical in status;
+-* consolidated labels (--labels): validate_labels per scene (slot alignment, statuses, certified => tv <= 0.05)."""
++* consolidated labels (--labels): validate_labels per scene (sha256 against labels/consolidated.jsonl, slot alignment,
++  statuses, certified => tv <= 0.05)."""
+ import argparse
+ import collections
+ import json
+@@ -22,11 +23,11 @@ sys.path[:0] = [str(HERE), str(REPO / "RIND3D_Dataset1K"), str(REPO / "RIND3D_Po
+ 
+ 
+ def _one(args):
+-    root, rec, phys, deep, labels = args
++    root, rec, phys, deep, labels, cons = args
+     from rind3d_100k.validate import validate_scene, validate_labels
+     v = validate_scene(root, rec["slot"], rec, physics=256 if phys else 0, deep=deep)
+     if labels:
+-        v["labels"] = validate_labels(root, rec["slot"], rec)
++        v["labels"] = validate_labels(root, rec["slot"], rec, cons)
+     return v
+ 
+ 
+@@ -36,13 +37,16 @@ def main():
+     ap.add_argument("--deep-every", type=int, default=500); ap.add_argument("--labels", action="store_true"); ap.add_argument("--out")
+     a = ap.parse_args()
+     root = Path(a.root)
+-    recs = [json.loads(l) for l in (root / "manifest" / "physical.jsonl").read_text().splitlines() if l.strip()]
++    from rind3d_100k.storage import read_jsonl
++    recs = read_jsonl(root / "manifest" / "physical.jsonl")
++    cons = {int(r["slot"]): r for r in read_jsonl(root / "labels" / "consolidated.jsonl")}     # last record wins
+     acc = collections.defaultdict(list)
+     for r in recs:
+         if r["status"] == "accepted":
+             acc[r["slot"]].append(r)
+     dup = [s for s, v in acc.items() if len(v) > 1]
+-    jobs = [(str(root), v[-1], i % a.physics_every == 0, i % a.deep_every == 0, a.labels) for i, (s, v) in enumerate(sorted(acc.items()))]
++    jobs = [(str(root), v[-1], i % a.physics_every == 0, i % a.deep_every == 0, a.labels, cons.get(int(s)))
++            for i, (s, v) in enumerate(sorted(acc.items()))]
+     with mp.get_context("spawn").Pool(a.workers) as pool:
+         res = pool.map(_one, jobs, chunksize=4)
+     from rind3d_100k.storage import iter_journal

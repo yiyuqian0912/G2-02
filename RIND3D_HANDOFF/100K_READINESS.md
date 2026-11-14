@@ -10,7 +10,7 @@
 | physical stage | **Local-only** (`rind3d_100k/local_eval.py`): exact probes, exact hull certificates for all-lit channels, lazy acceptance, progressive certified 64³ tiles with early stop, full crops of accepted windows only. **No full-world response field.** 3.7 s per scene on the laptop |
 | equivalence with the 1K full-field selection | documented on 12 scenes: identical windows and Λ̂, 0 mismatches in 2.9·10⁹ bits. The comparison harness is not committed; `scripts/smoke_test.py` checks determinism against fixtures |
 | selection law | same as the 1K: m-balanced c-tables from an epoch-frozen controller (1000-slot epochs, lag 1), adaptive k with a 15% floor. Rate stream R = 256/128/64, exact m only for the first 8 rate proposals |
-| storage | one npz container per scene (0.36 MB), R3LJ label journal (47 KB per label), ≈ 0.2 TB projected. Gaps: manifest without fsync; no sha256 for consolidated label files |
+| storage | one npz container per scene (0.36 MB), R3LJ label journal (47 KB per label), ≈ 0.2 TB projected. Gaps: manifest without fsync (a torn line blocks resume); no sha256 for consolidated label files; no directory fsync after renames. A tested minimal fix: `patches/100k_durability_5560a20.patch` (`100K_FASTLABEL_INTEGRATION.md` §4) |
 | labeller | tau-pencil TPE v3.1 (`rind3d_posterior.label_window`), CPU and GPU-assisted workers. Canary: 98.6% tier-1 coverage, ≈ 41 CPU-s per label, ≈ 33.4 k laptop-thread-h for 2.94 M labels [proj]. Tier 2 is in the contract but not wired |
 | orchestration | coordinator, worker pool, per-GPU workers, supervision of crash / timeout / RSS, resume, STOP and grace; multi-node runs use disjoint slots, each with **its own controller history** |
 | tests | none under `RIND3D_Dataset100K/tests`. Validation = `smoke_test.py` (6 steps) plus `validate.py` / `verify_root.py` |
@@ -25,7 +25,7 @@
   * `rind3d_posterior`;
   * `rind3d`.
 * It has its own loader, labels and controller.
-* `yushu/3d` adds what the 100K lacks: FastLabel (`rind3d_1k/fastlabel`), the `certified_stat` status, the M2 loader (populations, `combined_rb`, explicit fallback), sha256 per label file, and the GPU semaphore / worker init hook.
+* `yushu/3d` adds what the 100K lacks: FastLabel (core `rind3d_posterior.fastlabel` with a 100K container adapter, since 2026-11-13; 1K entry points `rind3d_1k/fastlabel`), the `certified_stat` status, the M2 loader (populations, `combined_rb`, explicit fallback), sha256 per label file, and the GPU semaphore / worker init hook.
 
 ## 3. Proposed scientific contract changes (`RIND3D_StudentResearch/H_100K_RECOMMENDATIONS.md`, `J_COMPLEXITY_COVERAGE.md`)
 
@@ -49,10 +49,12 @@
 
 **Coverage streams must stay logically distinct.** Per window, store the stream id, proposal index, U and c-row. Per scene-side, store the rate m-histogram and the proposal counts. Combine streams only through the balance-heuristic weights 1/(n_nat/P_A + n_cov c(m)/Λ_c).
 
-## 4. Integration work if FastLabel is adopted for the 100K (not performed)
+## 4. Integration work if FastLabel is adopted for the 100K (prepared, not applied)
 
-1. **Code.** Bring `rind3d_1k/fastlabel/` and the `labels.py` / `supervise.py` / loader changes into the 100K branch, or move FastLabel into `RIND3D_Posterior` first (`CLEANUP_MANIFEST.md` §5).
-2. **Scene adapter.** `label_task` reads the 1K directory layout. It needs the 100K `SceneFile` (meta resolution, geometry, crops) and a slot-based RNG scene index.
+**Status 2026-11-13:** steps 1–4 are prepared and tested on scratch copies (`100K_FASTLABEL_INTEGRATION.md`: adapter, `patches/100k_fastlabel_engine_5560a20.patch`, `patches/100k_durability_5560a20.patch`). Nothing is applied to the 100K branch.
+
+1. **Code.** FastLabel now lives in `RIND3D_Posterior` (`rind3d_posterior.fastlabel`); bring it into the 100K branch together with the `labels.py` / `supervise.py` / loader changes.
+2. **Scene adapter.** Done: `rind3d_posterior.fastlabel.window_from_100k` reads the 100K container, with the slot as the RNG scene index.
 3. **Workers.** CUDA in every label worker, with one GPU semaphore per device. The 100K CPU workers currently run with `CUDA_VISIBLE_DEVICES=""`, and the 100K pool has no init hook.
 4. **Statuses.** The 100K labels, validator and loader must handle `certified_stat`, kind 4 and the certificate meta.
 5. **δ and seed.** Set `n_tasks` to the planned 100K label count, with a new `base_seed`.
@@ -61,7 +63,7 @@
 ## 5. Required canary validation on the target hardware (before production)
 
 1. Build the environment; check NVRTC against the driver; probe FP64 and FP32 throughput. The renderer and the verifier rely on FP64 directed rounding, and H20 FP64 is reported low.
-2. Cross-device bit-exactness: the smoke label digests and physical fixtures. For FastLabel, also Gate A (`RIND3D_Posterior/experiments/fastlabel/validate_verify.py`, ≈ 10 min) and `RIND3D_Dataset1K/tests/test_fastlabel.py`.
+2. Cross-device bit-exactness: the smoke label digests and physical fixtures. For FastLabel, also Gate A (`python -m rind3d_posterior.fastlabel.gate_a`, default and both forced-path builds; research harness `experiments/fastlabel/validate_verify.py`), `RIND3D_Posterior/tests/test_fastlabel_core.py` and `RIND3D_Dataset1K/tests/test_fastlabel.py` (`100K_FASTLABEL_INTEGRATION.md` §5).
 3. A canary of ≥ 256 scenes under the final contract (κ, coverage stream), checking:
    * the realised per-(L, m, family) counts against the E19 predictions, especially L64 m = 4;
    * the weight distributions and the ESS;

@@ -1,7 +1,7 @@
 # 07 — What the TV certificate guarantees, and what it does not
 
 Audited code:
-* `RIND3D_Dataset1K/rind3d_1k/fastlabel/pipeline.py` (production v3.4, commit b7c8dee);
+* `RIND3D_Dataset1K/rind3d_1k/fastlabel/pipeline.py` (production v3.4, commit b7c8dee; since 2026-11-13 the code is `RIND3D_Posterior/src/rind3d_posterior/fastlabel/pipeline.py`, unchanged algorithm);
 * `RIND3D_Posterior/experiments/fastlabel/{adaptive3.py, sampler3.py, CERTIFICATE_AUDIT.md, REPORT.md}`;
 * `RIND3D_Posterior/src/rind3d_posterior/rpl/bound.py:tv_bound`;
 * `tpl/engine_p2.py:{stage2, emit_region, _shell_volume}`.
