@@ -47,8 +47,9 @@ def main():
         raise SystemExit("uncommitted changes in handoff paths:\n" + dirty)
     commit = git("rev-parse", "HEAD"); short = commit[:12]
     sub = git("rev-parse", "--show-prefix")              # "Phase4_Multi_Source_3D/": archive that subtree, so the package
-    tree = f"HEAD:{sub}" if sub else "HEAD"              # layout (RIND3D_*/ at its root) is unchanged by the Phase4 move
-    raw = subprocess.run(["git", "-C", str(REPO), "archive", "--format=tar", f"--prefix=rind3d_100k_{short}/", tree, "--", *PATHS, *EXCLUDE],
+    tree = f"HEAD:{sub}" if sub else "HEAD"              # layout (RIND3D_*/ at its root) is unchanged by the Phase4 move;
+    top = git("rev-parse", "--show-toplevel")            # run from the top level: pathspecs are then relative to the subtree
+    raw = subprocess.run(["git", "-C", top, "archive", "--format=tar", f"--prefix=rind3d_100k_{short}/", tree, "--", *PATHS, *EXCLUDE],
                          capture_output=True, check=True).stdout
     src = tarfile.open(fileobj=io.BytesIO(raw))
     files = {}
