@@ -1,5 +1,7 @@
 # RIND3D documentation index
 
+> **2026-11-13:** paths under `RIND3D_Research/` refer to the archive tag `archive/rind3d-research-2026-11-13` (removed from the active branch). Current RIND3D overview: `RIND3D_HANDOFF/README.md`.
+
 RIND3D is the 3D inverse-ray-geometry dataset and research line of G2-02.
 
 Each entry below has a status:

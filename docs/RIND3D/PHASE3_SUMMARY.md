@@ -1,5 +1,7 @@
 # RIND3D Phase 3 summary (2026-11-12): production optimization, consolidation, geometry, 1K v1
 
+> **2026-11-13:** paths under `RIND3D_Research/` refer to the archive tag `archive/rind3d-research-2026-11-13` (removed from the active branch). Current RIND3D overview: `RIND3D_HANDOFF/README.md`.
+
 ## What was built
 
 | Component | Location | Status |

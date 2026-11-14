@@ -2,7 +2,7 @@
                                     [--scene-order] [--sample n64,n128,n256,seed] [--kw json]
                                     [--timeout t64,t128,t256] [--retry-failed] [--nice n] [--engine fastlabel]
 
---engine fastlabel: FastLabel v3.3 (rind3d_1k.fastlabel; needs CUDA). Statistical labels get status "certified_stat"
+--engine fastlabel: FastLabel v3.4 (rind3d_1k.fastlabel; needs CUDA). Statistical labels get status "certified_stat"
 with the certificate in the task meta; <gpu_workers> is ignored. Recommended with --scene-order and 15 workers.
 
 Drains all unfinished (scene, window, source) tasks of accepted scenes with a supervised pool of GPU-assisted (exact
@@ -66,7 +66,7 @@ def main():
     t0 = time.perf_counter(); n = 0; nf = 0; touched = set()
     init = None
     if arg("--engine") == "fastlabel":
-        # FastLabel v3.3: every worker labels with the certified GPU verifier; one semaphore serialises GPU submissions
+        # FastLabel v3.4: every worker labels with the certified GPU verifier; one semaphore serialises GPU submissions
         engines = ["fastlabel"] * k
         init = ("rind3d_1k.fastlabel:set_gpu_lock", (ctx.Semaphore(1),))
     else:

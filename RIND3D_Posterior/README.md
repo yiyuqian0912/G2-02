@@ -1,5 +1,10 @@
 # rind3d-posterior: certified single-source global posterior labels for RIND3D
 
+> **2026-11-13.** Production FastLabel lives in `../RIND3D_Dataset1K/rind3d_1k/fastlabel/` (statistical certificates on top of
+> this engine's outer bounds). `experiments/fastlabel/` keeps its research record (`REPORT.md`, `CERTIFICATE_AUDIT.md`,
+> `GPUVERIFY.md`) and the Gate A verifier harness (`validate_verify.py`); benchmark outputs and the earlier
+> `RIND3D_Research/posterior_labels` studies (METHOD.md, Phase-1/2 docs) are in the archive tag `archive/rind3d-research-2026-11-13`.
+
 This package is the maintained form of the tau-pencil engine (TPE), Phases 1–2.
 
 ## What a label is
@@ -47,7 +52,7 @@ cells, q, tv = RP.point_estimate(rec)
 
 **Environment.** numba ≥ 0.60 and numpy ≥ 2, plus `cupy-cuda12x` for the GPU engine. Tests: `PYTHONPATH=src python -m pytest tests`.
 
-## Measured cost (RTX 3060 Laptop + Ryzen 7 5800H; details in `../RIND3D_Research/posterior_labels/phase2_gpu`)
+## Measured cost (RTX 3060 Laptop + Ryzen 7 5800H; details in `RIND3D_Research/posterior_labels/phase2_gpu` of the archive tag `archive/rind3d-research-2026-11-13`)
 
 * **128³ windows.** 0.16–1 CPU-s per informative label.
 * **1024³ windows.** 1–265 CPU-s per label; L = 256 windows dominate.

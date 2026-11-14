@@ -153,7 +153,7 @@ def scene_label_summary(scene_dir, include_uninformative=False, failures=None):
 
 
 def _run_fastlabel(t, out, kw):
-    """FastLabel v3.3 (rind3d_1k.fastlabel): writes the same task-file fields as the tau-pencil engine.
+    """FastLabel v3.4 (rind3d_1k.fastlabel): writes the same task-file fields as the tau-pencil engine.
     Statistical labels: one record per cell with lo = hi = the cell volume of the certified outer bound B (so the
     loader's q = lo / sum(lo) is q_B), kind = 4, tv_bound = eps, status "certified_stat", certificate in meta."""
     from rind3d_1k.fastlabel import label_task, DEFAULTS

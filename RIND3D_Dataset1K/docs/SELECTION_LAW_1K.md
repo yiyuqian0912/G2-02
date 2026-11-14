@@ -177,7 +177,7 @@ The theorem of §2 needs a weight with E[ω̂ | G, S] = Λ_L(G, S) that is indep
 
 **Interface (`rind3d_1k.loader`):**
 * Every window record carries `weight` (rate, the contract default) and `weights` = {rate, quota, combined}.
-* `flatten(..., weight="rate" | "quota" | "combined")` attaches the chosen ω to every example.
+* `flatten(..., weight="rate" | "quota" | "combined")` attaches the chosen ω to every example. *(2026-11-13: the interface is now `flatten(ds, population=..., estimator=...)`, default estimator `combined_rb`; populations B1K / Tstar / Tstar_mis; `../../RIND3D_StudentResearch/C_LOADER.md`, `B_SAMPLING_WEIGHTING.md`.)*
 * ω is a **loss weight**, never a model input.
 
 **Scene rejection:**

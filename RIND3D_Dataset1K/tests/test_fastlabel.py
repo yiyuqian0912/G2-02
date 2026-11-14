@@ -1,4 +1,4 @@
-"""FastLabel v3.3 production package (rind3d_1k.fastlabel).
+"""FastLabel v3.4 production package (rind3d_1k.fastlabel).
 
 * design2: the two-stage certificate's false-certificate probability is <= its budget for every p < 1 - eps.
 * gpuverify vs the original certified renderer: identical FREE-voxel fields (UNKNOWN voxels decided exactly).

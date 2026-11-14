@@ -72,6 +72,11 @@ The machine-readable copy is `contract/RIND3D_1K_CONTRACT_v1.json`. Any deviatio
 | Training weight | ω for every window (`weight`, contract default = rate-stream Λ̂_L; `weights` = rate / quota / combined, SELECTION_LAW §8). A **loss weight**, never a model input; training must use it. |
 | Privileged | Sources, global geometry, full fields, selection log |
 
+> **2026-11-13 additions.** Label statuses also include `certified_stat`: the FastLabel statistical certificate, TV ≤ 0.05
+> except with probability 0.01/159,802 per label (union bound 0.01 over the release; `docs/FASTLABEL_1K.md`). The
+> loader accepts every certified status by default, requires an explicit target `population`, and defaults to the
+> `combined_rb` weight estimator (`../../RIND3D_StudentResearch/C_LOADER.md`).
+
 Flattening to single-source examples is a loader adapter (`rind3d_1k.loader.flatten`). The canonical loader returns multi-channel window records. Each flattened example carries its window's ω.
 
 Label slot statuses: `certified` (TV ≤ 0.05), `certified_loose` (≤ 0.10), `uncertified` (> 0.10, stored, never presented as qualified), `unavailable` (informative, not computed yet), `not_computed` (uninformative, deferred), `engine_failure` / `timeout` (the supervised labeller recorded a native crash or a wall-clock limit for this task; no label is stored).

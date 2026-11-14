@@ -1,5 +1,7 @@
 # RIND3D posterior-label and scene-production optimization report (Phase 3, 2026-11-12)
 
+> **2026-11-13:** the ≈ 140 h tau-pencil labelling projection discussed here was superseded by FastLabel v3.4 (1K backfill 4.33 h; `../../RIND3D_StudentResearch/D_BACKFILL_REPORT.md`). Paths under `RIND3D_Research/` are in the archive tag `archive/rind3d-research-2026-11-13`.
+
 ## Setup and accounting
 
 * **Machine.** Ryzen 7 5800H (8 cores / 16 threads), 31 GB RAM, RTX 3060 Laptop (6 GB, weak FP64).

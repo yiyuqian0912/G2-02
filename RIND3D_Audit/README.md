@@ -1,5 +1,10 @@
 # RIND3D Scientific Foundations Audit (2026-11-13)
 
+> **Status 2026-11-13.** M1 resolved by declaring the target T* (`../RIND3D_StudentResearch/A_TASK_DEFINITION.md`); M2 fixed
+> (the loader accepts every certified status, explicit one-hot fallback; `C_LOADER.md`); M3 fixed (δ = family_delta /
+> n_tasks); S6 prototyped (`../RIND3D_StudentResearch/s6/`). Statements below about the loader default describe the
+> state at audit time. Paths under `RIND3D_Research/` are in the archive tag `archive/rind3d-research-2026-11-13`.
+
 This is an independent audit of the RIND3D program, written against the user brief `BRIEF.md`. Every claim carries an
 evidence class: **A** proved, **B** verified in code (file:function), **C** measured (configuration and uncertainty
 given), **D** literature (`LITERATURE.md`), **E** hypothesis or recommendation.

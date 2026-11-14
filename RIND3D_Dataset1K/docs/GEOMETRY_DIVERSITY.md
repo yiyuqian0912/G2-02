@@ -1,5 +1,7 @@
 # Geometry diversity: audit of the obstacle distribution, and curved and irregular families
 
+> **2026-11-13:** the ≈ 140 h tau-pencil labelling projection discussed here was superseded by FastLabel v3.4 (1K backfill 4.33 h; `../../RIND3D_StudentResearch/D_BACKFILL_REPORT.md`). Paths under `RIND3D_Research/` are in the archive tag `archive/rind3d-research-2026-11-13`.
+
 **Data:** `GEOMETRY_STUDY_128.json`, produced by `scripts/geometry_study.py` over campaigns `geom128/<family>`.
 
 **Design:**

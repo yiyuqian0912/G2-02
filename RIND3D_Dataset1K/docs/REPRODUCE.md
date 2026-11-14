@@ -55,7 +55,7 @@ To resume, just rerun the same command.
     from rind3d_1k.loader import RIND3D1K, flatten
     ds = RIND3D1K("/data/release", split="train")
     rec = ds[0]       # window 0 of scene 0: solid [L,L,L], responses [k,L,L,L], posteriors[k]
-    for ex in flatten(ds, informative_only=True, certified_only=True):
+    for ex in flatten(ds, population="Tstar")    # population is required: "Tstar" | "Tstar_mis" | "B1K" (see C_LOADER.md):
         ...           # single-source examples (solid, response_j, label_j)
 
 ## 7. Statistics

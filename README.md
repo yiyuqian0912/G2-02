@@ -2,6 +2,15 @@
 
 [中文说明](README.zh-CN.md) · [Project status](docs/PROJECT_STATUS.zh-CN.md)
 
+> **RIND3D (3D, this branch `yushu/3d`).** Multi-source 1024³ physical worlds with source-separated binary responses and
+> certified 128³ global source posteriors. The code is in `RIND3D_Generator/` (geometry, certified rendering, storage),
+> `RIND3D_Posterior/` (exact tau-pencil labels), `RIND3D_Dataset1K/` (1K pipeline, FastLabel, loader) and
+> `RIND3D_StudentResearch/` (task definition, Student reference, studies). Start at
+> [`RIND3D_HANDOFF/README.md`](RIND3D_HANDOFF/README.md); implementation facts are in
+> [`RIND3D_HANDOFF/RIND3D_IMPLEMENTATION_FACTS.md`](RIND3D_HANDOFF/RIND3D_IMPLEMENTATION_FACTS.md). The 100K
+> production branch is `yushu/3d-100k-h20`. The pre-consolidation research archive is the tag
+> `archive/rind3d-research-2026-11-13`. The 2D project below is unchanged.
+
 RIND studies source localization from local responses in a two-dimensional occluded environment. Sources have positive intensities, binary visibility and additive contributions without distance attenuation. The main student does not receive full-scene obstacle geometry.
 
 - **Phase1:** a physics-supervised conditional energy model predicts a full-field single-contribution location distribution. The current encoder combines multiscale boundaries, response regions, global context and relative candidate geometry.

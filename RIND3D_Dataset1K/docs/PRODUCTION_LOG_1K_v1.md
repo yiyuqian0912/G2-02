@@ -71,6 +71,10 @@ The rerun on v3.1 runs with per-side limits of 7200 / 14400 / 14400 s. Results a
 
 ## 6. Stopped (2026-11-12, ≈ 12:10 EST, on request)
 
+> **Superseded on 2026-11-13.** The labels were completed by the approved FastLabel backfill: 159,469 labels in 4.33 h,
+> 0 failures, all 159,802 informative channels certified (`../../RIND3D_StudentResearch/D_BACKFILL_REPORT.md`). The
+> `STOP` file in the release root is a leftover of this stop. The cost projections in this section are historical.
+
 * **What was stopped.** The user stopped the campaign to rethink the labelling cost. The production loop, both label runners and the release validator were stopped. `<root>/STOP` is present.
 * **State preserved.**
   * Physical stage: complete, all 1000 scenes.
