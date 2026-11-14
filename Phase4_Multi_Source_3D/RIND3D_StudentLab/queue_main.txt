@@ -1,0 +1,36 @@
+# Stage B (Q1): generic vs facet factor
+configs/G0_s0.json
+configs/F1_s0.json
+configs/G0_s1.json
+configs/F1_s1.json
+# Stage C (Q2): what must be built in? facet tokens without a geometric decoder; fixed vs learned facet head; facet-only
+configs/G1_s0.json
+configs/F1fix_s0.json
+configs/F1only_s0.json
+# Q3: one-hot supervision under each inductive bias
+configs/OHG0_s0.json
+configs/OHF1_s0.json
+# Q2: learned plane extraction from the pooled input
+configs/F2_s0.json
+# F3: two-hypothesis facets (shadow | occluder face) + facet dropout with availability flag; single-change arms
+configs/F3_s0.json
+configs/F1drop_s0.json
+configs/F1hyp_s0.json
+# third seeds of the main comparison
+configs/G0_s2.json
+configs/F1_s2.json
+# Q4: independent-scene learning curves (same scene subsets for both models)
+configs/F1sc125_s0.json
+configs/G0sc125_s0.json
+configs/F1sc25_s0.json
+configs/G0sc25_s0.json
+configs/F1sc5_s0.json
+configs/G0sc5_s0.json
+# Q6: generalisation (unseen side L256; unseen families corridors + thin_slabs)
+configs/G0side_s0.json
+configs/F1side_s0.json
+configs/G0fam_s0.json
+configs/F1fam_s0.json
+# window-aware prior; generic with 4x budget
+configs/Gblind_s0.json
+configs/G0long_s0.json

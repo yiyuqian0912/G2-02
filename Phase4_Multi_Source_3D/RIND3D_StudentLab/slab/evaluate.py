@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from .paths import OUT
+from .paths import OUT, facets_file
 from .data import LabTable, collate, to_dev, cf_of_cell
 from .density import legal_logv, log_normalise
 from .models import build, Generic
@@ -92,9 +92,12 @@ def main():
     if split == "confirm" and "--confirm" not in sys.argv:
         raise SystemExit("the confirm split needs --confirm (reserved for declared confirmatory comparisons)")
     dev = "cuda"
-    T = LabTable()
+    ver = json.loads((Path(tgt) / "config.json").read_text()).get("facets", "v1") if not tgt.startswith("pilot:") else "v1"
+    T = LabTable(facets=facets_file(ver))
     if tgt.startswith("pilot:"):
-        ck = tgt[6:]; logp_of = pilot_model(ck, dev); outp = Path(ck).parent / f"lab_eval_{split}{'_' + tag if tag else ''}.npz"
+        ck = tgt[6:]; logp_of = pilot_model(ck, dev)          # outputs go to the lab, never into the pilot's run directory
+        od = OUT / "pilot_evals" / Path(ck).parent.name; od.mkdir(parents=True, exist_ok=True)
+        outp = od / f"eval_{split}{'_' + tag if tag else ''}.npz"
     else:
         logp_of = lab_model(tgt, dev, arg("--ckpt", "final.pt")); outp = Path(tgt) / f"eval_{split}{'_' + tag if tag else ''}.npz"
     res = {}; t0 = time.time()

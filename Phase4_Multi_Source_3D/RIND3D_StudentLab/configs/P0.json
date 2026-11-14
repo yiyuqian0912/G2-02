@@ -1,0 +1,1 @@
+{"name":"P0","model":"facet","fixed":true,"facet_only":true,"min_inliers":100,"note":"non-learned physics-only estimator: uniform-legal prior x fixed facet factor (eps 1e-3, s0 0.5, kappa 1); weights untrained and unused"}

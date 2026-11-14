@@ -5,7 +5,8 @@ usage: build_facets.py [--workers 12] [--out PATH]
 For each row (one window channel): the lit/dark FREE interface of the full-resolution crop (6-neighbour pairs of FREE
 receivers with different response) is segmented into up to 8 planar facets by greedy local RANSAC (slab/facets.py).
 Only the crop's SOLID mask and the channel's own response are read: the facets are a deterministic function of X.
-Output npz: F (n_rows, 8, 12) float32 [mu_world_vox(3), normal(3), n_inliers, rms, sd1, sd2, remaining, 0], nf (n_rows,),
+Output npz: F (n_rows, 8, 12) float32 [mu_world_vox(3), normal(3), n_inliers, rms, sd1, sd2, remaining, lit_side], nf,
+lit_side = mean over inlier pairs of (lit-voxel direction . normal) in [-1, 1] (v2; +: the lit side is +normal),
 npts (n_rows,), plus provenance. Resumable per scene (part files in <out>.parts/)."""
 import argparse, glob, json, os, sys, time, hashlib
 from multiprocessing import Pool
@@ -50,7 +51,7 @@ def job(args):
         f, n = facets_of(get(int(r["window"]), -1), get(int(r["window"]), int(r["source"])), max_facets=KMAX)
         o = np.array([r["ox"], r["oy"], r["oz"]], float)
         f = f.copy(); f[:, :3] += o
-        F[j, :len(f), :11] = f[:, :11]; nf[j] = len(f); npts[j] = n
+        F[j, :len(f), :12] = f[:, :12]; nf[j] = len(f); npts[j] = n
     np.savez(part + ".tmp.npz", idx=np.asarray(idxs), F=F, nf=nf, npts=npts); os.replace(part + ".tmp.npz", part)
     return part
 

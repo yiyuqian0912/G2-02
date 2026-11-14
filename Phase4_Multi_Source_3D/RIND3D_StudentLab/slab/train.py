@@ -1,8 +1,9 @@
 """Train one lab arm (resumable).
 
 usage: python -m slab.train <config.json | json string> [--out DIR]
-Config keys (defaults in DEF): name, seed, model (generic | facet) + model keys (slab.models.build), target
-(posterior | onehot), weight (mis | b1k | trel | nat; pilot data.py), subset ({"scenes_frac"} | {"examples_frac"}),
+Config keys (defaults in DEF): name, seed, model (generic | facet | learned_facet) + model keys (slab.models.build),
+target (posterior | onehot), weight (mis | b1k | trel | nat; pilot data.py), subset ({"scenes_frac"} | {"examples_frac"}),
+train_sides (list of L), exclude_families (list of family indices; pilot build_features.FAMILIES order),
 steps, batch, lr, wd, warmup, workers, curve_every, curve_n.
 Data: train split (pilot-train), boundary-mixed rows only; batches drawn with probability proportional to the side-
 normalised population weight (unweighted loss; same expected gradient); batch s is keyed by (seed, s), so a resumed run
@@ -15,7 +16,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from .paths import OUT
+from .paths import OUT, facets_file
 from .data import LabTable, collate, to_dev, side_normalised, kish, SPLIT_ROLE
 from .density import legal_logv, log_normalise, sparse_ce
 from .models import build
@@ -31,6 +32,10 @@ def train_pool(T, cfg):
         m &= r["ds"] == 0
     if cfg["weight"] == "nat":
         m &= r["ds"] == 1
+    if cfg.get("train_sides"):                       # generalisation arms: restrict the training sides / families
+        m &= np.isin(r["Lp"], cfg["train_sides"])
+    if cfg.get("exclude_families"):
+        m &= ~np.isin(r["family"], cfg["exclude_families"])
     sub = cfg.get("subset")
     if sub:
         rng = np.random.default_rng(1000 + int(sub.get("seed", cfg["seed"])))
@@ -90,7 +95,7 @@ def main():
     (out / "config.json").write_text(json.dumps(cfg, indent=1))
     torch.manual_seed(cfg["seed"]); np.random.seed(cfg["seed"])
     dev = "cuda"
-    T = LabTable()
+    T = LabTable(facets=facets_file(cfg.get("facets", "v1")))
     idx, w = train_pool(T, cfg)
     info = dict(n_pool=int(len(idx)), n_scenes=int(len(np.unique(T.rows["scene"][idx]))), kish=kish(w))
     model = build(cfg).to(dev)
@@ -117,6 +122,8 @@ def main():
         with torch.autocast("cuda", torch.bfloat16):
             ce, _, ctx = loss_of(model, B)
         loss = ce.mean()
+        if "aux_loss" in ctx:                         # X-only auxiliary objective (F2 planarity)
+            loss = loss + ctx["aux_loss"].mean()
         opt.zero_grad(set_to_none=True); loss.backward()
         gn = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step(); fbs += B["fallback"]
@@ -133,6 +140,9 @@ def main():
             print(json.dumps(rec), flush=True)
             with open(out / "curve.jsonl", "a") as f:
                 f.write(json.dumps(rec) + "\n")
+            prev = [json.loads(l)["dev_nll"] for l in open(out / "curve.jsonl")][:-1]
+            if not prev or v < min(prev):           # best dev-curve step: secondary, optimistic (selection on dev)
+                torch.save(model.state_dict(), out / "best.pt")
             torch.save(dict(model=model.state_dict(), opt=opt.state_dict(), step=s + 1), out / "state.tmp.pt")
             os.replace(out / "state.tmp.pt", out / "state.pt")
     torch.save(model.state_dict(), out / "final.pt")

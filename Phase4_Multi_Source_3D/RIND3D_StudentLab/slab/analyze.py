@@ -11,13 +11,26 @@ import numpy as np
 SIDES = (64, 128, 256)
 
 
+_NF = None
+
+
+def _facet_counts():
+    global _NF
+    if _NF is None:
+        from .paths import FACETS
+        _NF = np.load(FACETS)["nf"] if FACETS.exists() else False
+    return _NF
+
+
 def load(path):
     z = np.load(path); out = {}
     for k in z.files:
         s, m = k.split("/", 1); out.setdefault(s, {})[m] = z[k]
+    nf = _facet_counts()
     for s, d in out.items():
         d["ig"] = d["nll_prior"] - d["nll"]
-        d["kl_ok"] = d["kl"]
+        if nf is not False:                 # facet count is a property of the row (X), not of the model
+            d["nf"] = nf[d["idx"]]
     return out
 
 

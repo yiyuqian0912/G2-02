@@ -76,3 +76,47 @@ def test_facet_law_synthetic_box_occluder():
     # axis-parallel facets can be off by 1-2 voxels (staircase quantisation): measured on real data in validate_facets.py
     for f in sorted(F, key=lambda f: -f[6])[:2]:
         assert abs(float((s - f[:3]) @ f[3:6])) < 0.1, f
+
+
+def test_triton_plane_factor_matches_torch():
+    if not torch.cuda.is_available():
+        return
+    from slab.plane_triton import plane_factor_fused
+    torch.manual_seed(2)
+    B, K = 2, 3; dev = "cuda"
+    mu = (torch.rand(B, K, 3, device=dev) * 1024).requires_grad_(); n0 = torch.randn(B, K, 3, device=dev)
+    n = torch.nn.functional.normalize(n0, dim=-1).detach().requires_grad_()
+    s0 = (torch.rand(B, K, device=dev) + 0.2).requires_grad_(); sth = (torch.rand(B, K, device=dev) * 1e-2).requires_grad_()
+    e = (torch.randn(B, K, device=dev) * 3).requires_grad_()
+    mask = torch.tensor([[True, False, True], [True, True, True]], device=dev)
+    g = torch.randn(B, 4096, 512, device=dev)
+    ref = plane_factor(mu, n, s0, sth, e, mask, checkpoint=False)
+    gr = torch.autograd.grad((ref * g).sum(), (mu, n, s0, sth, e))
+    out = plane_factor_fused(mu, n, s0, sth, e, mask)
+    go = torch.autograd.grad((out * g).sum(), (mu, n, s0, sth, e))
+    assert torch.allclose(out, ref, atol=1e-3), float((out - ref).abs().max())
+    for a, b in zip(go, gr):
+        assert torch.allclose(a, b, rtol=2e-3, atol=1e-2 * float(b.abs().max()) + 1e-6), (a, b)
+
+
+def test_triton_two_hypothesis_factor_matches_torch():
+    if not torch.cuda.is_available():
+        return
+    from slab.plane_triton import plane_factor2_fused, plane_factor2_torch
+    torch.manual_seed(3)
+    B, K = 2, 2; dev = "cuda"
+    mu = (torch.rand(B, K, 3, device=dev) * 1024).requires_grad_()
+    n = torch.nn.functional.normalize(torch.randn(B, K, 3, device=dev), dim=-1).detach().requires_grad_()
+    s0 = (torch.rand(B, K, device=dev) + 0.2).requires_grad_(); sth = (torch.rand(B, K, device=dev) * 1e-2).requires_grad_()
+    e = (torch.randn(B, K, device=dev) * 2).requires_grad_(); pi = torch.randn(B, K, device=dev).requires_grad_()
+    lr = (torch.randn(B, K, device=dev) - 3).requires_grad_()
+    mask = torch.tensor([[True, False], [True, True]], device=dev)
+    g = torch.randn(B, 4096, 512, device=dev)
+    args = (mu, n, s0, sth, e, pi, lr)
+    ref = plane_factor2_torch(*args, mask)
+    gr = torch.autograd.grad((ref * g).sum(), args)
+    out = plane_factor2_fused(*args, mask)
+    go = torch.autograd.grad((out * g).sum(), args)
+    assert torch.allclose(out, ref, atol=2e-3), float((out - ref).abs().max())
+    for a, b in zip(go, gr):
+        assert torch.allclose(a, b, rtol=3e-3, atol=1e-2 * float(b.abs().max()) + 1e-6), (a, b)

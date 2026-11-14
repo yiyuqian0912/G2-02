@@ -11,23 +11,24 @@ def _interface(sol, lit, out):
                 if sol[z, y, x]:
                     continue
                 c = lit[z, y, x]
+                sg = -1.0 if c else 1.0                    # +1 if the neighbour (higher coordinate) is the lit one
                 if x + 1 < L and not sol[z, y, x + 1] and lit[z, y, x + 1] != c:
-                    out[n, 0] = x + 1.0; out[n, 1] = y + 0.5; out[n, 2] = z + 0.5; n += 1
+                    out[n, 0] = x + 1.0; out[n, 1] = y + 0.5; out[n, 2] = z + 0.5; out[n, 3] = 0; out[n, 4] = sg; n += 1
                 if y + 1 < L and not sol[z, y + 1, x] and lit[z, y + 1, x] != c:
-                    out[n, 0] = x + 0.5; out[n, 1] = y + 1.0; out[n, 2] = z + 0.5; n += 1
+                    out[n, 0] = x + 0.5; out[n, 1] = y + 1.0; out[n, 2] = z + 0.5; out[n, 3] = 1; out[n, 4] = sg; n += 1
                 if z + 1 < L and not sol[z + 1, y, x] and lit[z + 1, y, x] != c:
-                    out[n, 0] = x + 0.5; out[n, 1] = y + 0.5; out[n, 2] = z + 1.0; n += 1
+                    out[n, 0] = x + 0.5; out[n, 1] = y + 0.5; out[n, 2] = z + 1.0; out[n, 3] = 2; out[n, 4] = sg; n += 1
                 if n + 3 > out.shape[0]:
                     return n
     return n
 
 
-def interface_points(sol, lit, cap=4_000_000):
+def interface_points(sol, lit, cap=4_000_000, with_sign=False):
     """sol, lit: ZYX bool crops. Returns (P, 3) XYZ midpoints of lit/dark FREE 6-neighbour pairs, in crop voxel units
-    (voxel centres at i + 1/2), ordered by (z, y, x, axis)."""
-    out = np.empty((cap, 3), np.float64)
+    (voxel centres at i + 1/2), ordered by (z, y, x, axis). with_sign: also (axis, lit sign) columns, (P, 5)."""
+    out = np.empty((cap, 5), np.float64)
     n = _interface(np.ascontiguousarray(sol), np.ascontiguousarray(lit), out)
-    return out[:n].copy()
+    return out[:n].copy() if with_sign else out[:n, :3].copy()
 
 @njit(cache=True)
 def _pca(P, idx, n):
@@ -46,7 +47,8 @@ def ransac_facets(P, block_start, block_order, block_of, seed, max_facets, thr, 
     np.random.seed(seed)
     n = P.shape[0]
     alive = np.ones(n, np.bool_)
-    out = np.zeros((max_facets, 12))     # mu(3) normal(3) n_inl, rms, eig1, eig2 (in-plane sd), alive_after, quality
+    out = np.zeros((max_facets, 12))     # mu(3) normal(3) n_inl, rms, eig1, eig2 (in-plane sd), alive_after, lit side
+    lab = np.full(n, -1, np.int64)
     nf = 0
     tmp = np.empty(n, np.int64)
     for f in range(max_facets):
@@ -91,24 +93,28 @@ def ransac_facets(P, block_start, block_order, block_of, seed, max_facets, thr, 
             i = alive_idx[k]
             d = ((P[i] - mu) * nrm).sum()
             if abs(d) < thr:
-                alive[i] = False; m += 1; ss += d * d
+                alive[i] = False; m += 1; ss += d * d; lab[i] = nf
         if m < min_inl: break
         out[nf, 0:3] = mu; out[nf, 3:6] = nrm; out[nf, 6] = m; out[nf, 7] = np.sqrt(ss / m)
         out[nf, 8] = np.sqrt(max(w[1], 0)); out[nf, 9] = np.sqrt(max(w[2], 0)); out[nf, 10] = alive.sum()
         nf += 1
-    return out[:nf]
+    return out[:nf], lab
 
 def facets_of(sol, lit, max_facets=8, thr=0.9, min_frac=0.01, min_abs=24, iters=150, seed=0, cap=40000, nscore=3000):
-    P = interface_points(sol, lit)
-    if len(P) < min_abs: return np.zeros((0, 12)), len(P)
-    if len(P) > cap:
-        rng = np.random.default_rng(seed); P = P[np.sort(rng.choice(len(P), cap, replace=False))]
+    Q = interface_points(sol, lit, with_sign=True)
+    if len(Q) < min_abs: return np.zeros((0, 12)), len(Q)
+    if len(Q) > cap:
+        rng = np.random.default_rng(seed); Q = Q[np.sort(rng.choice(len(Q), cap, replace=False))]
+    P = np.ascontiguousarray(Q[:, :3])
     blk = np.floor(P / 8).astype(np.int64); L = int(np.ceil(P.max() / 8)) + 1
     bid = (blk[:, 0] * L + blk[:, 1]) * L + blk[:, 2]
     order = np.argsort(bid, kind='stable'); ub, inv = np.unique(bid, return_inverse=True)
     counts = np.bincount(inv); start = np.r_[0, np.cumsum(counts)]
     block_of = inv.astype(np.int64)
     # block_order indexes points sorted by block; block_start per compact block id
-    F = ransac_facets(P, start.astype(np.int64), order.astype(np.int64), block_of, seed, max_facets, thr,
-                      max(min_abs, int(min_frac * len(P))), iters, nscore)
+    F, lab = ransac_facets(P, start.astype(np.int64), order.astype(np.int64), block_of, seed, max_facets, thr,
+                           max(min_abs, int(min_frac * len(P))), iters, nscore)
+    for k in range(len(F)):                         # lit side: mean over inliers of sign * n[axis], in [-1, 1]
+        m = lab == k
+        F[k, 11] = float(np.mean(Q[m, 4] * F[k, 3 + Q[m, 3].astype(np.int64)])) if m.any() else 0.0
     return F, len(P)
