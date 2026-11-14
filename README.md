@@ -1,93 +1,59 @@
 # RIND / G2-02
 
-[中文说明](README.zh-CN.md) · [Project status](docs/PROJECT_STATUS.zh-CN.md)
+[中文说明](README.zh-CN.md) · [Full research report (Chinese)](docs/RIND_RESEARCH_CHAIN.zh-CN.md) · [Experiment status](docs/PROJECT_STATUS.zh-CN.md)
 
-> **RIND3D (3D, this branch `yushu/3d`: the canonical RIND3D-100K pre-production branch).** Multi-source 1024³ physical
-> worlds with source-separated binary responses and certified 128³ global source posteriors.
-> * **100K production entry point:** [`RIND3D_Dataset100K/`](RIND3D_Dataset100K/README.md). It contains local-only rendering, contract v2 (declared κ, natural T* sampling, an optional L64 coverage slot), FastLabel labels and the multi-GPU coordinator. The H20 gate is [`docs/H20_CANARY_RUNBOOK.md`](RIND3D_Dataset100K/docs/H20_CANARY_RUNBOOK.md).
-> * **Shared modules:**
->   * `RIND3D_Generator/`: geometry, certified rendering and storage;
->   * `RIND3D_Posterior/`: the exact tau-pencil labeller and the FastLabel core;
->   * `RIND3D_Dataset1K/`: the 1K reference pipeline and loader, kept for regression;
->   * `RIND3D_StudentResearch/`: the task definition, the Student reference and studies.
-> * **Where to start:** [`RIND3D_HANDOFF/README.md`](RIND3D_HANDOFF/README.md), and the facts in [`RIND3D_HANDOFF/RIND3D_IMPLEMENTATION_FACTS.md`](RIND3D_HANDOFF/RIND3D_IMPLEMENTATION_FACTS.md).
-> * **Historical references:** `yushu/3d-100k-h20` (the former separate 100K branch) and the tag `archive/rind3d-research-2026-11-13`.
->
-> The 2D project below is unchanged.
+RIND studies source localization from local responses in a 1024×1024 occluded world. Positive source intensities add linearly through binary visibility, without distance attenuation. The main student does not receive full-scene obstacle geometry.
 
-RIND studies source localization from local responses in a two-dimensional occluded environment. Sources have positive intensities, binary visibility and additive contributions without distance attenuation. The main student does not receive full-scene obstacle geometry.
+## Research workflow
 
-- **Phase1:** a physics-supervised conditional energy model predicts a full-field single-contribution location distribution. The current encoder combines multiscale boundaries, response regions, global context and relative candidate geometry.
-- **Phase2:** a slot model predicts overlapping contribution masks, strengths and existence from the original multi-source observation. Current training focuses on decomposition; Phase1 localization can be connected later.
-- **Data:** the old 10k configurations and the new 100k multi-source configurations are joined without moving repeated geometries across splits. Training responses use the installed random-strength variant.
+- **Phase1:** infer a full-field single-contribution location distribution from its local response and window coordinates. A multiscale boundary/region/global encoder queries candidate coordinates. Formal test results are available.
+- **Phase2:** infer the effective contribution count and overlapping binary masks from the original multi-source observation. The current v6 student performs autonomous recurrent subtraction, supervised only by the final count and unordered mask set. Response conservation is a feasibility constraint. Final v6 performance is not established yet.
+- **Next:** connect predicted layers to Phase1, then test multi-window history fusion and budgeted observation selection. The acquisition environment and reference policies exist; end-to-end localization gains remain unverified.
 
-The 20k-window decomposition run is complete. The 100k-window expansion workflow is available and reuses the old training prefix and locked validation/test sets. Completion of that larger experiment and the final multi-view localization system have not yet been established.
+The two current primary metrics are exact effective-layer count accuracy and the fraction of teacher layers recovered with hard-mask IoU ≥0.90. Effective layers are not physical source identities. The 32-step capacity preserves existing labels and does not imply 32 physical sources.
 
-## RIND3D — 3D Physical Reasoning Dataset
+## Run the current experiment
 
-**RIND3D v0.1 — Initial release containing 1,000 certified 3D scenes and 256,000 observation windows.** [Phase 3](Phase3_Single_Source_3D/README.md) adds restricted local-observation loading, certified physical queries and a bounded adaptive-octree demonstration. The completed dataset is available now; the 3D teacher/student design remains research in progress.
-
-[Download RIND3D-v0.1.tar.zst from Google Drive](https://drive.google.com/file/d/1PmMp39En-uc4QTgACd_EpS4mTZ3wO7yx/view?usp=drivesdk) · Anyone with the link — Viewer · 633,273,091 bytes.
-
-SHA256: `1f5a2ff2bd9ac4a479a074b33e0d06f160706e4369b199144ee117693913ee1e`
-
-```bash
-cd Phase3_Single_Source_3D
-uv sync --extra dev --extra train
-uv run python examples/download_dataset.py --output data
-export RIND3D_DATA_ROOT="$PWD/data/RIND3D-v0.1"
-uv run python examples/inspect_dataset.py
-uv run python examples/pytorch_dataloader.py --workers 2
-```
-
-Reading requires no GPU or generator build. Use the separate Phase 3 environment: its NumPy/native physics dependencies differ from the 2D stack. The public training archive includes canonical geometry and complete response/solid fields; the default Phase 3 student adapter exposes only window identity, origin/size, local response and local mask. Hidden sources and private references are excluded from the archive. This is the `full-field-training-v1` policy, rather than a blind hidden-field benchmark.
-
-After installing the dataset, launch the [interactive RIND3D viewer](Phase3_Single_Source_3D/docs/VIEWER.md) from `Phase3_Single_Source_3D`:
-
-```bash
-uv sync --extra viewer
-./scripts/browser.sh
-```
-
-Open **http://127.0.0.1:8765** to explore all scenes, global 3D lit/shadow volumes, observation windows and exact XYZ slices. Volume previews have adjustable 64³/128³/256³ display resolution; the stored 1024³ fields stay unchanged. The tool requires no CUDA or native geometry build and works offline. True-source markers require explicitly configured, matching local original production records; public downloads keep those coordinates hidden.
-
-The dataset's permanent name is **RIND3D**. Historical `Lite-Core-1K` identifiers remain internal scientific provenance. All nine certified geometry families, mixed lit/shadow sampling, 85/85/86 size quotas at 64/128/256 and stable 776/116/108 geometry-group splits are preserved. One private reference does not imply a unique source. License and citation metadata remain pending. See [coordinates and data](Phase3_Single_Source_3D/docs/DATASET.md), [PhysicalOracle](Phase3_Single_Source_3D/docs/PHYSICAL_ORACLE.md), [teacher design](Phase3_Single_Source_3D/docs/ADAPTIVE_TEACHER.md) and [integration acceptance](docs/RIND3D_INTEGRATION.md).
-
-## Start
+From the repository root, install the environment or select an existing interpreter:
 
 ```bash
 ./setup.sh
 export RIND_PYTHON="$PWD/.venv/bin/python"
-# Install data separately; see the phase-specific guides.
-./run_masks_tmux.sh start all --gpus auto
-./run_masks_tmux.sh status
 ```
 
-To expand an existing `masks_only_v1` run:
+The current workflow requires the previous completed v5 mask cache and best checkpoint. Replace the source experiment below with its actual location. It preserves the entire cache and fixed evaluation cohorts; raw data and candidate teacher rendering are unnecessary for cache-only training.
 
 ```bash
-./run_masks_expanded_tmux.sh start all --gpus auto
+unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_TMUX_SESSION
+./run_implicit_masks_tmux.sh start all \
+  --source-root outputs/masks_disentangled_v5_complex245746 \
+  --gpus auto --auto-batch
+./run_implicit_masks_tmux.sh status
 ```
 
-See [the expansion guide](Phase2_Multi_Source/docs/MASKS_EXPANDED.zh-CN.md) for prerequisites and outputs. Training runs in tmux, saves checkpoints and supports resuming after disconnection. Existing environments can be selected with `RIND_PYTHON`.
+Long jobs run in tmux and save logs/checkpoints. Resume is at saved epoch boundaries. For evaluation without retraining:
+
+```bash
+./run_implicit_masks_tmux.sh start evaluate --gpus auto --auto-batch
+```
+
+See the [v6 guide](Phase2_Multi_Source/docs/SEQUENTIAL_COUNT_SHAPE.zh-CN.md), [Phase2 document index](Phase2_Multi_Source/docs/README.zh-CN.md), and [data installation guide](Phase2_Multi_Source/dataset_update/README.zh-CN.md). Historical entry points remain for reproducibility.
 
 ## Repository
 
 | Path | Purpose |
 |---|---|
 | `Phase1_Single_Source_Single_Intensity/` | Single-contribution physics, models, training, evaluation and visualization |
-| `Phase2_Multi_Source/` | Multi-source data, residual labels, slot decomposition, training and evaluation |
-| `Phase3_Single_Source_3D/` | RIND3D data adapter, interactive scene viewer, certified physical queries and exploratory single-source octree teacher |
-| `RIND3D_Generator/` | Self-contained canonical geometry, CPU/CUDA rendering, independent verification and resumable generation |
+| `Phase2_Multi_Source/` | Multi-source data, residual labels, decomposition models, evaluation and active observation research |
+| `docs/` | Research chain, status and compact numerical evidence |
 | `tools/` | Repository checks and reproducible server packages |
-| `docs/` | Cross-phase status, compact results and maintenance notes |
 | `Literature_Review/` | Team literature reviews |
 
-Raw datasets, caches, environments, checkpoints and transfer archives remain local and are excluded from Git. Phase1's `part_e/` and legacy student adapter are still runtime dependencies and intentionally retained.
+Phase1's `part_e/` and legacy student adapter remain runtime dependencies. Raw datasets, environments, caches, model weights and detailed outputs remain local and are excluded from Git.
 
 ```bash
 "$RIND_PYTHON" tools/check_repo.py
 "$RIND_PYTHON" tools/package_update.py
 ```
 
-The package is written to `dist/RIND_Phase2_Update.tar.gz`. It contains source and configuration, with no raw data, caches or model weights. The extraction prefix remains `RIND_Phase2_Training_Minimal` for existing server installations.
+The source-only package is `dist/RIND_Phase2_Update.tar.gz`, with the stable extraction prefix `RIND_Phase2_Training_Minimal`.

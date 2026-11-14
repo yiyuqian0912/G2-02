@@ -1,65 +1,60 @@
 # RIND Phase2：多源响应分层与定位
 
-[项目总览](../README.zh-CN.md) · [当前解耦训练](docs/MASKS_ONLY.zh-CN.md) · [10万窗口扩展](docs/MASKS_EXPANDED.zh-CN.md) · [完整定位流程](docs/DECOMPOSITION_TRAINING.zh-CN.md)
+[完整研究链路](../docs/RIND_RESEARCH_CHAIN.zh-CN.md) · [文档索引](docs/README.zh-CN.md) · [项目状态](../docs/PROJECT_STATUS.zh-CN.md) · [English](README.md)
 
-Phase2的目标是处理正强度、多源线性叠加响应。当前主线先让学生从完整局部响应预测有效贡献的二值掩码、强度和存在性；然后研究复用Phase1单贡献定位器。学生默认不读取全场障碍物几何。
+Phase2研究如何从完整局部多源响应恢复有效贡献层，再复用Phase1定位器。当前主线是v6：学生输入原始响应、窗口位置与size；内部自主逐层减法；教师最终层数与无序掩码只进入监督，不提供教师过程或强度答案。
 
-## 当前工作流
+两个主要目标为层数预测准确率、单层IoU≥0.90通过率，分别监督、等权。完整响应是守恒约束；不以重建loss代替分层正确性。当前v6最终测试结果尚未回收。
 
-局部总响应 → 最低正残差/BFS标签 → 重叠槽位掩码、强度与存在性监督 → 验证集选模 → 固定测试集评估。
+## 使用已有大缓存训练
 
-在G2-02根目录执行：
-
-```bash
-./run_masks_tmux.sh start all --gpus auto
-./run_masks_tmux.sh status
-```
-
-2万窗口版本已完成；配置为 `configs/masks_only.json`，输出为 `outputs/masks_only_v1/`。已收到的测试摘要：软Dice=0.8902，有效层数准确率=79.95%，响应重建绝对MAE=0.01773；最佳epoch=37。强度损失不等同于强度MAE，软Dice也不等同于整窗解耦成功率。
-
-已存在旧缓存和最佳权重时，用扩展版本：
+在G2-02根目录执行；示例源目录需换成服务器真实v5大实验目录：
 
 ```bash
-./run_masks_expanded_tmux.sh start all --gpus auto
-./run_masks_expanded_tmux.sh status
+unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_TMUX_SESSION
+./run_implicit_masks_tmux.sh start all \
+  --source-root outputs/masks_disentangled_v5_complex245746 \
+  --gpus auto --auto-batch
+./run_implicit_masks_tmux.sh status
 ```
 
-扩展目标为100000/2000/2000个实际完成的train/validation/test窗口，复用旧训练前缀并锁定旧评估集。从旧最佳模型微调，训练完成后自动生成 `evaluation/decomposition_metrics.json` 和中文报告。更多参数见扩展说明；10万窗口的正式训练结果尚待回收。
+需要源目录的 `mask_records.json`、完整 `mask_cache/` 与v5 `models/seed_0/best.pt`。全部原训练记录和追加复杂窗保留，验证/测试不变；无需原始ZIP、无需重新渲染位置教师。缺缓存明确报错，不回退小数据。
 
-## 目录与文件职责
+```bash
+./run_implicit_masks_tmux.sh logs
+./run_implicit_masks_tmux.sh attach
+./run_implicit_masks_tmux.sh start evaluate --gpus auto --auto-batch
+```
 
-| 路径 | 做什么 |
+正式评价在新输出 `outputs/<源实验名>_implicit_v6/evaluation/seed_0/`。保留旧best/last，旧训练完成后统一名单比较；未完成写pending。具体监督、约束、断点和输出说明见 [v6运行文档](docs/SEQUENTIAL_COUNT_SHAPE.zh-CN.md)。
+
+## 文件职责
+
+| 文件/目录 | 任务 |
 |---|---|
-| `research/implicit_slots/decomposition_model.py` | 原始多源响应编码、可重叠槽位、强度/存在性输出、匹配和监督损失 |
-| `research/implicit_slots/mask_only_data.py` | 低成本局部残差标签、二值掩码和连续训练缓存，不生成位置概率 |
-| `research/implicit_slots/expand_masks.py` | 复用旧缓存，追加新窗口，保持评估集固定并支持恢复 |
-| `research/implicit_slots/train_decomposition.py` | 解耦与完整定位两种模式的训练、选模和断点 |
-| `research/implicit_slots/evaluate_masks.py` | 解耦掩码、层数、强度与重建指标 |
-| `research/implicit_slots/evaluate_decomposition.py` | 完整定位模式的分层/位置指标，区别实际预测和oracle诊断 |
-| `research/implicit_slots/slot_*.py`、`train_slots.py` | 早期概率槽位基线与共享接口，保留实验复现 |
-| `research/layered_residual/` | 残差教师、逐层物理评分、旧层定位实验和结果浏览 |
-| `src/rind_phase2/` | 多源读取、正确加权叠加、几何遮挡、联合候选教师和检查工具 |
-| `dataset_update/` | 新数据安装、随机强度派生、重复几何安全划分与联合读取 |
-| `configs/` | 当前和历史实验配置；当前默认以masks开头的配置为准 |
-| `tests/`、研究模块中的 `test_*.py` | 数据、物理、标签、缓存、模型和命令入口的回归检查 |
-| `docs/` | 当前运行说明、方法限制、数据说明及历史实验记录 |
+| `research/implicit_slots/sequential_count_shape.py` | 当前自主残差模型、二值减法、正强度可行性验收 |
+| `sequential_objective.py` | 两项等权监督、最终无序匹配、两个主要指标 |
+| `optimization_batches.py` | 跨微批/跨GPU的优化步归一化 |
+| `configure_sequential.py` | 冻结旧权重、绑定完整原缓存、固定运行配置 |
+| `train_decomposition.py` | 多版本训练、选模、进度和恢复 |
+| `evaluate_sequential.py`、`model_comparison.py` | 当前评价、同名单旧最终best对比、配对统计 |
+| `evaluation_snapshot.py` | checkpoint角色/epoch/SHA与只读模型快照 |
+| `gpu_runtime.py` | 自适应选卡、共同微批探测和运行参数 |
+| `mask_only_data.py` | 低成本局部残差标签与连续缓存，候选渲染数为0 |
+| `research/layered_residual/` | 历史逐层教师、共享候选位置渲染、层定位与浏览器 |
+| `src/rind_phase2/` | 数据、加权可见性叠加、几何邻接与物理评价 |
+| `dataset_update/` | 新发布安装、随机强度派生、重复几何同split |
+| `research/active_observation/` | 像素预算、移动/扩窗环境及参考路径 |
 
-`src/rind_phase2`负责物理和数据，并不再保留无法运行的联合学生占位模块；当前学生在 `research/implicit_slots` 中。早期 `part_e/` 空接口与空基线目录已移除。原实现可从Git历史恢复，研究结论见保留的文档。
+表内单独文件均位于 `research/implicit_slots/`，除非明确写出其他目录。旧v1–v5、槽数搜索与数据扩充模块保留复现用途，入口见文档索引。
 
-## 数据与评估约定
+## 数据和结论边界
 
-- 已有旧1万随机强度多源配置；新发布包含10万配置、每配置256个随机窗口，原发布为单位强度。
-- 安装器保留原始数据，并创建随机(0,1)强度派生版本；正式联合目录为 `data/raw/phase2-merged-110k`。
-- 同一障碍物几何在不同发布出现时保持同split。11万配置不是11万独立几何。
-- 总响应必须逐源按强度加权再相加；底层多源OR渲染不能直接当作加权响应。
-- 当前窗口筛选保留同时有自由零响应与正响应的窗口；全正响应窗口沿用原协议跳过。
-- 局部分层不读真实源编号或位置来决定传播。有效贡献强度可以大于1，有效层数不等于真实源数。
-- 算术重建正确不保证每层可由单个物理源实现。严格整窗成功率与多源定位闭环尚需验证。
+- 正式随机强度派生响应必须逐源乘强度求和，不能用多源OR响应代替。
+- 当前静态分层过滤全暗与所有自由像素全正的窗口；主动观测需另行适配这些情况。
+- 有效层R不等于物理源K；32是缓存兼容的执行上限。
+- mask-only教师保证算术闭合，不检查每层是否是完整物理单源可见性；不能据此宣称真实源逐个恢复。
+- v6只保证接受的输出通过守恒检查，不保证所有输入都有可接受分解。未完成窗口留在指标分母。
+- `view_layer_results.sh`、`view_results.sh`服务对应历史位置实验，不能默认展示新纯分层学生。
 
-数据安装见 [dataset_update](dataset_update/README.zh-CN.md)。已有缓存可直接训练/评估，不需要重渲染位置教师。
-
-## 已有可视化与历史实验
-
-`./view_layer_results.sh`、`./view_results.sh` 保留旧定位实验的测试窗口浏览和逐层剥离可视化；需对应的原数据、教师缓存和checkpoint。它们不应被当成当前纯解耦模型的自动可视化。
-
-早期层定位、几何消融、集合训练探索及联合穷举工具保留用于研究复现；历史报告见 [v4–v6记录](docs/RIND_Phase2_v4_完整实验设计与结果.md)。这些流程不替代当前推荐入口。
+数据安装见 [dataset_update](dataset_update/README.zh-CN.md)。原数据、缓存、模型与逐窗输出保留本地，不进入GitHub或源码tar。

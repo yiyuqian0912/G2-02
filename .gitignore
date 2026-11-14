@@ -43,6 +43,23 @@ phase2_visualization_*_recovered/
 **/phase2_slot_update/
 **/server_bundle/
 
+# Regenerable diagnostic/editor output
+*.log
+*.pid
+*.tmp
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.ckpt
+*.safetensors
+*.tgz
+*.tar
+
+# Downloaded local experiment artifacts, not source evidence
+/results/
+
 # RIND3D local data, native build products, credentials and research runs
 *.tar.zst
 *.whl

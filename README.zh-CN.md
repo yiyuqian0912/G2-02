@@ -1,116 +1,104 @@
 # RIND / G2-02
 
-[English](README.md) · [项目进展与结果](docs/PROJECT_STATUS.zh-CN.md) · [Phase1](Phase1_Single_Source_Single_Intensity/README.zh-CN.md) · [Phase2](Phase2_Multi_Source/README.zh-CN.md)
+[完整研究链路报告](docs/RIND_RESEARCH_CHAIN.zh-CN.md) · [实验状态](docs/PROJECT_STATUS.zh-CN.md) · [English](README.md)
 
-目标是在学生不知道全场障碍物几何的情况下，根据局部响应推断驱动源位置，并研究如何用多个视窗逐步缩小不确定性。物理模型是无距离衰减的正强度、二值可见性线性叠加。
+目标是在学生不知道全场障碍物几何的情况下，从局部响应反演驱动源位置，并通过同场景多视窗观测逐步减少不确定性。物理模型为正强度、二值可见性、无距离衰减的线性叠加。
 
-当前主线分为两部分：Phase1学习单贡献的全场位置概率；Phase2先学习把原始多源响应解耦成若干有效贡献层，再复用Phase1定位。当前服务器已完成2万窗口的解耦训练；10万窗口扩展流程已交付，完整多源定位与多视窗闭环仍需验证。
+## 当前主线
 
-## RIND3D — 3D Physical Reasoning Dataset
+1. **Phase1定位**：单贡献响应与窗口位置 → 全场源位置概率。已有正式测试结果。
+2. **Phase2分层**：原始多源响应与窗口位置 → 有效层数、无序二值贡献掩码。当前v6在学生内部自主减去单层贡献，只监督最终层数和掩码；新实验尚无最终测试结论。
+3. **后续闭环**：学生分层 → Phase1逐层定位 → 多视窗融合与主动选窗。环境已有原型，完整多源定位收益仍需验证。
 
-**RIND3D v0.1 首次发布包含 1,000 个经过认证的三维场景、256,000 个局部观测窗口。** [Phase3](Phase3_Single_Source_3D/README.md) 已接入数据读取、真实物理查询和有预算限制的自适应八叉树示例。数据已经生成，无需重新生成；三维学生和教师算法仍在研究阶段。
+当前关注层数预测准确率与单层IoU≥0.90通过率，两项等权。完整响应是守恒约束，不是v6重建loss。教师剥离顺序、中间残差、强度和真源编号不进入学生前向。有效层数R不等于物理源数K；32为兼容已有复杂标签的执行上限。
 
-[Google Drive 下载 RIND3D-v0.1.tar.zst](https://drive.google.com/file/d/1PmMp39En-uc4QTgACd_EpS4mTZ3wO7yx/view?usp=drivesdk)，权限为“任何拥有链接的人可查看”，文件大小 633,273,091 字节。
-
-SHA256：`1f5a2ff2bd9ac4a479a074b33e0d06f160706e4369b199144ee117693913ee1e`
-
-```bash
-cd Phase3_Single_Source_3D
-uv sync --extra dev --extra train
-uv run python examples/download_dataset.py --output data
-export RIND3D_DATA_ROOT="$PWD/data/RIND3D-v0.1"
-uv run python examples/inspect_dataset.py
-uv run python examples/pytorch_dataloader.py --workers 2
-```
-
-读取数据不需要 GPU 或生成器编译。Phase3 使用独立环境，避免与二维项目的 NumPy 和原生依赖冲突。公开包采用 `full-field-training-v1` 策略，含全场连续几何及完整响应/实体场；因此不能把整个包当成隐藏全场的盲测集。默认学生接口只返回场景/窗口 ID、位置、边长、局部响应和局部实体掩码，不返回全场几何、源位置、参考解或证据点。教师通过显式接口获取完整几何。
-
-安装数据后，在 `Phase3_Single_Source_3D` 内启动[交互式场景查看器](Phase3_Single_Source_3D/docs/VIEWER.md)：
-
-```bash
-uv sync --extra viewer
-./scripts/browser.sh
-```
-
-打开 **http://127.0.0.1:8765**，即可浏览全部场景、旋转查看全局三维受光/阴影体积、选择观测窗口，以及移动 XYZ 精确切片。三维预览可选 64³/128³/256³ 显示精度，原始 1024³ 数据保持不变。工具无需 CUDA 或原生几何编译，可离线运行。真实驱动源标记需显式配置、校验匹配的本地原始生产记录；公开下载包仍隐藏源坐标。
-
-数据集的永久名称是 **RIND3D**；历史清单内的 `Lite-Core-1K` 仅是内部生产配置和溯源标识，不改写科学哈希。当前数据保留九类认证几何、混合明暗采样，每场景 256 窗，边长 64/128/256 各 85/85/86 窗；按几何分组的训练/验证/测试场景数为 776/116/108。每窗的一份私有参考解不代表源唯一。许可证和引用署名待定。详细说明见[数据与坐标](Phase3_Single_Source_3D/docs/DATASET.md)、[物理接口](Phase3_Single_Source_3D/docs/PHYSICAL_ORACLE.md)及[自适应教师设计](Phase3_Single_Source_3D/docs/ADAPTIVE_TEACHER.md)。
-
-构建、完整回归、新克隆安装、真实数据物理对照和已知限制的实测记录见[三维集成验收与交接](docs/RIND3D_INTEGRATION.md)。
+方法、证据、负结果、指标口径与研究限制见[完整报告](docs/RIND_RESEARCH_CHAIN.zh-CN.md)。
 
 ## 目录职责
 
-```text
-G2-02/
-├── README.md / README.zh-CN.md           项目入口
-├── setup.sh / requirements.txt          用户目录Python环境和固定训练依赖
-├── run_masks*_tmux.sh                   当前分层解耦训练、扩展与后台管理
-├── run_decomposition*.sh                保留完整位置教师/定位训练入口
-├── run_phase1_100k.sh                   单贡献定位训练入口
-├── Phase1_Single_Source_Single_Intensity/
-│   ├── src/rind_phase1/                 数据、物理教师、能量模型、训练和浏览器
-│   ├── part_e/                         正式评价与自适应对照，仍被主流程引用
-│   ├── student_baseline/               旧模型兼容适配，保留复现依赖
-│   ├── configs/ scripts/ tests/ docs/   配置、命令、回归检查与方法文档
-│   └── research/                       边界统计与几何反例研究
-├── Phase2_Multi_Source/
-│   ├── src/rind_phase2/                 多源数据、可见性、教师与几何邻接
-│   ├── research/implicit_slots/         当前解耦模型、标签、训练和评估
-│   ├── research/layered_residual/       残差教师、旧定位实验与结果浏览
-│   ├── dataset_update/                 数据安装、随机强度派生与几何安全拼接
-│   └── configs/ scripts/ tests/ docs/   运行配置、辅助命令与实验记录
-├── tools/                              检查仓库与构建服务器更新包
-├── Phase3_Single_Source_3D/             三维单源数据接口、物理教师查询与八叉树实验
-├── RIND3D_Generator/                    独立完整的三维生成、认证、CPU/CUDA及恢复源码
-├── docs/                               跨阶段进展、结果摘要和整理记录
-├── Literature_Review/                  组员文献与讨论
-└── G2_02_Initial_Proposal.pdf           原始proposal
-```
+| 路径 | 内容 |
+|---|---|
+| `Phase1_Single_Source_Single_Intensity/` | 单贡献物理教师、模型、训练、评价与位置场浏览器 |
+| `Phase2_Multi_Source/src/rind_phase2/` | 多源数据、几何遮挡、加权响应和候选工具 |
+| `Phase2_Multi_Source/research/implicit_slots/` | 当前分层学生、标签缓存、训练、指标和旧权重对比 |
+| `Phase2_Multi_Source/research/layered_residual/` | 逐层教师、共享候选渲染、历史定位实验与浏览器 |
+| `Phase2_Multi_Source/research/active_observation/` | 新增像素预算、移动/扩窗环境及参考策略 |
+| `Phase2_Multi_Source/dataset_update/` | 安装数据、随机强度派生、重复几何安全拼接 |
+| 各阶段的 `configs/`、`tests/`、`docs/` | 版本化实验、回归测试、方法及运行文档 |
+| `docs/` | 跨阶段研究报告、状态和紧凑证据 |
+| `tools/` | 仓库检查、从正式源码构建服务器包 |
+| `Literature_Review/`、`G2_02_Initial_Proposal.pdf` | 团队文献与原proposal |
 
-各阶段的 `data/`、`outputs/` 与虚拟环境保留在本地，GitHub不包含原始数据、教师缓存、权重和逐窗输出。服务器包也不包含这些文件。
+Phase1的 `part_e/`、`student_baseline/` 仍是运行依赖。历史训练入口和配置用于复现旧权重；当前版本无需复制另一套源码目录。
 
-## 环境与数据
+## 环境
 
-从仓库根目录运行：
+在G2-02根目录运行：
 
 ```bash
 ./setup.sh
 export RIND_PYTHON="$PWD/.venv/bin/python"
 ```
 
-安装脚本在用户目录管理uv/Python 3.12，无需sudo或snap；默认安装CUDA 12.4版PyTorch，CPU环境可用 `RIND_TORCH_BACKEND=cpu ./setup.sh`。已有环境可直接设置 `RIND_PYTHON=/path/to/python`，不必重装。脚本不会覆盖已有的阶段独立虚拟环境。
+安装器在用户目录准备Python 3.12和固定依赖，无需sudo/snap。默认CUDA 12.4；CPU安装可用 `RIND_TORCH_BACKEND=cpu ./setup.sh`。已有环境直接设置 `RIND_PYTHON=/absolute/path/to/python`。
 
-数据需单独安装。多源数据步骤见 [数据更新说明](Phase2_Multi_Source/dataset_update/README.zh-CN.md)；单源数据见 [Phase1服务器说明](Phase1_Single_Source_Single_Intensity/docs/SERVER_100K_MULTISCALE.zh-CN.md)。已有缓存可直接训练/评估；只有准备新窗口时才需要原始数据。
+原始数据需单独安装，见[多源数据说明](Phase2_Multi_Source/dataset_update/README.zh-CN.md)及[Phase1服务器说明](Phase1_Single_Source_Single_Intensity/docs/SERVER_100K_MULTISCALE.zh-CN.md)。已有完整分层缓存和旧v5最佳权重时，v6训练无需原始ZIP或重新渲染位置教师。
 
-## 当前推荐运行流程
+## 当前训练与评价
 
-复现2万窗口解耦训练：
-
-```bash
-./run_masks_tmux.sh start all --gpus auto
-./run_masks_tmux.sh status
-```
-
-在已有 `outputs/masks_only_v1` 缓存和最佳权重基础上扩展到10万窗口：
+以下源目录是服务器上一轮大实验示例；必须包含完整 `mask_records.json`、`mask_cache/` 与v5 `models/seed_0/best.pt`。缺失时明确报错，不回退到小数据集。
 
 ```bash
-./run_masks_expanded_tmux.sh start all --gpus auto
-./run_masks_expanded_tmux.sh status
+unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG RIND_TMUX_SESSION
+./run_implicit_masks_tmux.sh start all \
+  --source-root outputs/masks_disentangled_v5_complex245746 \
+  --expected-source-epoch 16 \
+  --run-name masks_implicit_v6_best16 \
+  --session rind_v6_best16 \
+  --gpus auto --auto-batch
+./run_implicit_masks_tmux.sh status --session rind_v6_best16
 ```
 
-扩展复用旧2万训练窗，仅新增8万；原验证和测试各2千窗保持不变。训练结束自动生成完整指标。配置、恢复命令和输出位置见 [扩展训练说明](Phase2_Multi_Source/docs/MASKS_EXPANDED.zh-CN.md)。后台任务启动后可断开SSH/VPN。
+全部原训练记录及追加复杂窗保留，验证/测试名单不变；真实数量以缓存索引和日志为准。任务在tmux后台运行，可断开SSH/VPN。再次启动复用配置与epoch末的 `last.pt`，不承诺恢复到中断batch。
 
-已完成标签准备时用 `start train`，只生成指标时用 `start evaluate`。默认最多选取所有符合空闲阈值的GPU，也可传 `--gpus 6` 或 `--gpu-ids 0,2,3`。
+```bash
+./run_implicit_masks_tmux.sh logs --session rind_v6_best16
+./run_implicit_masks_tmux.sh attach --session rind_v6_best16
+./run_implicit_masks_tmux.sh start evaluate --session rind_v6_best16 --gpus auto
+```
 
-单源定位与旧结果浏览继续从Phase1目录使用原入口；完整定位流程见 [完整训练说明](Phase2_Multi_Source/docs/DECOMPOSITION_TRAINING.zh-CN.md)。新分层模型的可视化接入情况以对应说明为准，旧定位浏览器展示的是已有定位实验。
+最后一条只做正式评价。上述命令的新输出位于 `Phase2_Multi_Source/outputs/masks_implicit_v6_best16/`，保留旧权重，并检查继承的最佳轮次为16：
 
-## 检查与服务器打包
+- `models/seed_0/best.pt`、`last.pt`：最佳模型与恢复断点。
+- `training_summary.json`、`models/seed_0/training.json`：训练记录。
+- `evaluation/seed_0/primary_metrics.json`：两个主要指标及分层结果。
+- `evaluation/seed_0/reference_comparison.zh-CN.md`：相同名单上的旧最终best/新best对比；旧训练未完成时记录pending。
+- `tmux_runs/`：持久日志、执行命令、退出码。
+
+当前运行和加速细节见 [best16续训说明](Phase2_Multi_Source/docs/V6_BEST16_RUN.zh-CN.md)，完整协议见 [v6说明](Phase2_Multi_Source/docs/SEQUENTIAL_COUNT_SHAPE.zh-CN.md)。历史v1–v5、数据扩充、诊断、槽数搜索与动态观测入口集中在 [Phase2文档索引](Phase2_Multi_Source/docs/README.zh-CN.md)。旧定位浏览器仍可用于对应旧产物，当前纯分层结果不自动获得完整位置场可视化。
+
+## 检查与服务器包
 
 ```bash
 "$RIND_PYTHON" tools/check_repo.py
 "$RIND_PYTHON" tools/package_update.py
 ```
 
-默认生成 `dist/RIND_Phase2_Update.tar.gz`，始终使用同一文件名；也可用 `--output /path/to/RIND_Phase2_Update.tar.gz`。更新包按白名单从正式目录构建，不再依赖临时更新副本。解压到服务器现有安装的父目录即可覆盖代码，保留已有数据、缓存和模型。
+默认生成 `dist/RIND_Phase2_Update.tar.gz`；解压前缀固定为 `RIND_Phase2_Training_Minimal`。可以用 `--output /path/to/RIND_Phase2_Update.tar.gz` 指定同名目标。源码包不含原始数据、缓存、虚拟环境、权重或逐窗结果。
 
-未完成的研究包括有效层的单源物理可实现性、严格整窗解耦成功率、多源定位端到端验证，以及多视窗信息融合与动态扩窗。分层标签目前是既有BFS规则的有效贡献，不应直接解释成真实源逐个恢复。
+本地的这些实验产物仍保留，由 `.gitignore` 排除。GitHub保存源码、配置、测试、方法与紧凑证据。维护规则见 [仓库整理约定](docs/REPOSITORY_MAINTENANCE.zh-CN.md)。
+
+## 单源RL动态选窗（独立实验）
+
+冻结已有Phase1定位器，训练选路策略。新版从一个16×16块开始，每次在整个已观测区域的四邻接边缘添加一个新块；独立查询Phase1，保留原始小窗概率的逐点最小值，再归一化。新增全量配置，继承全部80,000/10,000/10,000场景划分，测试排除上轮审阅的128个场景；以实际解析数量为准。每个训练场景至少完成一条轨迹后才允许结束。原64块乘积融合实验保留。
+
+```bash
+./run_single_source_rl_tmux.sh start all --gpus auto \
+  --run-name single_source_rl_frontier16_minimum_full \
+  --config configs/active_rl_frontier16_minimum_full.json \
+  --phase1-run outputs/experiments/phase1_100k_multiscale_h20_memmap \
+  --data-root data/raw/phase1-single-source-100k
+./run_single_source_rl_tmux.sh status --run-name single_source_rl_frontier16_minimum_full
+```
+
+运行、融合定义、参数与逐步HTML可视化见 [16块最小值版指南](Phase1_Single_Source_Single_Intensity/docs/FRONTIER16_MINIMUM_RL.zh-CN.md)。服务器原v1已完成128场景测试：观测扩展有效，但PPO未证明优于随机或直接扩窗；详见 [审核报告](Phase1_Single_Source_Single_Intensity/docs/results/rl_single_source_v1_review.zh-CN.md)。v2完成本地真实数据流程验证，100k模型的选路收益和H20效率待服务器评价。真源只用于训练奖励及离线评价，不进入策略。

@@ -3,11 +3,16 @@ from pathlib import Path
 import math
 
 
-def validate_mask_cache(index, cache_root, max_slots):
+def validate_mask_cache(index, cache_root, max_slots, *,
+                        splits=("train", "validation", "test"),
+                        allow_overflow_splits=()):
     """Check complete splits, identities, offsets and exact file lengths.
 
     Does not re-read bulk arrays. Numerical reconstruction is checked when the
     cache is built, and the training loop rejects nonfinite losses/gradients.
+    Search can omit locked-test validation until selection is complete. Only
+    explicit locked-test evaluation can retain capacity-overflow labels; its
+    evaluator counts their missing predictions instead of truncating targets.
     """
     if index.get("schema") != "rind-local-mask-labels-v1" or index.get("task") != "decomposition_only":
         raise ValueError("mask-only training requires a mask-only cache")
@@ -18,8 +23,12 @@ def validate_mask_cache(index, cache_root, max_slots):
         raise ValueError("invalid cached world size")
     if index.get("candidate_renders") != 0 or index.get("probability_fields_saved") is not False:
         raise ValueError("mask-only cache unexpectedly contains position supervision")
+    if (not splits or len(set(splits)) != len(splits) or
+            set(splits) - {"train", "validation", "test"} or
+            set(allow_overflow_splits) - {"test"}):
+        raise ValueError("invalid validation splits/overflow policy")
     membership = {}
-    for split in ("train", "validation", "test"):
+    for split in splits:
         rows = index.get("records", {}).get(split)
         if not isinstance(rows, list) or not rows or index.get("counts", {}).get(split) != len(rows):
             raise ValueError(f"empty or inconsistent {split} records")
@@ -42,7 +51,8 @@ def validate_mask_cache(index, cache_root, max_slots):
                     max(window[0] + side, window[1] + side) > world):
                 raise ValueError("invalid cached window coordinates")
             strengths = row["intensities"]
-            if (not 1 <= len(strengths) <= max_slots or
+            limit = 32 if split in allow_overflow_splits else max_slots
+            if (not 1 <= len(strengths) <= limit or
                     any(not math.isfinite(float(a)) or a <= 0 for a in strengths) or
                     row.get("layer_count", len(strengths)) != len(strengths)):
                 raise ValueError("invalid cached layer count/strength")

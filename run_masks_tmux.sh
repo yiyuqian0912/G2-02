@@ -24,6 +24,16 @@ fi
 RIND_MASKS_CONFIG="$("$python_bin" -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$RIND_MASKS_CONFIG")"
 RIND_TMUX_OUTPUT_ROOT="$("$python_bin" -c 'import json,sys; from pathlib import Path; p=Path(json.loads(Path(sys.argv[1]).read_text())["output_root"]); print(p if p.is_absolute() else Path(sys.argv[2])/p)' "$RIND_MASKS_CONFIG" "$ROOT/Phase2_Multi_Source")"
 export RIND_TMUX_OUTPUT_ROOT
+inventory_only="$("$python_bin" -c 'import json,sys; print(int(json.load(open(sys.argv[1])).get("training_expansion",{}).get("mode")=="inventory"))' "$RIND_MASKS_CONFIG")"
+if [[ "$inventory_only" == 1 ]]; then
+  export RIND_TMUX_JOB_LABEL=inventory
+  if [[ "$action" == start ]]; then
+    case "$task" in
+      prepare|index|all) task=prepare ;;
+      *) echo 'Inventory-only configuration: training/evaluation is disabled; use start prepare.' >&2; exit 2 ;;
+    esac
+  fi
+fi
 export RIND_TMUX_RUNNER="$ROOT/run_masks.sh"
 export RIND_TMUX_TASK="$task"
 export RIND_TMUX_FRONTEND="${RIND_TMUX_FRONTEND:-./run_masks_tmux.sh}"
