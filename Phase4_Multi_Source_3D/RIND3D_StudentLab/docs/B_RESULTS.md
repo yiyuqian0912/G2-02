@@ -399,6 +399,30 @@ Solid-separated: F2 − G0 = −0.16, the same co-adaptation as F1.
 
 
 
+### 4.7 F6 (F5 + dropout, flag, consensus) and the confirm selection
+
+| | T* | B1K | sep | all-lit | all-dark | T* KL | HPD-MAE |
+|---|---|---|---|---|---|---|---|
+| F5 | 7.97 | 7.98 | 0.42 | −0.03 | 0.29 | 2.32 | 0.031 |
+| F6 | 7.96 [7.73, 8.19] | 7.96 | 0.39 | −0.03 | 0.26 | 2.33 | 0.039 |
+
+**Paired F6 − F5:**
+* T* −0.01 [−0.03, 0.01];
+* violating rows +0.12 [−0.02, 0.28];
+* law-obeying rows −0.02 [−0.04, −0.01].
+
+**Readings.**
+* Combining the components does not add up. Consensus and dropout bring their small violating-row gain, but cost a little on law-obeying rows.
+* **Unresolved: dropout did not repair facet-free windows under quadrature.**
+  * Solid-separated rows have no facets at all (0 of 486 dev rows), so only the generic field acts there.
+  * With the cell-centre factor, dropout + flag lifted them from 0.37–0.42 (F1 seeds) to 0.58–0.64 (F1drop, F3, F4). With quadrature, F6 stays at 0.39.
+  * The seed spread on this small set is ~0.1 nats (G0 s0/s1: 0.57/0.46). The cause is untested.
+
+**Confirm selection (amendments A1/A3, applied mechanically).**
+* Dev T* IG of the candidates: F3 7.75, F4 7.77, **F5 7.97**, F6 7.96.
+* F5 is the largest and beats F1 s0 by 0.25 > 0.06. **The best projective arm is F5_s0**, and its M = 4 test-time variant is the A2 secondary comparison.
+* Recorded before the confirm split was opened.
+
 ## 5. Q3 (H1): does posterior supervision still matter once the inductive bias is right?
 
 Same architectures, same rows and MIS weights, 8k steps, seed 0. The only change is the target: a one-hot at the true
