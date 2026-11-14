@@ -40,6 +40,6 @@ configs/F1side_s0.json
 configs/G0fam_s0.json
 configs/F1fam_s0.json
 # single-change arms of F3 (dropout+flag only; two-hypothesis only); sampling design; window-aware prior
-configs/F1hyp_s0.json
-configs/F1b1k_s0.json
+# configs/F1hyp_s0.json   (dropped: F3 - F1drop already isolates the occluder branch, +0.01 T*)
+# configs/F1b1k_s0.json   (dropped: sampling design is not among the brief's hypotheses; MIS was settled by the pilot)
 configs/Gblind_s0.json
