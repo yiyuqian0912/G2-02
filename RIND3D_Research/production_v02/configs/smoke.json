@@ -1,3 +1,0 @@
-{"seed": 20261202, "slots": 20, "shard_size": 10, "profile_schedule": ["SB", "MA"], "multi_K": [2, 3, 4],
- "renderer_backend": "cuda_certified", "max_attempts": 2,
- "caps": {"scene_seconds": 600, "field_seconds": 300, "verification_seconds": 300}}

@@ -1,2 +1,0 @@
-{"scenes": [], "tasks": 449, "workers": 15, "kw": {"validate_n": 4096}}
-{"tasks": 449, "wall": 114.58142912499989, "labels_per_s": 3.918610576153437, "gpu_util_mean": 89.21739130434783, "proj_1k_hours": 11.327852967726573}

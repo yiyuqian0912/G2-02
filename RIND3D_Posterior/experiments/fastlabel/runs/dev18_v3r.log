@@ -1,3 +1,0 @@
-{"scenes": ["000907", "000970", "000985", "000112", "000897", "000573", "000068", "000104", "000737", "000332", "000101", "000569", "000720", "000360", "000667", "000091", "000408", "000066"], "tasks": 2562, "workers": 15, "kw": {}}
-/home/yushu/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 7 leaked semaphore objects to clean up at shutdown
-  warnings.warn('resource_tracker: There appear to be %d '

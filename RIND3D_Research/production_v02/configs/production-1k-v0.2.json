@@ -1,6 +1,0 @@
-{"campaign": "rind3d-production-v0.2-1k (NOT LAUNCHED; requires explicit authorization)",
- "seed_file": "REPLACE: path to a private file holding a 256-bit hexadecimal master seed (never committed, never published)",
- "slots": 1008, "shard_size": 24,
- "profile_schedule": ["SB", "MA"], "multi_K": [2, 3, 4], "renderer_backend": "cuda_certified", "max_attempts": 2,
- "caps": {"scene_seconds": 600, "field_seconds": 300, "verification_seconds": 300, "canary_wall_seconds": 43200},
- "notes": "identical contract and policies to the accepted canary; only the slot count, the private master seed and the wall cap differ"}
