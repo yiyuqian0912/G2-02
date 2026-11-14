@@ -1,0 +1,194 @@
+{
+ "FL_B1K_s0": {
+  "tstar": {
+   "n_ref": 6321,
+   "full_world_info_KL_q_u": 10.322873856912349,
+   "student_gain_on_ref_rows": 3.7688168819366514,
+   "share_recovered": 0.365093764989969
+  },
+  "ood_nat_sep": {
+   "n_ref": 59,
+   "full_world_info_KL_q_u": 1.9611629435737887,
+   "student_gain_on_ref_rows": 0.891421022334121,
+   "share_recovered": 0.4545369497496735
+  },
+  "ood_rel_sep": {
+   "n_ref": 440,
+   "full_world_info_KL_q_u": 1.925066418310826,
+   "student_gain_on_ref_rows": 0.7066801794724746,
+   "share_recovered": 0.3670939208905634
+  },
+  "ood_nat_alllit": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 0.3644440362766322,
+   "student_gain_on_ref_rows": -0.006406185362074106,
+   "share_recovered": -0.01757796732668023
+  },
+  "ood_nat_alldark": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 1.6322278523663958,
+   "student_gain_on_ref_rows": 0.2016121864318848,
+   "share_recovered": 0.1235196336954969
+  }
+ },
+ "FL_B1K_s1": {
+  "tstar": {
+   "n_ref": 6321,
+   "full_world_info_KL_q_u": 10.322873856912349,
+   "student_gain_on_ref_rows": 3.884143089986791,
+   "share_recovered": 0.3762656740579961
+  },
+  "ood_nat_sep": {
+   "n_ref": 59,
+   "full_world_info_KL_q_u": 1.9611629435737887,
+   "student_gain_on_ref_rows": 0.9486894844548145,
+   "share_recovered": 0.4837382266289594
+  },
+  "ood_rel_sep": {
+   "n_ref": 440,
+   "full_world_info_KL_q_u": 1.925066418310826,
+   "student_gain_on_ref_rows": 0.7460864719070925,
+   "share_recovered": 0.3875640158752318
+  },
+  "ood_nat_alllit": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 0.3644440362766322,
+   "student_gain_on_ref_rows": -0.027590253618028433,
+   "share_recovered": -0.07570504898339447
+  },
+  "ood_nat_alldark": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 1.6322278523663958,
+   "student_gain_on_ref_rows": 0.23900785975986058,
+   "share_recovered": 0.14643045051176415
+  }
+ },
+ "FL_MIS_s0": {
+  "tstar": {
+   "n_ref": 6321,
+   "full_world_info_KL_q_u": 10.322873856912349,
+   "student_gain_on_ref_rows": 3.976872375344873,
+   "share_recovered": 0.3852485684189486
+  },
+  "ood_nat_sep": {
+   "n_ref": 59,
+   "full_world_info_KL_q_u": 1.9611629435737887,
+   "student_gain_on_ref_rows": 1.0359351857075119,
+   "share_recovered": 0.5282249438283529
+  },
+  "ood_rel_sep": {
+   "n_ref": 440,
+   "full_world_info_KL_q_u": 1.925066418310826,
+   "student_gain_on_ref_rows": 0.7592186770915386,
+   "share_recovered": 0.39438570527749617
+  },
+  "ood_nat_alllit": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 0.3644440362766322,
+   "student_gain_on_ref_rows": -0.030079083972507054,
+   "share_recovered": -0.08253416431178873
+  },
+  "ood_nat_alldark": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 1.6322278523663958,
+   "student_gain_on_ref_rows": 0.29313763512505425,
+   "share_recovered": 0.1795935749411853
+  }
+ },
+ "FL_MIS_s1": {
+  "tstar": {
+   "n_ref": 6321,
+   "full_world_info_KL_q_u": 10.322873856912349,
+   "student_gain_on_ref_rows": 3.9569221259730125,
+   "share_recovered": 0.3833159429070616
+  },
+  "ood_nat_sep": {
+   "n_ref": 59,
+   "full_world_info_KL_q_u": 1.9611629435737887,
+   "student_gain_on_ref_rows": 0.8586798916074047,
+   "share_recovered": 0.4378421968562434
+  },
+  "ood_rel_sep": {
+   "n_ref": 440,
+   "full_world_info_KL_q_u": 1.925066418310826,
+   "student_gain_on_ref_rows": 0.6640976593748106,
+   "share_recovered": 0.3449738944371237
+  },
+  "ood_nat_alllit": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 0.3644440362766322,
+   "student_gain_on_ref_rows": -0.07391204304165311,
+   "share_recovered": -0.2028076623143038
+  },
+  "ood_nat_alldark": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 1.6322278523663958,
+   "student_gain_on_ref_rows": 0.2523392783270942,
+   "share_recovered": 0.1545980715628973
+  }
+ },
+ "OH_B1K_s0": {
+  "tstar": {
+   "n_ref": 6321,
+   "full_world_info_KL_q_u": 10.322873856912349,
+   "student_gain_on_ref_rows": 1.14377572837436,
+   "share_recovered": 0.11080012642104221
+  },
+  "ood_nat_sep": {
+   "n_ref": 59,
+   "full_world_info_KL_q_u": 1.9611629435737887,
+   "student_gain_on_ref_rows": 0.13851288447916002,
+   "share_recovered": 0.07062793274420671
+  },
+  "ood_rel_sep": {
+   "n_ref": 440,
+   "full_world_info_KL_q_u": 1.925066418310826,
+   "student_gain_on_ref_rows": -0.25008737534007836,
+   "share_recovered": -0.12991103733424467
+  },
+  "ood_nat_alllit": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 0.3644440362766322,
+   "student_gain_on_ref_rows": -0.21036655637953017,
+   "share_recovered": -0.5772259536162389
+  },
+  "ood_nat_alldark": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 1.6322278523663958,
+   "student_gain_on_ref_rows": -0.5017368899451361,
+   "share_recovered": -0.3073939028902861
+  }
+ },
+ "OH_MIS_s0": {
+  "tstar": {
+   "n_ref": 6321,
+   "full_world_info_KL_q_u": 10.322873856912349,
+   "student_gain_on_ref_rows": 1.5960750389435878,
+   "share_recovered": 0.15461537756511792
+  },
+  "ood_nat_sep": {
+   "n_ref": 59,
+   "full_world_info_KL_q_u": 1.9611629435737887,
+   "student_gain_on_ref_rows": 0.2554751333946484,
+   "share_recovered": 0.13026716328277194
+  },
+  "ood_rel_sep": {
+   "n_ref": 440,
+   "full_world_info_KL_q_u": 1.925066418310826,
+   "student_gain_on_ref_rows": -0.08896191560856882,
+   "share_recovered": -0.04621238766744972
+  },
+  "ood_nat_alllit": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 0.3644440362766322,
+   "student_gain_on_ref_rows": -0.8510018401675755,
+   "share_recovered": -2.3350686400630805
+  },
+  "ood_nat_alldark": {
+   "n_ref": 180,
+   "full_world_info_KL_q_u": 1.6322278523663958,
+   "student_gain_on_ref_rows": -0.2556525919172499,
+   "share_recovered": -0.15662800481354738
+  }
+ }
+}
