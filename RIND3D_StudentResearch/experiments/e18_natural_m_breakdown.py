@@ -6,11 +6,12 @@ channels. P(m >= 1) = sum_m pi_m is the natural acceptance rate (no source in bo
 Reported per (L, K), per (L, family) for K = 4 (the only K where m = 4 exists), and per (L, family, K) in the JSON.
 Shares are of WINDOWS among admissible m >= 1 windows, and of CHANNELS (examples: m channels per window).
 Scenes are weighted equally (each scene one world). usage: e18_natural_m_breakdown.py > out/e18_natural_m.json"""
+import os
 import json, sys
 from pathlib import Path
 import numpy as np
 
-ROOT = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
+ROOT = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1")
 SIDES = (64, 128, 256)
 rows = []
 for d in sorted((ROOT / "scenes").iterdir()):

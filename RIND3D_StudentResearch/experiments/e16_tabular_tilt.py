@@ -9,13 +9,14 @@ estimate for one sigma-algebra, not a bound). Noise reference: the same TV betwe
 weighted for T* (split by scene hash), and the B1K-vs-T* TV computed separately on each half.
 All non-test release scenes; labels must exist (run after the backfill). Read-only.
 usage: e16_tabular_tilt.py <out.json> [workers]"""
+import os
 import json, sys, hashlib
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_StudentResearch/pilot")
-REL = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "RIND3D_StudentResearch/pilot"))
+REL = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1")
 QUOTA = {64: 16, 128: 24, 256: 24}
 LITB = np.array([0.01, 0.1, 0.5, 0.9, 0.99])
 

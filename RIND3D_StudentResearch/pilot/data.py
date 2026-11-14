@@ -7,12 +7,13 @@ Weights (per natural-proposal unit; A_TASK_DEFINITION.md section 5; omega_hat = 
   w_nat   natural rows: 1 / n_p                                (T*, natural supplement only)
 Training samples examples with probability proportional to the arm's weight after equal-side normalisation (each side
 1/3 of the mass; side is an input, so the optimum is unchanged), and uses an unweighted loss (same expected gradient)."""
+import os
 import json
 from pathlib import Path
 import numpy as np
 
-REL = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
-NAT = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/natural_supplement_v1")
+REL = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1")
+NAT = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "natural_supplement_v1")
 QUOTA = {64: 16, 128: 24, 256: 24}
 ALPHA_QUOTA = {64: 0.20, 128: 0.09, 256: 0.04}
 ROLES = ("pilot-train", "pilot-select", "pilot-eval")

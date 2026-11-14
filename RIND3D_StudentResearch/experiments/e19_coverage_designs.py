@@ -25,11 +25,12 @@ Targets (declared in the report, judgement based on the 1K pilot's scene-count s
   train: >= 3,000 independent scenes, >= 20,000 effective channels, T* within-stratum ESS >= 5,000 per (L, m);
   family: m = 4 at every side: >= 30 independent test scenes and >= 300 train scenes per family.
 usage: e19_coverage_designs.py > out/e19_coverage_designs.json"""
+import os
 import json, sys
 from pathlib import Path
 import numpy as np
 
-ROOT = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
+ROOT = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1")
 SIDES = (64, 128, 256)
 N = 100_000; SPLIT = dict(train=0.8, test=0.1)
 NW = 4

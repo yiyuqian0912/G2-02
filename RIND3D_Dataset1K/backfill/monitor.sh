@@ -1,8 +1,9 @@
 #!/bin/bash
 # Emits one progress line every ${1:-900} s, and immediately on failures, Python errors, or process exit.
-R=/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/RIND3D_HANDOFF/env.sh"   # RIND3D_REPO, RIND3D_1K_DATA, interpreters, NVRTC
+R=$RIND3D_1K_DATA/release_1k_v1
 LOG=$R/labels_fastlabel_backfill.log
-PID=$(cat /home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K/backfill/backfill.pid)
+PID=$(cat $RIND3D_REPO/RIND3D_Dataset1K/backfill/backfill.pid)
 nf0=$(grep -c '"failure"' $LOG); ne0=$(grep -c '"error"' $R/labels_log.jsonl)
 last=0
 while true; do

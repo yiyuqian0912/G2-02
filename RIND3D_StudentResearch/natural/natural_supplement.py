@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import zstandard
 
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "RIND3D_Dataset1K"))
 from rind3d.geometry import keyed_rng
 from rind3d_1k.physical import Fields, contains_any
 from rind3d_1k.loader import split_of

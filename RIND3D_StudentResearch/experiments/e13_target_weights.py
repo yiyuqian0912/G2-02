@@ -16,11 +16,12 @@ Outputs (JSON on stdout):
 5. design study (expected values computed from each scene's natural per-proposal m-distribution pi_m = rate_m / 1024):
    ESS of T* per labelled example, M-histograms, maximum weights, for release-only omega/c, a natural supplement with
    n_p fixed proposals per side, and the multiple-importance (balance-heuristic) union of both."""
+import os
 import json, sys
 from pathlib import Path
 import numpy as np
 
-ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else "/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
+ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else str(Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1"))
 SIDES = (64, 128, 256)
 QUOTA = {64: 16, 128: 24, 256: 24}
 ALPHA_QUOTA = {64: 0.20, 128: 0.09, 256: 0.04}

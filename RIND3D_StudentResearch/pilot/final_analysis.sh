@@ -1,9 +1,10 @@
 #!/bin/bash
 # Final pilot analysis over all 13 arms with the declared paired comparisons; writes experiments/out/pilot_analysis.json
 # and the markdown tables experiments/out/pilot_tables.md; plus seed-averaged effects (pilot_seed_effects.json).
-R=/home/yushu/Projects/RIND/RIND3D_1K_data/pilot_runs_v1
-PY=/home/yushu/Projects/Post-Attention-Arch/.venv/bin/python
-cd /home/yushu/Projects/RIND/G2-02-3d/RIND3D_StudentResearch/pilot
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/RIND3D_HANDOFF/env.sh"   # RIND3D_REPO, RIND3D_1K_DATA, interpreters, NVRTC
+R=$RIND3D_1K_DATA/pilot_runs_v1
+PY=$RIND3D_TORCH_PY
+cd $RIND3D_REPO/RIND3D_StudentResearch/pilot
 O=../experiments/out
 ARMS=""
 for a in FL_B1K_s0 FL_B1K_s1 OH_B1K_s0 OH_B1K_s1 FL_MIS_s0 FL_MIS_s1 OH_MIS_s0 OH_MIS_s1 FL_TREL_s0 FL_B1K_sc25_s0 OH_B1K_sc25_s0 FL_B1K_ex25_s0 OH_B1K_ex25_s0; do

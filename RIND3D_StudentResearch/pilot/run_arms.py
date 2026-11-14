@@ -1,10 +1,11 @@
 """Run pilot arms sequentially (train -> evaluate best checkpoint on pilot-eval), resumable.
 usage: run_arms.py <feat_dir> <runs_dir> <arms.json> [--train-only | --eval-only]
 arms.json: list of arm dicts (train.py keys). A finished arm has runs/<name>/eval.npz and is skipped."""
+import os
 import json, subprocess, sys, time
 from pathlib import Path
 
-PY = "/home/yushu/Projects/Post-Attention-Arch/.venv/bin/python"
+PY = os.environ.get("RIND3D_TORCH_PY", sys.executable)   # torch interpreter (RIND3D_HANDOFF/env.sh)
 HERE = Path(__file__).resolve().parent
 feat, runs, arms = sys.argv[1], Path(sys.argv[2]), json.loads(Path(sys.argv[3]).read_text())
 for arm in arms:

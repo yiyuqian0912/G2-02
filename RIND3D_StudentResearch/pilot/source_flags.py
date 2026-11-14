@@ -1,12 +1,13 @@
 """Privileged analysis flags per (scene, source): is SOLID within 8 / 32 voxels (inf-norm) of the true source?
 Read from the stored 1024^3 SOLID field (read-only). Used only to stratify evaluation (F_OOD_BENCHMARK.md stratum E).
 usage: source_flags.py <out.json>   (labeller venv: rind3d.pack)"""
+import os
 import json, sys
 from pathlib import Path
 import numpy as np
 from rind3d.pack import RINDPack
 
-REL = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
+REL = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1")
 out = {}
 for d in sorted((REL / "scenes").iterdir()):
     if not (d / "SEAL.json").exists():

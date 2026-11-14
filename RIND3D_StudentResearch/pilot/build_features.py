@@ -19,8 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "natural"))
 from featlib import pooled  # noqa: E402
 
-REL = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
-NAT = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/natural_supplement_v1")
+REL = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1")
+NAT = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "natural_supplement_v1")
 P = 32
 ROLES = ("pilot-train", "pilot-select", "pilot-eval")
 FAMILIES = ("barriers", "convex_polyhedra", "corridors", "multiscale_convex", "occluder_clusters", "prisms",

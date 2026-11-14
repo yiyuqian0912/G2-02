@@ -13,7 +13,7 @@ import json, os, sys, time
 from pathlib import Path
 import numpy as np
 
-NAT = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/natural_supplement_v1")
+NAT = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "natural_supplement_v1")
 HERE = Path(__file__).resolve().parent
 N_PER = 60
 SEED_BASE = 20261115          # label stream base seed of this family (differs from the release and NAT-1K mixed labels)
@@ -79,7 +79,7 @@ def worker(t, engine, kw):
 
 def run(tasks_p, k, timeout):
     import multiprocessing as mp
-    sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K")
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "RIND3D_Dataset1K"))
     from rind3d_1k.supervise import Supervisor
     tasks = []
     for line in open(tasks_p):
@@ -89,8 +89,8 @@ def run(tasks_p, k, timeout):
     todo = [t for t in tasks if not (Path(t[0]) / "labels" / "ood" / f"w{t[1]:03d}_s{t[2]}.npz").exists()]
     ctx = mp.get_context("spawn")
     sup = Supervisor(ctx, ["ood"] * k, "label_ood:worker", dict(n_tasks=n_tasks), 5,
-                     sys_path=[str(HERE), "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K",
-                               "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Posterior/src"],
+                     sys_path=[str(HERE), str(Path(__file__).resolve().parents[2] / "RIND3D_Dataset1K"),
+                               str(Path(__file__).resolve().parents[2] / "RIND3D_Posterior/src")],
                      init=("rind3d_1k.fastlabel:set_gpu_lock", (ctx.Semaphore(1),)))
     log = open(Path(tasks_p).with_suffix(".log.jsonl"), "a")
 

@@ -3,11 +3,12 @@ beta = vol(D(G) & box(W)) / vol(D(G)), K ~ example-level (size-biased) source co
 fraction (sum of brick populations of the stored 1024^3 SOLID field; metadata only) and the realised k histogram.
 Reports per side the worst-case bound TV(p*_T*, p*_N1) <= 1 - g(beta_max)/g(beta_min), with beta ranging over the solid
 fractions of the window's family (an upper bound on the variation across worlds compatible with the same X)."""
+import os
 import json, sys
 from pathlib import Path
 import numpy as np
 from rind3d.pack import RINDPack
-ROOT = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
+ROOT = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1")
 phi, fam, ks = [], [], []
 for d in sorted((ROOT / "scenes").iterdir()):
     meta = json.loads((d / "scene.json").read_text())

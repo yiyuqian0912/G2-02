@@ -13,11 +13,12 @@ Designs:
   D3  hybrid: per side 2 m-balanced + 2 natural windows, combined by the balance heuristic
   D4  D1 with a stored natural m = 0 reservoir (all-lit / all-dark only windows) for OOD (no labels needed for T*)
 The scene weight of T* is per natural proposal, so ESS accounts for the spread of omega across scenes."""
+import os
 import json, sys
 from pathlib import Path
 import numpy as np
 
-ROOT = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
+ROOT = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1")
 SIDES = (64, 128, 256)
 NW = 4                                     # windows per side in the 100K
 

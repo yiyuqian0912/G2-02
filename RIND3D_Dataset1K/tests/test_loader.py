@@ -11,7 +11,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 from rind3d_1k import loader as LD   # noqa: E402
 
-REL = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
+REL = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1")
 pytestmark = pytest.mark.skipif(not (REL / "scenes" / "000000").exists(), reason="release not available")
 
 

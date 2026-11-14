@@ -10,14 +10,15 @@ Two partitions:
   coarse: side x 2^3 window-centre cell x 6 lit-fraction bins
 Labels aggregated to 8^3 coarse cells (block size 1/8 of the world). Non-test release scenes; read-only.
 usage: e16b_tilt_permutation.py <out.json> [workers]"""
+import os
 import json, sys, hashlib
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_StudentResearch/pilot")
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K")
-REL = Path("/home/yushu/Projects/RIND/RIND3D_1K_data/release_1k_v1")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "RIND3D_StudentResearch/pilot"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "RIND3D_Dataset1K"))
+REL = (Path(os.environ.get("RIND3D_1K_DATA", "/home/yushu/Projects/RIND/RIND3D_1K_data")) / "release_1k_v1")
 QUOTA = {64: 16, 128: 24, 256: 24}
 LITB = np.array([0.01, 0.1, 0.5, 0.9, 0.99])
 NB = 8

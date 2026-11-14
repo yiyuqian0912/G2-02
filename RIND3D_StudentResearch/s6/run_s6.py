@@ -1,7 +1,8 @@
 """Run the S6 prototype (and optionally production v3.4) on listed tasks; one JSON line per task.
 usage: run_s6.py <scene_dir> <w> <s> [prod]"""
+from pathlib import Path
 import json, sys, time
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_StudentResearch/s6")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "RIND3D_StudentResearch/s6"))
 import numpy as np
 from fastlabel_s6 import label_task_s6
 sd, w, s = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])

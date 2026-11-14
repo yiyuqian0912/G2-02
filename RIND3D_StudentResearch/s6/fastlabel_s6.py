@@ -23,7 +23,7 @@ import sys, time
 from pathlib import Path
 import numpy as np
 
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Dataset1K")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "RIND3D_Dataset1K"))
 from rind3d_1k.fastlabel import pipeline as PL          # noqa: E402
 from rind3d_1k.fastlabel.pipeline import (DEFAULTS, VERSION, STAT_KIND, scene_cache, label_rng, design2, kstar,  # noqa: E402
                                           cp_lower, process_factory)

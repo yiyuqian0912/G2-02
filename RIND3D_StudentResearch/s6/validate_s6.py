@@ -5,8 +5,9 @@ usage: validate_s6.py <scene_dir> <w> <s> [n_b=4096] [n_prior=40000]
    -> p_hat = vol(F)/vol(B') with a 99% Clopper-Pearson interval (the certificate claims p >= 0.95).
 3. n_prior uniform points of the cube -> exact membership in F (exact GPU verifier) -> every feasible point must lie
    in a cell with positive label mass (soundness of F ⊆ B'); also the MC volume of F vs. sum(label) * p_hat."""
+from pathlib import Path
 import json, sys, time
-sys.path.insert(0, "/home/yushu/Projects/RIND/G2-02-3d/RIND3D_StudentResearch/s6")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "RIND3D_StudentResearch/s6"))
 import numpy as np
 from scipy.stats import beta
 from fastlabel_s6 import label_task_s6

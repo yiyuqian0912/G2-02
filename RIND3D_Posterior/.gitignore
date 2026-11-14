@@ -1,0 +1,5 @@
+# run artifacts of research harnesses (never source)
+*.pid
+*.done
+experiments/**/*.log
+__pycache__/

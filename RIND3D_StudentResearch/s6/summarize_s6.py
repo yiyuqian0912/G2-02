@@ -1,7 +1,7 @@
 """Table: S6 prototype vs production v3.4 (audit E11) on the 18 audit all-dark tasks."""
 import json
 from pathlib import Path
-E11 = Path("/home/yushu/Projects/RIND/G2-02-3d/RIND3D_Audit/experiments/out/e11_fastlabel_extreme.jsonl")
+E11 = (Path(__file__).resolve().parents[2] / "RIND3D_Audit/experiments/out/e11_fastlabel_extreme.jsonl")
 prod = {}
 for l in open(E11):
     r = json.loads(l)
