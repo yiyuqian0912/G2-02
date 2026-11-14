@@ -360,3 +360,179 @@ def plane_factor_q_torch(mu, n, s0, sth, eps_logit, mask, M=2):
                     S = S + torch.where(mask[:, k, None], phi, torch.zeros_like(phi))
                 lse = S if lse is None else torch.logaddexp(lse, S)
     return (lse - math.log(M ** 3)).view(-1, NC ** 3, NF ** 3)
+
+
+# ---------------------------------------------------------------- sparse quadrature (used by F5)
+# A cell uses the quadrature only if >= 2 planes are non-negligible at its centre (Gaussian part within e^-8 of the
+# floor, evaluated with the cell-centre variance); elsewhere at most one plane differs from its floor and the
+# cell-centre formula is kept. Blocks without any such cell skip the sub-point loop (most of the volume).
+# AMP: both paths approximate the cell *average* of the same function f = eps + (1 - eps) exp(-d^2 / 2 v0),
+# v0 = s0^2 + r^2 sth^2: a Gaussian smoothed by variance c has amplitude sqrt(v0 / (v0 + c)). Without it, the two paths
+# give a single plane different mass relative to the floor (peak-normalised kernels of different widths), and the switch
+# between them distorts lines (measured: -0.12 nats on two-plane windows at M = 2).
+@triton.jit
+def _term(x, y, z, base, C0X: tl.constexpr, AMP: tl.constexpr):
+    mx, my, mz, nx, ny, nz, s0, sth, le, l1 = _phi(x, y, z, base)
+    dx = x - mx; dy = y - my; dz = z - mz
+    d = nx * dx + ny * dy + nz * dz
+    r2 = dx * dx + dy * dy + dz * dz
+    v0 = s0 + r2 * sth
+    s2 = C0X + v0
+    u = d * d / (2.0 * s2)
+    a = l1 - u
+    if AMP:
+        a += 0.5 * tl.log(v0 / s2)
+    # d a / d v0 (through s2 and the amplitude)
+    av = u / s2
+    if AMP:
+        av += 0.5 * C0X / (v0 * s2)
+    return a, le, d, s2, av, dx, dy, dz, nx, ny, nz, sth, r2
+
+
+@triton.jit
+def _store_grads(o, gq, a, le, d, s2, av, dx, dy, dz, nx, ny, nz, sth, r2):
+    w = 1.0 / (1.0 + tl.exp(le - a))
+    gw = gq * w
+    ds = d / s2
+    tl.store(o + 0, tl.sum(gw * (ds * nx - 2.0 * av * sth * dx), 0))
+    tl.store(o + 1, tl.sum(gw * (ds * ny - 2.0 * av * sth * dy), 0))
+    tl.store(o + 2, tl.sum(gw * (ds * nz - 2.0 * av * sth * dz), 0))
+    tl.store(o + 3, tl.sum(-gw * ds * dx, 0))
+    tl.store(o + 4, tl.sum(-gw * ds * dy, 0))
+    tl.store(o + 5, tl.sum(-gw * ds * dz, 0))
+    tl.store(o + 6, tl.sum(gw * av, 0))
+    tl.store(o + 7, tl.sum(gw * av * r2, 0))
+    tl.store(o + 8, tl.sum(gq * (1.0 - w), 0))
+    tl.store(o + 9, tl.sum(gw, 0))
+
+
+@triton.jit
+def _subsum(x, y, z, P, b, K: tl.constexpr, C0: tl.constexpr, AMP: tl.constexpr, BLOCK: tl.constexpr):
+    S = tl.zeros([BLOCK], tl.float32)
+    for k in tl.static_range(K):
+        a, le, d, s2, av, dx, dy, dz, nx, ny, nz, sth, r2 = _term(x, y, z, P + (b * K + k) * 10, C0, AMP)
+        S += _lae(le, a)
+    return S
+
+
+@triton.jit
+def _fwdqs(P, OUT, SEL, K: tl.constexpr, NCELL: tl.constexpr, C0C: tl.constexpr, C0: tl.constexpr, BLOCK: tl.constexpr,
+           M: tl.constexpr, AMP: tl.constexpr):
+    b = tl.program_id(0); blk = tl.program_id(1)
+    j = blk * BLOCK + tl.arange(0, BLOCK)
+    x0, y0, z0 = _centre(j)
+    res = tl.zeros([BLOCK], tl.float32); cnt = tl.zeros([BLOCK], tl.int32)
+    for k in tl.static_range(K):
+        a, le, d, s2, av, dx, dy, dz, nx, ny, nz, sth, r2 = _term(x0, y0, z0, P + (b * K + k) * 10, C0C, AMP)
+        res += _lae(le, a)
+        cnt += (a >= le - 8.0).to(tl.int32)
+    sel = cnt >= 2
+    if tl.max(sel.to(tl.int32), 0) > 0:
+        lse = tl.full([BLOCK], -1e30, tl.float32)
+        for qa in tl.static_range(M):
+            for qb in tl.static_range(M):
+                for qc in tl.static_range(M):
+                    S = _subsum(x0 + ((qa + 0.5) / M - 0.5) * 8.0, y0 + ((qb + 0.5) / M - 0.5) * 8.0,
+                                z0 + ((qc + 0.5) / M - 0.5) * 8.0, P, b, K, C0, AMP, BLOCK)
+                    lse = _lae(lse, S)
+        res = tl.where(sel, lse - tl.log(M * M * M * 1.0), res)
+    tl.store(OUT + b * NCELL + j, res)
+    tl.store(SEL + b * NCELL + j, sel.to(tl.int8))
+
+
+@triton.jit
+def _bwdqs(P, G, OUTF, SEL, PART, K: tl.constexpr, NCELL: tl.constexpr, C0C: tl.constexpr, C0: tl.constexpr,
+           BLOCK: tl.constexpr, NBLK: tl.constexpr, M: tl.constexpr, AMP: tl.constexpr):
+    b = tl.program_id(0); blk = tl.program_id(1)
+    j = blk * BLOCK + tl.arange(0, BLOCK)
+    x0, y0, z0 = _centre(j)
+    g = tl.load(G + b * NCELL + j)
+    sel = tl.load(SEL + b * NCELL + j) > 0
+    gc = tl.where(sel, 0.0, g)
+    Q: tl.constexpr = M * M * M
+    for k in tl.static_range(K):                                   # cell-centre path (slot Q)
+        a, le, d, s2, av, dx, dy, dz, nx, ny, nz, sth, r2 = _term(x0, y0, z0, P + (b * K + k) * 10, C0C, AMP)
+        _store_grads(PART + (((b * NBLK + blk) * (Q + 1) + Q) * K + k) * 10, gc, a, le, d, s2, av, dx, dy, dz,
+                     nx, ny, nz, sth, r2)
+    if tl.max(sel.to(tl.int32), 0) > 0:                             # quadrature path (slots 0..Q-1; zero-filled otherwise)
+        lse = tl.where(sel, tl.load(OUTF + b * NCELL + j) + tl.log(Q * 1.0), 1e30)
+        gs = tl.where(sel, g, 0.0)
+        for qa in tl.static_range(M):
+            for qb in tl.static_range(M):
+                for qc in tl.static_range(M):
+                    x = x0 + ((qa + 0.5) / M - 0.5) * 8.0
+                    y = y0 + ((qb + 0.5) / M - 0.5) * 8.0
+                    z = z0 + ((qc + 0.5) / M - 0.5) * 8.0
+                    S = _subsum(x, y, z, P, b, K, C0, AMP, BLOCK)
+                    gq = gs * tl.exp(tl.minimum(S - lse, 0.0))
+                    q = (qa * M + qb) * M + qc
+                    for k in tl.static_range(K):
+                        a, le, d, s2, av, dx, dy, dz, nx, ny, nz, sth, r2 = _term(x, y, z, P + (b * K + k) * 10, C0, AMP)
+                        _store_grads(PART + (((b * NBLK + blk) * (Q + 1) + q) * K + k) * 10, gq, a, le, d, s2, av,
+                                     dx, dy, dz, nx, ny, nz, sth, r2)
+
+
+class PlaneFactorQSFn(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, P, M, amp):
+        P = P.contiguous().float(); B, K, _ = P.shape
+        out = torch.empty(B, NCELL, device=P.device, dtype=torch.float32)
+        sel = torch.empty(B, NCELL, device=P.device, dtype=torch.int8)
+        _fwdqs[(B, NCELL // BLOCK)](P, out, sel, K=K, NCELL=NCELL, C0C=SIGMA_CELL2, C0=(8.0 / M) ** 2 / 12.0, BLOCK=BLOCK,
+                                    M=M, AMP=amp)
+        ctx.save_for_backward(P, out, sel); ctx.M = M; ctx.amp = amp
+        return out.view(B, NC ** 3, NF ** 3)
+
+    @staticmethod
+    def backward(ctx, g):
+        P, out, sel = ctx.saved_tensors; M = ctx.M; B, K, _ = P.shape; nblk = NCELL // BLOCK
+        part = torch.zeros(B, nblk, M ** 3 + 1, K, 10, device=P.device, dtype=torch.float32)
+        _bwdqs[(B, nblk)](P, g.contiguous().float(), out, sel, part, K=K, NCELL=NCELL, C0C=SIGMA_CELL2,
+                          C0=(8.0 / M) ** 2 / 12.0, BLOCK=BLOCK, NBLK=nblk, M=M, AMP=ctx.amp)
+        return part.sum((1, 2)), None, None
+
+
+def plane_factor_qs_fused(mu, n, s0, sth, eps_logit, mask, M=2, amp=True):
+    """Sparse quadrature: M^3 sub-points only in cells where >= 2 planes are non-negligible; cell-centre factor elsewhere.
+    amp: amplitude-consistent cell average (see above); M = 1 with amp=True is the amplitude-corrected cell-centre factor."""
+    with torch.autocast("cuda", enabled=False):
+        le = torch.nn.functional.logsigmoid(eps_logit.float()); l1 = torch.nn.functional.logsigmoid(-eps_logit.float())
+        le = torch.where(mask, le, torch.zeros_like(le)); l1 = torch.where(mask, l1, torch.full_like(l1, -1e4))
+        P = torch.cat([mu.float(), n.float(), (s0.float() ** 2)[..., None], (sth.float() ** 2)[..., None], le[..., None], l1[..., None]], -1)
+        return PlaneFactorQSFn.apply(P, M, bool(amp))
+
+
+def plane_factor_qs_torch(mu, n, s0, sth, eps_logit, mask, M=2, amp=True):
+    """Reference implementation of the sparse rule (tests; any device)."""
+    from .density import cell_centres
+    le = torch.nn.functional.logsigmoid(eps_logit); l1 = torch.nn.functional.logsigmoid(-eps_logit)
+    C = cell_centres(mu.device).view(-1, 3); B, K, _ = mu.shape
+
+    def terms(X, c):
+        out = []
+        for k in range(K):
+            D = X[None] - mu[:, k, None]; d = (D * n[:, k, None]).sum(-1); r2 = (D * D).sum(-1)
+            v0 = s0[:, k, None] ** 2 + r2 * sth[:, k, None] ** 2; s2 = c + v0
+            a = l1[:, k, None] - d * d / (2 * s2) + (0.5 * torch.log(v0 / s2) if amp else 0)
+            out.append(a)
+        return out
+
+    A = terms(C, SIGMA_CELL2); cen = 0; cnt = 0
+    for k in range(K):
+        phi = torch.logaddexp(le[:, k, None].expand_as(A[k]), A[k])
+        cen = cen + torch.where(mask[:, k, None], phi, torch.zeros_like(phi))
+        cnt = cnt + ((A[k] >= le[:, k, None] - 8) & mask[:, k, None]).long()
+    sel = cnt >= 2
+    c0 = (8.0 / M) ** 2 / 12.0
+    offs = (torch.arange(M, device=mu.device, dtype=torch.float32) + 0.5) / M * 8.0 - 4.0
+    lse = None
+    for ox in offs:
+        for oy in offs:
+            for oz in offs:
+                At = terms(C + torch.stack([ox, oy, oz]), c0); S = 0
+                for k in range(K):
+                    phi = torch.logaddexp(le[:, k, None].expand_as(At[k]), At[k])
+                    S = S + torch.where(mask[:, k, None], phi, torch.zeros_like(phi))
+                lse = S if lse is None else torch.logaddexp(lse, S)
+    out = torch.where(sel, lse - math.log(M ** 3), cen)
+    return out.view(B, NC ** 3, NF ** 3), sel.view(B, NC ** 3, NF ** 3)

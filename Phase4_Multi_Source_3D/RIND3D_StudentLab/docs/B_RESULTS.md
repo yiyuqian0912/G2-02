@@ -158,6 +158,131 @@ On train-split rows, 3.8% of large facets miss the source by more than 4 voxels 
 
 F1's generic field co-adapts with the facet factor: almost every boundary-mixed training row has facets. On facet-free windows it can be weaker than G0, which is the motivation for F3's facet dropout.
 
+## 4. Q2: what must be built in?
+
+### 4.1 Information vs operator: G1 (the decisive control)
+
+**G1** is G0 plus the same X-measured facets as F1, entered as K extra key/value tokens of every cross-attention block. The facet embedding covers:
+* the centroid (Fourier features);
+* the normal;
+* the plane offset n·μ;
+* size and fit quality.
+
+G1 has **the information F1 has, but no geometric decoding operator**.
+
+| arm | T* IG | B1K IG | KL | IG by facets: 1 / 2 / 3 / ≥ 4 |
+|---|---|---|---|---|
+| G0 s0 | 3.90 | 3.83 | 6.37 | 2.62 / 4.30 / 4.72 / 5.19 |
+| **G1 s0** (facet tokens) | **3.81 [3.68, 3.95]** | 3.75 | 6.46 | 2.59 / 4.19 / 4.65 / 4.95 |
+| F1 s0 (facet factor) | 7.72 | 7.73 | 2.58 | 4.66 / 8.78 / 10.46 / 11.80 |
+
+**Paired differences:**
+* G1 − G0 = **−0.09 [−0.13, −0.06]**;
+* F1 − G1 = **+3.91 [3.76, 4.04]**.
+
+**Conclusion.** Giving a generic decoder the exact shadow planes does not help at all. Access to the projective information is not the bottleneck; the operator that turns it into a global constraint is.
+
+* A cross-attention decoder can form logits that are linear in n·s, but its output is a soft average of token values, read out by smooth position features: Fourier frequencies ≤ 8 over the cube, a 16³ coarse grid, and a fine head that is linear in the query embedding.
+* A sheet one cell (8 voxels) thick, 700 voxels from the evidence, needs a function that is sharp in d = n·(s − μ). The architecture has no inductive path to it at 1K data scale.
+* The explicit factor log(ε + exp(−d²/2σ²)) supplies exactly that function. Its parameters are the X-measured planes.
+
+### 4.2 Which learned parts matter? (explicit-facet family, seed 0, dev T*)
+
+| arm | generic field | facet head | T* IG | Δ vs P0 | KL | HPD-MAE |
+|---|---|---|---|---|---|---|
+| P0 | none (uniform-legal) | fixed (ε = 10⁻³, s0 = 0.5, κ = 1), no training | 7.20 | — | 3.11 | 0.024 |
+| F1only | none | learned | 7.45 [7.22, 7.68] | +0.25 [0.20, 0.29] | 2.86 | 0.033 |
+| F1fix | learned jointly | fixed | 7.64 [7.42, 7.86] | +0.44 [0.39, 0.49] | 2.66 | 0.048 |
+| F1 | learned jointly | learned | 7.72 | +0.52 | 2.58 | 0.053 |
+
+**Readings.**
+* **Geometry carries the result.** P0 − G0 = +3.30 nats with no learning at all. Every learned component together adds +0.5.
+* **The generic field adds along-plane information** (+0.27 = F1 − F1only): prior, visibility and sidedness.
+* **Learned facet reliability adds +0.08 to +0.25.** It adds more when no generic field can absorb errors.
+* With the current descriptors the head cannot recognise occluder-interface facets, which motivates F3 and F4.
+* **Calibration.** HPD-MAE rises from 0.024 (P0) to 0.053 (F1), still within the pilot's 0.03–0.05 range.
+* (F1fix uses facets with ≥ 24 inliers and P0 those with ≥ 100.)
+
+### 4.3 The cell integral: a non-learned probe (motivated by the failure analysis, §9)
+
+**Probe.** `scripts/quadrature_probe.py`: P0's fixed facet factor, with one change.
+* The product of the plane factors is integrated over each 8-voxel cell with m³ midpoint sub-points, each using the residual sub-cell variance (8/m)²/12.
+* This replaces evaluating every plane at the cell centre with the full cell variance 8²/12.
+* m = 1 reproduces P0 exactly (7.202).
+* No training. Dev T*, paired with m = 1:
+
+| stratum | rows | P0 (m = 1) | m = 2 | m = 4 | m = 2 − m = 1 | m = 4 − m = 1 |
+|---|---|---|---|---|---|---|
+| all | 5,218 | 7.20 | 7.41 | 7.45 | **+0.21 [0.17, 0.24]** | **+0.25 [0.20, 0.30]** |
+| 1 large facet, law-obeying | 1,469 | 4.48 | 4.40 | 4.29 | −0.08 | −0.19 |
+| 2, law-obeying | 1,266 | 8.64 | 8.72 | 8.63 | +0.08 | −0.01 |
+| ≥ 3, law-obeying | 1,726 | 10.93 | 11.55 | 11.84 | **+0.62 [0.54, 0.70]** | **+0.91 [0.81, 1.01]** |
+| law-violating | 623 | 5.57 | 5.99 | 6.16 | +0.42 | +0.59 |
+
+**Readings.**
+* **The hypothesis of §9 holds.** On point-determined windows, about a third of the 3.5-nat P0-to-label gap is the cell-integral approximation, not missing information.
+  * The cell-centre factor inflates every plane independently. For planes that meet at small angles, this smears the product over several cells in depth.
+* **On single-plane windows, quadrature with P0's hand-set width loses 0.1–0.2 nats.**
+  * The cell inflation had been acting as extra width that the fixed s0 = 0.5 lacks.
+  * The learned head of F1 sets its own width, so this cost is not intrinsic.
+* **Consequence for the Student.** F1 cannot learn this: its variance floor is the fixed cell term.
+
+**Making it affordable: sparse quadrature.**
+* Sub-points are used only in cells where ≥ 2 planes are non-negligible at the centre (0.1–0.6% of cells, in 2–7% of the kernel blocks). The cell-centre formula is kept elsewhere.
+* Cost: ~3× the cell-centre kernel at M = 2, against ~20× for full quadrature.
+* **Pitfall.** The plane factors are peak-normalised, so kernels of different width give a plane different mass relative to the outlier floor.
+  * Switching formulas at the edge of the sparse region then distorts lines: two-plane rows lose 0.12 nats at M = 2 and 0.46 at M = 4, while full quadrature gains there.
+  * **Fix:** let both paths approximate the cell *average* of the same function f = ε + (1 − ε) exp(−d²/2v0), with v0 = s0² + r²σθ². A Gaussian smoothed by variance c then carries the amplitude √(v0 / (v0 + c)).
+  * Probe with this amplitude-consistent semantics (`1a` = cell-centre with amplitude; same fixed ε, s0, κ):
+
+| stratum | 1a | sparse M = 2 | sparse M = 4 | M = 2 − 1a | M = 4 − 1a |
+|---|---|---|---|---|---|
+| all | 6.98 | 7.23 | 7.35 | **+0.26 [0.22, 0.29]** | **+0.38 [0.33, 0.42]** |
+| 1, law-obeying | 4.15 | 4.15 | 4.15 | 0.00 | 0.00 |
+| 2, law-obeying | 8.18 | 8.39 | 8.46 | +0.21 | +0.28 |
+| ≥ 3, law-obeying | 10.90 | 11.50 | 11.81 | +0.60 | +0.91 |
+| law-violating | 5.86 | 6.13 | 6.21 | +0.27 | +0.35 |
+
+* With consistent semantics, quadrature helps every multi-plane stratum and leaves single planes unchanged (by construction).
+* The amplitude itself costs 0.22 nats at P0's *hand-set* ε, because it shifts the plane/floor balance. A learned head re-tunes ε and s0.
+* **Arm F5** = F1 + amplitude-consistent sparse quadrature, M = 2 (M = 4 would cost several times more per step).
+  * The fused kernels are tested against a torch reference of the same rule, values and gradients, with and without the amplitude.
+  * F5 is the only change relative to F1. It was added before any F3–F5 dev result (amendment A1 of the plan).
+
+## 5. Q3 (H1): does posterior supervision still matter once the inductive bias is right?
+
+Same architectures, same rows and MIS weights, 8k steps, seed 0. The only change is the target: a one-hot at the true
+source cell ("OH") instead of the certified q_G. `best.pt` is the step with the lowest true-source NLL on 1,024 of
+the 5,218 dev T* rows. On the 4,194 rows that did not take part in that selection, the paired differences are
+unchanged to ±0.01, so selection bias is negligible.
+
+| arm | target | checkpoint | T* IG | sep IG | all-lit IG | all-dark IG | T* KL | HPD-MAE |
+|---|---|---|---|---|---|---|---|---|
+| G0 | posterior | final | 3.90 | 0.57 | −0.05 | 0.22 | 6.37 | 0.046 |
+| OHG0 | one-hot | final | 0.75 | −2.14 | −2.91 | −2.28 | 9.54 | 0.456 |
+| OHG0 | one-hot | best (step 2k) | 1.37 | −0.70 | −1.06 | −0.47 | 8.89 | 0.278 |
+| F1 | posterior | final | 7.72 | 0.37 | −0.05 | 0.30 | 2.58 | 0.053 |
+| OHF1 | one-hot | final | 5.14 | −2.54 | −3.03 | −2.53 | 5.09 | 0.393 |
+| OHF1 | one-hot | best (step 1k) | 7.23 | −0.44 | −0.62 | −0.06 | 3.04 | 0.134 |
+
+| paired T* IG difference | final | best one-hot checkpoint |
+|---|---|---|
+| G0 − OHG0 | 3.16 [2.92, 3.38] | 2.53 [2.41, 2.67] |
+| F1 − OHF1 | 2.57 [2.35, 2.79] | **0.48 [0.39, 0.59]** |
+
+**Readings.**
+* **H1 holds under both inductive biases.** Posterior supervision wins on every set, at every checkpoint.
+* **Its size depends on the architecture.** With early stopping the gap falls from 2.5 nats (G0) to 0.5 (F1). The projective operator supplies most of what the dense label was teaching.
+* **One-hot training memorises.** OHF1 train loss falls to ~2 nats while dev NLL rises from 6.4 (step 1k) to 8.3 (step 8k). OHG0 behaves the same way from step 2k on.
+  * There are 684 training worlds with one source each. Many windows share a source, so a one-hot target lets the network learn the world → source map.
+  * The certified posterior q_G is the conditional expectation of the one-hot target given the full world and the observation, i.e. a Rao–Blackwellised target. Since p*(s | X) = E[q_G | X], both targets have the same population optimum, but q_G removes the source-sampling noise that one-hot training fits.
+* **Early-stopped one-hot F1 reaches exactly what geometry alone gives.** OHF1-best scores 7.23 against P0's 7.20, the non-learned facet estimator. Under one-hot supervision, the learned parts add nothing beyond the X-measured planes before they start to overfit. Posterior labels are what make the learned along-plane field (+0.27, §4.2) and the reliability head learnable at this scale.
+* **Calibration and OOD are where one-hot hurts most.**
+  * Even the best OHF1 checkpoint has HPD-MAE 0.134, against 0.053.
+  * It scores negative IG on solid-separated and all-lit windows, i.e. worse than the uniform-legal prior.
+  * One-hot gradients reward sharp mass at the source. Nothing in them teaches the model to stay diffuse where X is uninformative.
+* **Scale caveat.** At 100K worlds the one-hot noise averages over ~150× more sources. The early-stopped gap would be expected to shrink further, but this cannot be tested here. The data-scaling arms (§6) give the local slope.
+
 ## 7. Q5: hidden worlds with an identical observation (counterfactuals, brief §8)
 
 Two exact constructions on dev rows (`scripts/counterfactual.py`, `scripts/counterfactual_depth.py`). Every edited world
@@ -210,81 +335,48 @@ Counts:
 
 This motivates F3 (occluder hypothesis) and F4 (consensus).
 
-## 4. Q2: what must be built in?
+## 9. Failure analysis (deliverable E): where the remaining 2.7 nats go
 
-### 4.1 Information vs operator: G1 (the decisive control)
+Run with `scripts/failure_analysis.py` on dev T*. The true source is used only to *score* facets.
+* A row is **law-violating** when some large facet (≥ 100 inliers) misses the true source by more than 4 voxels.
+* Law-violating rows are 11.9% of all rows, but 33% of thin_slabs and 23% of occluder_clusters rows (cf. §2.2).
 
-**G1** is G0 plus the same X-measured facets as F1, entered as K extra key/value tokens of every cross-attention block. The facet embedding covers:
-* the centroid (Fourier features);
-* the normal;
-* the plane offset n·μ;
-* size and fit quality.
+| stratum (large facets) | rows | label IG | G0 | P0 | F1 | label − F1 | share of the pooled gap |
+|---|---|---|---|---|---|---|---|
+| 0 | 2.6% | 7.11 | 0.66 | 0.00 | 1.71 | 5.37 | 0.14 |
+| 1, law-obeying | 28.2% | 7.21 | 2.82 | 4.48 | 5.01 | 2.21 | 0.62 |
+| 2, law-obeying | 24.3% | 11.15 | 4.81 | 8.64 | 9.41 | 1.86 | 0.45 |
+| ≥ 3, law-obeying (point-determined) | 33.1% | 14.42 | 5.56 | 10.93 | 11.00 | 2.80 | **0.93** |
+| 1, violating | 1.7% | 7.12 | 0.29 | 1.17 | 2.05 | 5.04 | 0.09 |
+| 2, violating | 2.3% | 9.37 | 2.06 | 3.68 | 3.70 | 5.86 | 0.14 |
+| ≥ 3, violating | 7.9% | 13.08 | 3.75 | 7.91 | 8.73 | 3.75 | 0.30 |
 
-G1 has **the information F1 has, but no geometric decoding operator**.
+IG is side-balanced within each stratum. The gap shares are pooled means per dev T* row; they sum to 2.66.
 
-| arm | T* IG | B1K IG | KL | IG by facets: 1 / 2 / 3 / ≥ 4 |
-|---|---|---|---|---|
-| G0 s0 | 3.90 | 3.83 | 6.37 | 2.62 / 4.30 / 4.72 / 5.19 |
-| **G1 s0** (facet tokens) | **3.81 [3.68, 3.95]** | 3.75 | 6.46 | 2.59 / 4.19 / 4.65 / 4.95 |
-| F1 s0 (facet factor) | 7.72 | 7.73 | 2.58 | 4.66 / 8.78 / 10.46 / 11.80 |
+**Three failure modes, in order of size.**
+1. **Precision on point-determined windows (0.93 nats, 35% of the gap).**
+   * With ≥ 3 law-obeying planes, X determines the source to ~1.5 voxels (§7). The label is nearly a one-cell delta (14.4 nats), yet P0 and F1 both stop at ~11.
+   * Learning adds nothing over the fixed factor here (F1 − P0 = +0.07), and F1 is well calibrated (signed HPD −0.018). It is precise in the wrong way: it spreads mass over a few cells along the depth direction, rather than placing it in the wrong place.
+   * Hypothesis: the cell-integral approximation.
+     * The window subtends ~0.1 rad at the source, so the planes meet at small angles. Depth is ill-conditioned by a factor of ~10 relative to the in-plane directions.
+     * The cell-centre factor inflates *every* plane's variance by the cell term 8²/12, independently. Multiplying the inflated planes spreads the product over several cells in depth.
+     * The exact cell integral of the product does not have this problem → probe below, and arm F5.
+2. **Plane-only and line-only windows (1.07 nats).** One plane leaves a 2-D sheet and two planes a 1-D line. Here the label's extra information is along-plane: hidden geometry, visibility and prior. The generic field contributes +0.5 over P0 in these strata. This is the part where more data and a better generic field should help (Q4).
+3. **Occluder interfaces and mis-fits (0.53 nats, 11.9% of rows).**
+   * On violating rows F1 trails the label by 3.8–5.9 nats.
+   * There it is strongly *over-confident*: signed HPD −0.184, against −0.035 on law-obeying rows. It places a sharp sheet on a plane that does not contain the source.
+   * The facet head cannot recognise these facets from size and fit descriptors. F3 (two-hypothesis factor) and F4 (consensus) target exactly this.
 
-**Paired differences:**
-* G1 − G0 = **−0.09 [−0.13, −0.06]**;
-* F1 − G1 = **+3.91 [3.76, 4.04]**.
+**Calibration (H5).** HPD-MAE / signed deviation by stratum. Negative means over-confident: the true source lies outside the nominal high-density regions too often.
 
-**Conclusion.** Giving a generic decoder the exact shadow planes does not help at all. Access to the projective information is not the bottleneck; the operator that turns it into a global constraint is.
+| | all | law-obeying | violating | no large facet | ≥ 3 law-obeying |
+|---|---|---|---|---|---|
+| G0 | 0.046 / −0.038 | 0.046 / −0.029 | 0.102 / −0.102 | 0.035 / −0.035 | 0.047 / −0.022 |
+| P0 | 0.024 / +0.024 | 0.057 / +0.057 | 0.222 / −0.222 | 0.039 / +0.035 | 0.019 / −0.012 |
+| F1 | 0.053 / −0.053 | 0.036 / −0.035 | 0.184 / −0.184 | 0.049 / −0.049 | 0.018 / −0.018 |
 
-* A cross-attention decoder can form logits that are linear in n·s, but its output is a soft average of token values, read out by smooth position features: Fourier frequencies ≤ 8 over the cube, a 16³ coarse grid, and a fine head that is linear in the query embedding.
-* A sheet one cell (8 voxels) thick, 700 voxels from the evidence, needs a function that is sharp in d = n·(s − μ). The architecture has no inductive path to it at 1K data scale.
-* The explicit factor log(ε + exp(−d²/2σ²)) supplies exactly that function. Its parameters are the X-measured planes.
+The headline HPD-MAE of each model hides two opposite regimes:
+* near-perfect calibration where the facet law holds;
+* strong over-confidence where it fails.
 
-### 4.2 Which learned parts matter? (explicit-facet family, seed 0, dev T*)
-
-| arm | generic field | facet head | T* IG | Δ vs P0 | KL | HPD-MAE |
-|---|---|---|---|---|---|---|
-| P0 | none (uniform-legal) | fixed (ε = 10⁻³, s0 = 0.5, κ = 1), no training | 7.20 | — | 3.11 | 0.024 |
-| F1only | none | learned | 7.45 [7.22, 7.68] | +0.25 [0.20, 0.29] | 2.86 | 0.033 |
-| F1fix | learned jointly | fixed | 7.64 [7.42, 7.86] | +0.44 [0.39, 0.49] | 2.66 | 0.048 |
-| F1 | learned jointly | learned | 7.72 | +0.52 | 2.58 | 0.053 |
-
-**Readings.**
-* **Geometry carries the result.** P0 − G0 = +3.30 nats with no learning at all. Every learned component together adds +0.5.
-* **The generic field adds along-plane information** (+0.27 = F1 − F1only): prior, visibility and sidedness.
-* **Learned facet reliability adds +0.08 to +0.25.** It adds more when no generic field can absorb errors.
-* With the current descriptors the head cannot recognise occluder-interface facets, which motivates F3 and F4.
-* **Calibration.** HPD-MAE rises from 0.024 (P0) to 0.053 (F1), still within the pilot's 0.03–0.05 range.
-* (F1fix uses facets with ≥ 24 inliers and P0 those with ≥ 100.)
-
-## 5. Q3 (H1): does posterior supervision still matter once the inductive bias is right?
-
-Same architectures, same rows and MIS weights, 8k steps, seed 0. The only change is the target: a one-hot at the true
-source cell ("OH") instead of the certified q_G. `best.pt` is the step with the lowest true-source NLL on 1,024 of
-the 5,218 dev T* rows. On the 4,194 rows that did not take part in that selection, the paired differences are
-unchanged to ±0.01, so selection bias is negligible.
-
-| arm | target | checkpoint | T* IG | sep IG | all-lit IG | all-dark IG | T* KL | HPD-MAE |
-|---|---|---|---|---|---|---|---|---|
-| G0 | posterior | final | 3.90 | 0.57 | −0.05 | 0.22 | 6.37 | 0.046 |
-| OHG0 | one-hot | final | 0.75 | −2.14 | −2.91 | −2.28 | 9.54 | 0.456 |
-| OHG0 | one-hot | best (step 2k) | 1.37 | −0.70 | −1.06 | −0.47 | 8.89 | 0.278 |
-| F1 | posterior | final | 7.72 | 0.37 | −0.05 | 0.30 | 2.58 | 0.053 |
-| OHF1 | one-hot | final | 5.14 | −2.54 | −3.03 | −2.53 | 5.09 | 0.393 |
-| OHF1 | one-hot | best (step 1k) | 7.23 | −0.44 | −0.62 | −0.06 | 3.04 | 0.134 |
-
-| paired T* IG difference | final | best one-hot checkpoint |
-|---|---|---|
-| G0 − OHG0 | 3.16 [2.92, 3.38] | 2.53 [2.41, 2.67] |
-| F1 − OHF1 | 2.57 [2.35, 2.79] | **0.48 [0.39, 0.59]** |
-
-**Readings.**
-* **H1 holds under both inductive biases.** Posterior supervision wins on every set, at every checkpoint.
-* **Its size depends on the architecture.** With early stopping the gap falls from 2.5 nats (G0) to 0.5 (F1). The projective operator supplies most of what the dense label was teaching.
-* **One-hot training memorises.** OHF1 train loss falls to ~2 nats while dev NLL rises from 6.4 (step 1k) to 8.3 (step 8k). OHG0 behaves the same way from step 2k on.
-  * There are 684 training worlds with one source each. Many windows share a source, so a one-hot target lets the network learn the world → source map.
-  * The certified posterior q_G is the conditional expectation of the one-hot target given the full world and the observation, i.e. a Rao–Blackwellised target. Since p*(s | X) = E[q_G | X], both targets have the same population optimum, but q_G removes the source-sampling noise that one-hot training fits.
-* **Early-stopped one-hot F1 reaches exactly what geometry alone gives.** OHF1-best scores 7.23 against P0's 7.20, the non-learned facet estimator. Under one-hot supervision, the learned parts add nothing beyond the X-measured planes before they start to overfit. Posterior labels are what make the learned along-plane field (+0.27, §4.2) and the reliability head learnable at this scale.
-* **Calibration and OOD are where one-hot hurts most.**
-  * Even the best OHF1 checkpoint has HPD-MAE 0.134, against 0.053.
-  * It scores negative IG on solid-separated and all-lit windows, i.e. worse than the uniform-legal prior.
-  * One-hot gradients reward sharp mass at the source. Nothing in them teaches the model to stay diffuse where X is uninformative.
-* **Scale caveat.** At 100K worlds the one-hot noise averages over ~150× more sources. The early-stopped gap would be expected to shrink further, but this cannot be tested here. The data-scaling arms (§6) give the local slope.
+P0's good overall MAE (0.024) is a cancellation: it is under-confident on law-obeying rows (+0.057) and over-confident on violating rows (−0.222).

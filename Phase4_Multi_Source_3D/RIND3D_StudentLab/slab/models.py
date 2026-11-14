@@ -21,7 +21,7 @@ sys.path.insert(0, str(PILOT))
 from student import Student as PilotStudent, fourier, coarse_centers, RES   # noqa: E402
 
 from .density import legal_logv, plane_factor, NC, NF
-from .plane_triton import plane_factor_fused, plane_factor2_fused, plane_factor_q_fused
+from .plane_triton import plane_factor_fused, plane_factor2_fused, plane_factor_qs_fused
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = True          # convolutions only
@@ -184,9 +184,10 @@ class Facet(Generic):
     a training example are hidden (facet dropout); flag: the generic field is told whether facets are present."""
 
     def __init__(self, min_inliers=24, facet_only=False, fixed=False, two_hyp=False, drop=0.0, flag=False, cons=False, quad=1,
-                 **kw):
+                 amp=True, **kw):
         super().__init__(**kw)
-        self.quad = quad                   # F5: M^3 sub-cell quadrature of the facet product (1 = cell-centre factor)
+        self.quad = quad                   # F5: M^3 sparse sub-cell quadrature of the facet product (1 = cell-centre factor)
+        self.amp = amp                     # F5: amplitude-consistent cell average (slab.plane_triton, sparse section)
         self.min_inliers = min_inliers
         self.facet_only = facet_only       # ablation: uniform-legal x facet factor (no generic field)
         self.fixed = fixed                 # ablation: hand-set eps / s0 / kappa (no learned facet head)
@@ -226,7 +227,7 @@ class Facet(Generic):
             pf = plane_factor2_fused(Fc[..., :3], Fc[..., 3:6] * sgn, s0, sth, e, pi, lrho, mask)
             ctx.update(pi=pi)
         elif self.quad > 1:
-            pf = plane_factor_q_fused(Fc[..., :3], Fc[..., 3:6], s0, sth, e, mask, M=self.quad)
+            pf = plane_factor_qs_fused(Fc[..., :3], Fc[..., 3:6], s0, sth, e, mask, M=self.quad, amp=self.amp)
         else:
             pf = (plane_factor_fused if Fc.is_cuda else plane_factor)(Fc[..., :3], Fc[..., 3:6], s0, sth, e, mask)
         ctx.update(eps_logit=e, s0=s0, sth=sth, fmask=mask)
@@ -242,7 +243,8 @@ def build(cfg):
     if kind == "facet":
         return Facet(min_inliers=cfg.get("min_inliers", 24), facet_only=cfg.get("facet_only", False),
                      fixed=cfg.get("fixed", False), two_hyp=cfg.get("two_hyp", False), drop=cfg.get("drop", 0.0),
-                     flag=cfg.get("flag", False), cons=cfg.get("cons", False), quad=cfg.get("quad", 1), **kw)
+                     flag=cfg.get("flag", False), cons=cfg.get("cons", False), quad=cfg.get("quad", 1),
+                     amp=cfg.get("amp", True), **kw)
     if kind == "learned_facet":
         return LearnedFacet(K=cfg.get("slots", 8), min_mass=cfg.get("min_mass", 2.0), planar_w=cfg.get("planar_w", 0.1),
                             min_inliers=0, **kw)

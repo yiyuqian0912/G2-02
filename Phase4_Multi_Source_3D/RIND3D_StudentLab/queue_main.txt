@@ -12,6 +12,8 @@ configs/OHG0_s0.json
 configs/OHF1_s0.json
 # Q2: learned plane extraction from the pooled input
 configs/F2_s0.json
+# F5: F1 + sparse sub-cell quadrature of the facet product (failure analysis mode 1; amendment A1)
+configs/F5_s0.json
 # F3: two-hypothesis facets (shadow | occluder face) + facet dropout with availability flag; single-change arms
 configs/F3_s0.json
 configs/F1drop_s0.json

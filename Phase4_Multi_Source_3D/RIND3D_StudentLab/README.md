@@ -14,9 +14,12 @@ the validated production code. Nothing here changes the 1K release, its labels, 
 | `scripts/run_queue.py` | sequential train + dev evaluation of the arms listed in `queue_main.txt` |
 | `scripts/counterfactual.py`, `scripts/counterfactual_depth.py` | X-identical counterfactual worlds (bodies outside the source–window hull removed; hidden casters scaled about the source, verified exactly), relabelled with FastLabel |
 | `scripts/analyze_counterfactual.py` | label divergence across X-identical worlds; JSD floors vs Students |
+| `scripts/failure_analysis.py` | dev T* failure strata: facet-law violation × facet count, family, lower tail, gap shares |
+| `scripts/quadrature_probe.py` | non-learned probe of the cell-integral approximation (sub-cell quadrature of the facet product) |
+| `scripts/confirm.sh` | the pre-declared confirmatory evaluation (`docs/A_RESEARCH_PLAN.md` §7), run once |
 | `slab/figures.py` | posterior projections, curves, IG by facet count, scaling, counterfactual panels |
 | `configs/` | arm configurations |
-| `tests/test_lab.py` | normalisation, plane factor, synthetic facet law |
+| `tests/test_lab.py` | normalisation, plane factor, synthetic facet law, Triton kernels (cell-centre, two-hypothesis, quadrature, sparse quadrature) vs torch |
 
 **Environment.**
 

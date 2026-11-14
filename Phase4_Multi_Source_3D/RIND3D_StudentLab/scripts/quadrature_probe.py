@@ -6,7 +6,7 @@ variance by 8^2/12. For a point-determined window (>= 3 planes meeting at small 
 ill-conditioned depth direction. Probe: integrate the product over the cell by m^3 midpoint sub-points with the
 residual sub-cell variance (8/m)^2/12, i.e. log p_cell = logmeanexp_j sum_k phi_k(x_j). m = 1 reproduces P0.
 
-usage: quadrature_probe.py [--ms 1,2,4] [--split dev] [--batch 8] [--out name]
+usage: quadrature_probe.py [--ms 1,2,4,2s] [--split dev] [--batch 8] [--out name]   ('2s': sparse M=2; '2sa': sparse + amplitude, as in arm F5; '1a': amplitude only)
 Writes $RIND3D_LAB_OUT/quadrature_<out>.npz (per-row IG for each m) and prints side-balanced IG by stratum."""
 import json, math, sys, time
 from pathlib import Path
@@ -18,7 +18,7 @@ from slab.data import LabTable, collate, to_dev           # noqa: E402
 from slab.density import cell_centres, legal_logv, NC, NF  # noqa: E402
 from slab.paths import OUT, facets_file                     # noqa: E402
 from slab.analyze import boot, _stat                        # noqa: E402
-from slab.plane_triton import plane_factor_q_fused          # noqa: E402
+from slab.plane_triton import plane_factor_q_fused, plane_factor_qs_fused   # noqa: E402
 
 CELL = 8.0
 
@@ -30,13 +30,16 @@ def factor_quadrature(B, m, min_inliers=100, eps=1e-3, s0=0.5, kappa=1.0):
     mask = (Fc[..., 6] >= min_inliers) & (torch.arange(Fc.shape[1], device=Fc.device)[None] < B["nf"][:, None])
     sth = kappa * Fc[..., 7].clamp_min(0.2) / (Fc[..., 8].clamp_min(1.0) * Fc[..., 6].clamp_min(1).sqrt())
     e = torch.full_like(sth, math.log(eps / (1 - eps)))
+    if isinstance(m, str):              # '2s': sparse quadrature; suffix 'a': amplitude-consistent (the F5 kernel: '2sa')
+        M = int(m.rstrip("sa"))
+        return plane_factor_qs_fused(Fc[..., :3], Fc[..., 3:6], torch.full_like(e, s0), sth, e, mask, M=M, amp="a" in m)
     return plane_factor_q_fused(Fc[..., :3], Fc[..., 3:6], torch.full_like(e, s0), sth, e, mask, M=m)
 
 
 @torch.no_grad()
 def main():
     opt = lambda n, d: sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
-    ms = [int(x) for x in opt("--ms", "1,2,4").split(",")]
+    ms = [x if not x.isdigit() else int(x) for x in opt("--ms", "1,2,4").split(",")]
     split, bs, name = opt("--split", "dev"), int(opt("--batch", "8")), opt("--out", "v1")
     assert split == "dev", "exploratory probe: dev only"
     T = LabTable(facets=facets_file("v1"))

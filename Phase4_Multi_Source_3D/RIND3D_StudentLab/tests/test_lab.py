@@ -146,3 +146,31 @@ def test_triton_quadrature_factor_matches_torch():
     o1 = plane_factor_q_fused(*[t.cuda() for t in (mu, n, s0, sth, e)], mask.cuda(), M=1)
     o0 = plane_factor_fused(*[t.cuda() for t in (mu, n, s0, sth, e)], mask.cuda())
     assert torch.allclose(o1, o0, atol=1e-4)
+
+
+def test_triton_sparse_quadrature_matches_rule():
+    """Sparse quadrature (F5) vs the torch reference of the same rule, with and without the amplitude correction."""
+    if not torch.cuda.is_available():
+        return
+    from slab.plane_triton import plane_factor_qs_fused, plane_factor_qs_torch, plane_factor_fused
+    torch.manual_seed(4)
+    B, K, M = 1, 3, 2
+    mu = torch.rand(B, K, 3) * 1024; n = torch.nn.functional.normalize(torch.randn(B, K, 3), dim=-1)
+    s0 = torch.rand(B, K) + 0.2; sth = torch.rand(B, K) * 1e-2; e = torch.randn(B, K) * 2 - 4
+    mask = torch.tensor([[True, True, False]])
+    g = torch.randn(B, 4096, 512)
+    for amp in (True, False):
+        leaves = [t.clone().requires_grad_() for t in (mu, n, s0, sth, e)]
+        ref, sel = plane_factor_qs_torch(*leaves, mask, M=M, amp=amp)
+        assert 0 < sel.float().mean() < 0.5
+        gr = torch.autograd.grad((ref * g).sum(), leaves)
+        cl = [t.cuda().requires_grad_() for t in (mu, n, s0, sth, e)]
+        out = plane_factor_qs_fused(*cl, mask.cuda(), M=M, amp=amp)
+        go = torch.autograd.grad((out * g.cuda()).sum(), cl)
+        assert torch.allclose(out.cpu(), ref, atol=2e-3), (amp, float((out.cpu() - ref).abs().max()))
+        for a, b in zip(go, gr):
+            assert torch.allclose(a.cpu(), b, rtol=3e-3, atol=1e-2 * float(b.abs().max()) + 1e-6), (amp, a, b)
+    # without amplitude, M = 1 is the cell-centre factor
+    o1 = plane_factor_qs_fused(*[t.cuda() for t in (mu, n, s0, sth, e)], mask.cuda(), M=1, amp=False)
+    o0 = plane_factor_fused(*[t.cuda() for t in (mu, n, s0, sth, e)], mask.cuda())
+    assert torch.allclose(o1, o0, atol=1e-4)
