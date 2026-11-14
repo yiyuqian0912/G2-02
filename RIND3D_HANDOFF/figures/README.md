@@ -32,7 +32,7 @@ Reruns are byte-identical: no timestamps, fixed SVG hash salt, deterministic dat
 | `extract_data.py` | data extraction. 1K scene 7 (train split): geometry, crops, rays, exact tau-pencil label, instrumented FastLabel run. The 100K slot-0 container: logs, work counters, one full-world plane from the certified renderer |
 | `render3d.py` | small orthographic ray caster: convex bodies from exact half-spaces, voxel cutaways, first-hit voxels, depth-tested overlays |
 | `make_figures.py` | the nine figures and the contact sheet |
-| `data/` | compact arrays (≈ 0.8 MB) and `LOG.json` (the extraction record) |
+| `data/` | `LOG.json`, the extraction record (tracked), and compact arrays (`*.npz`, `*.npy`, ≈ 0.2 MB). The arrays are **not tracked**, because the repository ignores `*.npz` / `*.npy`; regenerate them with `extract_data.py` |
 
 **Checks recorded in `data/LOG.json`.**
 * Every displayed 1K crop re-renders bit for bit with the certified CUDA renderer (`rerender_mismatch = 0`).

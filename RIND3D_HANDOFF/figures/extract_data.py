@@ -236,8 +236,6 @@ def main():
     t0 = time.perf_counter(); lab2, ev2 = instrumented_fastlabel(window_from_1k(d, ws, ss))
     log["solid_separated_run"] = dict(seconds=round(time.perf_counter() - t0, 2), status=lab2["status"],
                                       rounds=[dict(records=v["records"], cells=int(len(v["cells"]))) for k, v in ev2 if k == "stage2"])
-    last = [v for k, v in ev2 if k == "stage2"][-1]
-    np.savez_compressed(out / "solid_sep_B.npz", cells=last["cells"], hi=last["hi"])
 
     # ---- 100K local-only renderer: container logs, work counters, a full-world plane for comparison
     z = np.load(a.container); meta = json.loads(z["meta"].tobytes())
