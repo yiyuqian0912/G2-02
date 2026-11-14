@@ -103,13 +103,37 @@ class Generic(PilotStudent):
         return self.readout(q), dict(tok=tok, h=h, sidx=sidx)
 
 
+def consensus(Fc, mask, origin, side, rho=1e-6):
+    """Leave-one-out consistency of each facet with the others (X only). For facet k, x_k = argmin_x
+    sum_{j != k} w_j (n_j . x - b_j)^2 / sig_j^2 + rho |x - c|^2 (c = window centre, w_j = valid), the residual
+    r_k = |n_k . x_k - b_k| (voxels) and the variance v_k = n_k^T M_k^{-1} n_k of n_k . x under the others' constraints.
+    Returns (B, K, 3): log1p(r), log(v + 1), z = r / sqrt(v + 4) clipped to 50. With fewer than 3 other facets v is huge
+    and z ~ 0 (no evidence)."""
+    with torch.autocast("cuda", enabled=False):
+        n = Fc[..., 3:6].double(); b = (n * Fc[..., :3].double()).sum(-1)
+        c = (origin.double() + side.double()[:, None] / 2)
+        sig2 = (1.0 + (Fc[..., 7].double().clamp_min(0.2) / Fc[..., 8].double().clamp_min(1.0)) ** 2 * 700.0 ** 2)
+        w = mask.double() / sig2                                                     # (B, K)
+        nn_ = n[..., :, None] * n[..., None, :]                                     # (B, K, 3, 3)
+        Mall = (w[..., None, None] * nn_).sum(1); rall = (w[..., None] * n * b[..., None]).sum(1)
+        I = torch.eye(3, device=Fc.device, dtype=torch.float64)
+        M = Mall[:, None] - w[..., None, None] * nn_ + rho * I                       # leave one out
+        r = rall[:, None] - w[..., None] * n * b[..., None] + rho * c[:, None]
+        x = torch.linalg.solve(M, r[..., None])[..., 0]                              # (B, K, 3)
+        res = ((n * x).sum(-1) - b).abs()
+        v = (n[..., None, :] @ torch.linalg.solve(M, n[..., :, None]))[..., 0, 0]
+        z = (res / (v + 4.0).sqrt()).clamp(max=50.0)
+        out = torch.stack([torch.log1p(res.clamp(max=1e6)), torch.log1p(v.clamp(max=1e12)), z], -1)
+        return torch.where(mask[..., None], out, torch.zeros_like(out)).float()
+
+
 class FacetHead(nn.Module):
     """Per-facet reliability and width from X-measurable descriptors + context."""
 
-    def __init__(self, d=128, dh=96, init_eps=1e-3, init_s0=0.5, init_kappa=1.0, two_hyp=False):
+    def __init__(self, d=128, dh=96, init_eps=1e-3, init_s0=0.5, init_kappa=1.0, two_hyp=False, cons=False):
         super().__init__()
-        self.two_hyp = two_hyp
-        self.inp = nn.Sequential(nn.Linear(16 + int(two_hyp) + d, dh), nn.GELU(), nn.Linear(dh, dh))
+        self.two_hyp, self.cons = two_hyp, cons
+        self.inp = nn.Sequential(nn.Linear(16 + int(two_hyp) + 3 * int(cons) + d, dh), nn.GELU(), nn.Linear(dh, dh))
         self.att = nn.MultiheadAttention(dh, 4, batch_first=True)
         self.ctx_tok = nn.Linear(d, dh)
         self.n1 = nn.LayerNorm(dh); self.n2 = nn.LayerNorm(dh)
@@ -139,6 +163,8 @@ class FacetHead(nn.Module):
         desc, sth_fit = self.descriptors(Fc, origin, side)
         if self.two_hyp:
             desc = torch.cat([desc, Fc[..., 11:12].abs()], -1)          # consistency of the lit side
+        if self.cons:
+            desc = torch.cat([desc, consensus(Fc, mask, origin, side)], -1)  # agreement with the other facets
         x = self.inp(torch.cat([desc, ctx[:, None].expand(-1, desc.shape[1], -1)], -1))
         # keys: one always-present context token + the facets (no fully masked rows: no NaN in softmax or its gradient)
         kv = torch.cat([self.ctx_tok(ctx)[:, None], self.n1(x)], 1)
@@ -157,7 +183,7 @@ class Facet(Generic):
     the lit half-space; facets table v2 gives the lit side), plus the outlier floor. drop: probability that all facets of
     a training example are hidden (facet dropout); flag: the generic field is told whether facets are present."""
 
-    def __init__(self, min_inliers=24, facet_only=False, fixed=False, two_hyp=False, drop=0.0, flag=False, **kw):
+    def __init__(self, min_inliers=24, facet_only=False, fixed=False, two_hyp=False, drop=0.0, flag=False, cons=False, **kw):
         super().__init__(**kw)
         self.min_inliers = min_inliers
         self.facet_only = facet_only       # ablation: uniform-legal x facet factor (no generic field)
@@ -166,7 +192,7 @@ class Facet(Generic):
         self.flag_emb = nn.Embedding(2, self.coarse_head[1].in_features) if flag else None
         if flag:
             nn.init.zeros_(self.flag_emb.weight)
-        self.fhead = FacetHead(d=self.coarse_head[1].in_features, two_hyp=two_hyp)
+        self.fhead = FacetHead(d=self.coarse_head[1].in_features, two_hyp=two_hyp, cons=cons)
 
     def facet_mask(self, B):
         Fc = B["facets"].float()
@@ -212,7 +238,7 @@ def build(cfg):
     if kind == "facet":
         return Facet(min_inliers=cfg.get("min_inliers", 24), facet_only=cfg.get("facet_only", False),
                      fixed=cfg.get("fixed", False), two_hyp=cfg.get("two_hyp", False), drop=cfg.get("drop", 0.0),
-                     flag=cfg.get("flag", False), **kw)
+                     flag=cfg.get("flag", False), cons=cfg.get("cons", False), **kw)
     if kind == "learned_facet":
         return LearnedFacet(K=cfg.get("slots", 8), min_mass=cfg.get("min_mass", 2.0), planar_w=cfg.get("planar_w", 0.1),
                             min_inliers=0, **kw)

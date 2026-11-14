@@ -129,3 +129,17 @@ Laptop RTX 3060, 6 GB.
 
 * **Lit-cone visibility factor.** Every lit receiver must see the source through the visible window geometry, which gives a hard X-measurable support constraint. It is the only geometric information in all-lit windows.
 * **Partial counterfactuals.** Perturb hidden objects that avoid the source's view of the window. X is unchanged and q_G changes, which shows non-identifiability directly. It needs FastLabel runs (~1 s each).
+
+## 7. Pre-declared confirmatory comparisons (written 2026-11-14 ~06:30, before the Q2–Q6 dev results)
+
+Only F1 s0 and G0 s0/s1 had been seen on dev when this was written. The confirm split (1K val) is opened once, for
+these comparisons only, with the frozen final checkpoints.
+
+| id | comparison | sets | decision rule |
+|---|---|---|---|
+| C1 | F1 − G0, both seeds (s0, s1), paired | T*, B1K | primary; confirmed if the scene-bootstrap 95% interval excludes 0 in both seed pairs |
+| C2 | P0 (non-learned facets) − G0 s0 | T*, B1K | confirms that X-measurable projective information exceeds what the generic Student extracts |
+| C3 | the best dev projective arm (F3 if it beats F1 on dev T* by more than twice the F1 seed spread, else F1) vs G0 | solid-separated, all-lit, all-dark (with the 360 certified OOD references of this split) | reported descriptively: calibration, IG, KL where references exist |
+| C4 | G0 s0 − pilot FL_MIS_s0 | T* | reproduction on the pilot's own evaluation scenes |
+
+Everything else (ablations, scaling, generalisation arms) stays dev-only.

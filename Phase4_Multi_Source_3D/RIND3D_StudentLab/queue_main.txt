@@ -16,9 +16,9 @@ configs/F2_s0.json
 configs/F3_s0.json
 configs/F1drop_s0.json
 configs/F1hyp_s0.json
-# third seeds of the main comparison
-configs/G0_s2.json
-configs/F1_s2.json
+# F4: F3 + leave-one-out facet consensus descriptors
+configs/F4_s0.json
+# (third seeds of G0/F1 dropped: seed spread 0.03 nats << 3.8-nat effect)
 # Q4: independent-scene learning curves (same scene subsets for both models)
 configs/F1sc125_s0.json
 configs/G0sc125_s0.json
