@@ -1,0 +1,12 @@
+{
+ "scene": 7,
+ "main": "main",
+ "channels": {"main": [12, 0], "all_lit": [12, 2], "all_dark": [6, 0], "solid_separated": [6, 1], "boundary_mixed": [6, 3]},
+ "rays_lit": 8,
+ "rays_dark": 8,
+ "e_window": 8,
+ "e_source": 0,
+ "font": "LXGW WenKai",
+ "width_in": 5.83,
+ "dpi_png": 300
+}

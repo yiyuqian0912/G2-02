@@ -11,7 +11,8 @@ the RIND3D pipeline described here. The RIND3D code lives in the `RIND3D_*` dire
 | `RIND3D_Dataset1K/` | package `rind3d_1k`: physical stage, selection law and controller, label orchestration (`labels.py`, `supervise.py`), the 1K FastLabel entry points (`rind3d_1k/fastlabel/`, a compatibility layer over the core), the **loader** (`loader.py`), release validation; `scripts/`, `backfill/` (run, monitor, verify), `docs/`, `tests/` | production for the 1K (validated at 1K scale) |
 | `RIND3D_StudentResearch/` | scientific decisions A–J for the current design, plus their tools: NAT-1K natural-window generator (`natural/`), the Student reference implementation (`pilot/`), the OOD benchmark (`ood/`), the all-dark S6 prototype (`s6/`), analyses E13–E19 (`experiments/`) | reference / research prototypes |
 | `RIND3D_Audit/` | the scientific foundations audit (01–10) with its toy-world and fixture experiments | reference |
-| `RIND3D_HANDOFF/` | this directory: implementation facts, cleanup manifest, validation record, 100K readiness, `env.sh`, `smoke_checks.py` | handoff |
+| `RIND3D_HANDOFF/` | this directory: implementation facts, cleanup manifest, validation record, 100K readiness and FastLabel integration plan (`100K_FASTLABEL_INTEGRATION.md`, `patches/`), figure sources of the Chinese design document (`figures/`), its review (`DOC_REVIEW_2026-11-13.md`), `env.sh`, `smoke_checks.py` | handoff |
+| `docs/RIND3D_数据集设计与技术说明.md` | the Chinese design and technical document, with figures in `docs/assets/` | handoff |
 | `docs/RIND3D*`, `docs/RIND3D_INTEGRATION.md` | the 2026-11-02 integration of the RIND3D v0.1 release into G2-02 (Phase 3 reader) | historical context |
 
 **Related branches:**
