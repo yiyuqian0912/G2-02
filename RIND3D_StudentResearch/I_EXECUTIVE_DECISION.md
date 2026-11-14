@@ -32,7 +32,7 @@ Evidence is in A–H of this directory. **M** = measured; **A** = proved; **E** 
 * release-only ω/c weights (ESS 11%) are not better than balanced ones (−0.04 n.s.);
 * the hidden balancing tilt is below the experiment's resolution (< 0.1 nats). The tabular E16 test agrees.
 
-**For the 100K:** fix it upstream.
+**For the 100K:** fix it upstream (refined in `J_COMPLEXITY_COVERAGE.md`: declared κ with ≥ 50% K = 4, plus a minimal L64 coverage stream for complexity coverage).
 * Natural windows (no m-thinning).
 * A fixed declared κ.
 * ω̂ only for the per-scene quota normalisation: T* ESS 85–94% instead of 10–24% (E15).

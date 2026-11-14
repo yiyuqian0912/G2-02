@@ -14,6 +14,7 @@ with its addendum on cost-gated extreme responses. **Start with `I_EXECUTIVE_DEC
 | `G_GENERALIZATION_AND_EXTREMES.md` | OOD results and interpretation; S6 all-dark fix; cost gate for extremes |
 | `H_100K_RECOMMENDATIONS.md` | changes before the 100K contract is frozen |
 | `I_EXECUTIVE_DECISION.md` | answers to the brief's seven questions; deliverable status |
+| `J_COMPLEXITY_COVERAGE.md` | follow-up: natural T* plus a minimal complexity-coverage stream for the 100K (E18, E19) |
 
 **Code:**
 

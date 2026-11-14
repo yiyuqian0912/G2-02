@@ -33,6 +33,7 @@ campaign was started. Evidence:
 
 | # | recommendation | evidence |
 |---|---|---|
+| R0 | **Complexity coverage (superseding R1/R2 for coverage; `J_COMPLEXITY_COVERAGE.md`).** Every m-level must be well represented, without 25% quotas: choose κ with ≥ 50% K = 4 scenes, and add a minimal coverage stream (1 of the 4 L64 windows in K = 4 scenes, c(m) = (1/8, 1/4, 1/2, 1); +1% labels, +14% proposals) combined with the natural stream by the balance heuristic. All declared minimum-coverage targets are met at 100K scale | E18, E19 |
 | R1 | **Effective-layer balance for a multi-channel study:** if it needs m-balanced windows, add a *separately declared* m-balanced stream and combine it with the natural stream by the balance heuristic (E15 D3: 2 + 2 windows per side gives an L64 M-histogram of 50/22/16/12 at ESS 0.52 / 0.67 / 0.86). Do not thin the primary population | E15 |
 | R2 | **A heavy-k κ partly balances m without thinning.** With 1K worlds, κ = all-4 gives natural M-histograms of 65/21/8/5 (L64), 44/25/15/16 (L128), 19/16/18/47 (L256). κ cannot balance L64, where most windows have one mixed channel | e15b |
 | R3 | **Labelling cost:** natural windows carry fewer mixed channels (22.0 vs 29.8 labels per scene, E15). About 26% fewer label tasks for the same 12 windows | E15 |
