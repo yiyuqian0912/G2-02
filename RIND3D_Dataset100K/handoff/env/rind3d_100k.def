@@ -1,0 +1,26 @@
+# Apptainer / Singularity recipe (build on a machine with the same driver major version or pass DRIVER_CUDA):
+#   apptainer build --build-arg DRIVER_CUDA=12.4 rind3d_100k.sif RIND3D_Dataset100K/handoff/env/rind3d_100k.def
+#   apptainer exec --nv -B /data rind3d_100k.sif bash -c 'source /opt/rind3d/r3d_env.sh && python /opt/rind3d/RIND3D_Dataset100K/scripts/smoke_test.py --work /data/r3d_smoke'
+# Build from the repository root (the %files section copies it).
+Bootstrap: docker
+From: ubuntu:24.04
+
+%arguments
+    DRIVER_CUDA=12.4
+
+%files
+    . /opt/rind3d
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update && apt-get install -y --no-install-recommends build-essential cmake git curl ca-certificates \
+        xz-utils libarchive-tools libgmp-dev libmpfr-dev libzstd-dev libboost-dev pkg-config
+    rm -rf /var/lib/apt/lists/*
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH=/root/.local/bin:$PATH
+    cd /opt/rind3d && R3D_DRIVER_CUDA="{{ DRIVER_CUDA }}" bash RIND3D_Dataset100K/handoff/env/setup_env.sh
+
+%environment
+    export PATH=/opt/rind3d/.venv/bin:$PATH
+    export PYTHONPATH=/opt/rind3d/RIND3D_Dataset100K:/opt/rind3d/RIND3D_Dataset1K:/opt/rind3d/RIND3D_Posterior/src
+    export OMP_NUM_THREADS=1 NUMBA_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1
