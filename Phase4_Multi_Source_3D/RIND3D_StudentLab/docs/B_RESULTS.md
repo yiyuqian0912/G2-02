@@ -357,13 +357,47 @@ Solid-separated: F2 − G0 = −0.16, the same co-adaptation as F1.
 
 **Readings.**
 * **Solid-separated windows are repaired.** F3 scores 0.64 there, against 0.37 for F1 and 0.57 for G0. The projective Student no longer pays for its facet factor on facet-free windows.
-  * The single-change arm F1drop (dropout + flag only) will tell whether the repair comes from dropout or from the occluder hypothesis.
+  * The single-change arm F1drop (dropout + flag only, no occluder hypothesis) shows that the repair comes entirely from dropout: see the attribution below.
 * **Occluder interfaces are only partly handled.** F3 recovers 0.23 of the ~4–6-nat label gap on violating rows. Its calibration there does not improve: signed HPD −0.191 vs −0.184.
   * The mixture lets a facet be "either", but with only size, fit and lit-side descriptors the head cannot tell which. It hedges a little and stays confidently wrong when it chooses the shadow reading.
   * The slab face behind an occluder interface is itself invisible in X (§2.2), so the distinction must come from evidence beyond the facet:
     * agreement with the other facets' common intersection (F4: leave-one-out consensus; violators have median z 4.0 against 0.06);
     * or a visible solid edge lying on the plane inside the window (a visible caster), which is not yet a descriptor.
 * By the pre-declared rule, F3 does not replace F1 on T* (+0.03 < 0.06). F5 remains the best projective arm (F5 − F3 = +0.22 [0.19, 0.26]).
+
+**F4** = F3 + leave-one-out consensus descriptors, i.e. each facet's agreement with the least-squares intersection of the others: log1p of the residual, log1p of its variance, and a z score.
+
+| | T* | B1K | sep | all-lit | T* KL | HPD-MAE | violating rows, signed HPD |
+|---|---|---|---|---|---|---|---|
+| F3 | 7.75 | 7.78 | 0.64 | −0.01 | 2.54 | 0.049 | −0.191 |
+| F4 | 7.77 | 7.82 | 0.58 | 0.01 | 2.52 | 0.054 | −0.201 |
+
+**Paired differences:**
+* F4 − F3 = +0.03 [0.01, 0.04] on T*;
+* on violating rows, **+0.12 [0.04, 0.19]**: +0.23 where < 3 large facets, +0.11 where ≥ 3;
+* on law-obeying rows, +0.02;
+* F4 − F1 = +0.06 [0.03, 0.09];
+* F5 − F4 = +0.20 [0.16, 0.23].
+
+**Reading (failure mode 3).**
+* Together, the occluder hypothesis and the consensus statistic recover ~0.35 nats on law-violating rows, out of a 4–6-nat gap.
+* Neither reduces the over-confidence there.
+* The X-measurable evidence that a facet is an occluder face exists (§2.2 consensus z), but the learned head does not turn it into calibrated doubt at this data scale. Per facet, the training signal is weak: only 3.8% of large training facets violate the law (§2.2).
+* This failure mode stays open (§11).
+
+**Attribution by single-change arms** (paired, dev; F1 → F1drop → F3 → F4):
+
+| change | T* | solid-separated | law-violating T* rows | law-obeying T* rows |
+|---|---|---|---|---|
+| + facet dropout 0.2 and availability flag (F1drop − F1) | +0.02 [0.00, 0.04] | **+0.27 [0.17, 0.36]** | **+0.16 [0.04, 0.28]** | +0.01 |
+| + two-hypothesis factor (F3 − F1drop) | +0.01 [−0.01, 0.02] | +0.01 | +0.07 [−0.00, 0.14] | 0.00 |
+| + consensus descriptors (F4 − F3) | +0.03 [0.01, 0.04] | −0.06 | **+0.12 [0.04, 0.19]** | +0.02 |
+
+* Dropout with an availability flag is the cheap, decisive fix for facet-free windows. It also helps on violating rows: the generic field learns not to lean on facets.
+* The occluder branch adds little (+0.07, borderline); consensus adds +0.12 on violating rows.
+* F6 (amendment A3, declared before these results) combines F5 with dropout, flag and consensus, without the occluder branch.
+
+
 
 ## 5. Q3 (H1): does posterior supervision still matter once the inductive bias is right?
 
