@@ -98,3 +98,31 @@ FastLabel moved from `RIND3D_Dataset1K/rind3d_1k/fastlabel/` (`git mv`) into `ri
 | `report.py --costs` + `estimate.py` | run end to end. Laptop projection: 25.4 labels per scene, 7.0 labels/s with 8 workers. Not an H20 number |
 
 **Not executed (H20 pending):** every section of `RIND3D_Dataset100K/docs/H20_CANARY_RUNBOOK.md`.
+
+## 8. Phase4 reorganization and main synchronization (2026-11-14)
+
+**What changed.**
+* `origin/main` (`4ed9419`) was merged; its Phase1, Phase2, tools, root scripts and docs are byte-identical to main.
+* The RIND3D components moved to `Phase4_Multi_Source_3D/` (`git mv`, 695 byte-identical renames).
+* Path, doc and README updates followed.
+* Recovery point: tag `archive/yushu-3d-pre-phase4-2026-11-14` (`e55e7d9`).
+
+**Validation**, in a fresh environment built from the new location with `RIND3D_Dataset100K/handoff/env/setup_env.sh` (offline: uv cache plus local CGAL / Boost archives), so that `rind3d` resolves to `Phase4_Multi_Source_3D/RIND3D_Generator`:
+
+| check | result |
+|---|---|
+| scientific trees: contract, `rind3d_100k`, fixtures, tests; `rind3d_posterior` (FastLabel); `rind3d_1k`; generator src / native / vendor / provenance / tests; pilot | **identical Git trees** before and after |
+| `verify_source_copy.py` (generator provenance) | 292 files, 0 mismatches |
+| `RIND3D_Posterior/tests` | 16 passed |
+| `RIND3D_Dataset1K/tests` | 9 passed |
+| `RIND3D_Dataset100K/tests` | 21 passed |
+| `RIND3D_Generator/tests` | 337 passed, 18 skipped (experiment natives rebuilt in the new location) |
+| `smoke_checks.py` (1K) | 10/10 OK; seals intact |
+| `smoke_test.py` (100K) | SMOKE PASS, 9 steps: fixtures, FastLabel digests, Gate A, FastLabel node run |
+| CLIs from the new location | `gate_a` (95/95 fields identical); `verify_root --labels` ok; `coverage_report`; `compare_engines` (4 tasks within bounds, max TV 0.0045); `student_smoke` (finite loss); `make_handoff` (package layout unchanged, after a fix) |
+| Phase3 | `uv lock --check` ok. `uv sync --locked --python 3.12 --extra dev --extra viewer --extra physics` installs `rind3d`, `rind-dataset` and `rind3d-reader` from the new path; `scripts/build.sh` ok; **54 passed, 8 skipped** (CUDA-device and data-root tests) |
+| Phase1, Phase2, tools | `tools/check_repo.py`: "Repository checks passed" (shell syntax, tools tests, Phase1 / Phase2 unit tests), scratch Python 3.12 venv with `requirements.txt` and torch 2.4.1 CPU |
+
+**Operational notes.**
+* The canonical-geometry natives are built in place, in `RIND3D_Generator/vendor/canonical_geometry/.build/`. If two environments (Phase3, Phase4) build them in turn, delete `.build/native` before the second build: a stale CMake cache made CMake miss the other venv's Python development headers.
+* Both failed configures (Python 3.13 and 3.12 venvs) ran against this stale cache. The clean configure succeeded with 3.12; 3.13 was not retried.
