@@ -1,6 +1,7 @@
 """Window helpers for FastLabel (production copy of experiments/fastlabel/fastwin.py, v3 helpers).
-All outputs are identical to the originals (class tensor = SceneObs.cls; boundary mask, sentinels, point items and
-top items = rind3d_posterior.tpl.window.Window); verified in RIND3D_Posterior/experiments/fastlabel/test_fastwin2.py."""
+All outputs are identical to the originals (class tensor = rind3d_1k.labels.SceneObs.cls; boundary mask, sentinels,
+point items and top items = rind3d_posterior.tpl.window.Window); verified in
+RIND3D_Posterior/experiments/fastlabel/test_fastwin2.py and tests/test_fastlabel_core.py."""
 import numpy as np
 from numba import njit
 from rind3d_posterior.tpl.window import Window
@@ -127,9 +128,14 @@ def _cls_from_bits_blocked(lit, sol, L, out):
     return out
 
 
-def fast_cls3(S, w, s):
-    L = int(S.W[w]["L"]); dz = S.dz
-    def raw(j):
-        o, n = S._pos[(w, j)]
-        return np.frombuffer(dz.decompress(S.blob[o:o + n]), np.uint8)
-    return _cls_from_bits_blocked(raw(s), raw(-1), L, np.empty((L, L, L), np.uint8))
+def cls_from_packed(lit_bits, solid_bits, L):
+    """Labeller classes cls[x, y, z] (0 dark FREE, 1 lit FREE, 2 SOLID) from the stored packed crops
+    (np.packbits of bool [Z, Y, X], big-endian bit order)."""
+    L = int(L)
+    return _cls_from_bits_blocked(np.asarray(lit_bits, np.uint8), np.asarray(solid_bits, np.uint8), L,
+                                  np.empty((L, L, L), np.uint8))
+
+
+def window_classes(task):
+    """Class tensor of a FastLabelWindow."""
+    return cls_from_packed(task.lit_bits, task.solid_bits, task.L)

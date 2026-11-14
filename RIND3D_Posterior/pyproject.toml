@@ -7,6 +7,7 @@ dependencies = ["numpy>=2.0", "numba>=0.60", "scipy>=1.12"]
 
 [project.optional-dependencies]
 gpu = ["cupy-cuda12x>=13"]
+fastlabel = ["zstandard>=0.22"]
 test = ["pytest>=8"]
 
 [build-system]
@@ -15,3 +16,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+rind3d_posterior = ["fastlabel/verify.cu"]

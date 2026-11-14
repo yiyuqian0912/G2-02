@@ -1,6 +1,9 @@
 """FastLabel v3.4 label pipeline (production copy of RIND3D_Posterior/experiments/fastlabel/adaptive3.py).
 
 Target (contract rind3d-1k-contract-v1): q_F, the 128^3 cell masses of Uniform(F_W^j).
+Entry point: label_window_fast(task, **cfg) with task an inputs.FastLabelWindow (from an adapter: window_from_1k,
+window_from_100k). The computation depends only on the task record and cfg; the scene format enters only through the
+adapter. The 1K entry point rind3d_1k.fastlabel.label_task(scene_dir, w, s) is label_window_fast(window_from_1k(...)).
 
 Per task (scene, window w, source channel s):
 1. Phase 1, round r: B_r = F(X'_r) ∩ filter(B_{r-1}) by the tau-pencil engine on a receiver subset (B_r ⊇ F).
@@ -21,14 +24,13 @@ Status of the returned label:
 import json
 import time
 from functools import lru_cache
-from pathlib import Path
 
 import numpy as np
 
 from . import engine as T
 from .filters import build_filter2, items_from_vox2
 from .sampler import BSampler
-from .window import fast_cls3, LazyWindow2
+from .window import window_classes, LazyWindow2
 
 VERSION = "fastlabel-v3.4"
 N_DATASET = 159802
@@ -45,7 +47,7 @@ GPU_LOCK = None
 
 
 def set_gpu_lock(lock):
-    """Worker initialiser (rind3d_1k.supervise): the cross-process semaphore around GPU submissions."""
+    """Worker initialiser (e.g. rind3d_1k.supervise): the cross-process semaphore around GPU submissions."""
     global GPU_LOCK
     GPU_LOCK = lock
 
@@ -60,21 +62,22 @@ def process_factory():
     return _FAC
 
 
-def scene_cache(scene_dir):
-    key = str(scene_dir)
+def scene_context(scene_key, P, K, bundle, policy):
+    """Per-scene solver objects, cached by scene_key (at most 2 scenes per process): tau-pencil geometry from the
+    float64 rows P/K and the certified geometry context of the canonical bundle."""
+    key = str(scene_key)
     v = _SCENES.get(key)
     if v is None:
-        from rind3d.geometry import load_geometry
-        from rind3d_1k.labels import SceneObs
-        from rind3d_1k.physical import POLICY
-        S = SceneObs(scene_dir)
-        bundle = load_geometry(Path(scene_dir) / "privileged" / "geometry.npz")
-        v = dict(S=S, geom=T.Geom(np.asarray(S.P, float), np.asarray(S.K)), bundle=bundle,
-                 ctx=process_factory().context(bundle, POLICY))
+        v = dict(geom=T.Geom(np.asarray(P, float), np.asarray(K)), bundle=bundle,
+                 ctx=process_factory().context(bundle, policy))
         if len(_SCENES) >= 2:
             _SCENES.pop(next(iter(_SCENES)))
         _SCENES[key] = v
     return v
+
+
+def task_context(task):
+    return scene_context(task.scene_key, task.P, task.K, task.bundle, task.policy)
 
 
 @lru_cache(maxsize=4096)
@@ -121,22 +124,23 @@ def label_rng(base_seed, scene_index, w, s):
     return int(a.generate_state(1)[0]), np.random.default_rng(b), np.random.default_rng(c)
 
 
-def label_task(scene_dir, w, s, **kw):
-    """Label one (scene, window, source channel). Returns dict(cell, lo, hi, kind, tv_bound, status, meta)."""
+def label_window_fast(task, **kw):
+    """Label one FastLabelWindow (scene, window, source channel). Returns dict(cell, lo, hi, kind, tv_bound, status,
+    meta). Deterministic given (task, cfg): every random stream is keyed by (base_seed, task.key)."""
     from . import gpuverify as GV
     cfg = dict(DEFAULTS); cfg.update(kw)
     # per-label delta: explicit, or family_delta / n_tasks for a simultaneous guarantee over the PLANNED workload
     # (union bound); n_tasks must be the number of labels the campaign will certify (1K: 159,802; 100K: set it)
     eps = float(cfg["eps"])
     delta = float(cfg["delta"]) if cfg["delta"] is not None else float(cfg["family_delta"]) / int(cfg["n_tasks"])
-    scene_dir = Path(scene_dir); sc = scene_dir.name
+    sc, w, s = (int(v) for v in task.key)
     out = dict(version=VERSION, eps=eps, delta=delta)
     tt = {}
     t0 = time.perf_counter(); c0 = time.process_time()
-    scn = scene_cache(scene_dir); S = scn["S"]; geom = scn["geom"]
-    cls = fast_cls3(S, w, s); win = LazyWindow2(cls, np.asarray(S.origin(w), np.int64), int(S.scene["resolution"]))
+    scn = task_context(task); geom = scn["geom"]
+    cls = window_classes(task); win = LazyWindow2(cls, np.asarray(task.origin, np.int64), int(task.N))
     tt["setup"] = time.perf_counter() - t0
-    seed_items, rng_s, rng_c = label_rng(cfg["base_seed"], int(sc), w, s)
+    seed_items, rng_s, rng_c = label_rng(cfg["base_seed"], sc, w, s)
     t = time.perf_counter()
     roots, _ = T.stage1(geom, win, d1=cfg["s1_d1"], n_boundary=cfg["s1_nb"], n_class=cfg["s1_nc"], n_learn=cfg["s1_learn"],
                         max_tests=cfg["s1_tests"])
@@ -161,7 +165,7 @@ def label_task(scene_dir, w, s, **kw):
                 if r2["stats"]["undet"] == 0:
                     out["path"] = "exact_race"; race_res = r2; break
             if V is None:
-                V = GV.WindowVerifier(process_factory(), scn["ctx"], S, w, s, cls, lock=GPU_LOCK)
+                V = GV.WindowVerifier(process_factory(), scn["ctx"], task, cls, lock=GPU_LOCK)
             n_r = int(cfg["n_cert"]); d_r = delta * 0.5 ** r; n1 = int(cfg["n_stage1"] or n_r)
             if n1 < n_r:
                 a1, k_r, alpha_r = design2(n1, n_r, eps, d_r)
@@ -199,7 +203,7 @@ def label_task(scene_dir, w, s, **kw):
                            delta_r=d_r, alpha_r=alpha_r, p_lower=cp_lower(tested - K, tested, d_r))
                 if cfg["validate_n"]:
                     from scipy.stats import beta
-                    rv = np.random.default_rng(np.random.SeedSequence([int(cfg["base_seed"]), int(sc), w, s, 99]))
+                    rv = np.random.default_rng(np.random.SeedSequence([int(cfg["base_seed"]), sc, w, s, 99]))
                     vp = BSampler(res, rv, tri_cache).draw(int(cfg["validate_n"]))
                     nv = len(vp); kv = sum(not g[0] for g in V.test_batch(vp))
                     out["validation"] = dict(n=nv, fail=int(kv), p_hat=1 - kv / nv, note="empirical, not part of the certificate",
@@ -239,7 +243,7 @@ def label_task(scene_dir, w, s, **kw):
                                           f"{float(cfg['family_delta'])} / {int(cfg['n_tasks'])}") if cfg["delta"] is None
                                   else f"explicit per-label delta = {delta}",
                                   n_tasks=int(cfg["n_tasks"]) if cfg["delta"] is None else None,
-                                  seed=[int(cfg["base_seed"]), int(sc), int(w), int(s)])
+                                  seed=[int(cfg["base_seed"]), sc, int(w), int(s)])
     elif path == "single_cell_support":
         lab = dict(cell=np.array([out["cell"]], np.int32), lo=np.array([1.0]), hi=np.array([1.0]),
                    kind=np.zeros(1, np.int8), tv_bound=0.0, status="certified")

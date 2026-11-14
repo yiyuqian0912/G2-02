@@ -1,9 +1,9 @@
 """Batched certified point-source verification on the GPU (host side). Kernel: verify.cu.
 
-`WindowVerifier(fac, ctx, S, w, s, cls)` holds the device-resident observation of one label (window w, source
-channel s): stored packed lit and SOLID crops and the 8^3 leaf codes. `test_batch(points)` decides, for every
-candidate source, EXACTLY whether it is in F_W^j:
-1. legality (certified clearance, rind3d_1k.physical.legal_source) and exclusion of the closed window box (host);
+`WindowVerifier(fac, ctx, task, cls)` holds the device-resident observation of one label (a FastLabelWindow: window
+origin / side / resolution, stored packed lit and SOLID crops) and the 8^3 leaf codes. `test_batch(points)` decides,
+for every candidate source, EXACTLY whether it is in F_W^j:
+1. legality (certified clearance, inputs.legal_source) and exclusion of the closed window box (host);
 2. shadow rows on the GPU (directed intervals), exact host rows for flagged sources;
 3. one verify launch over (source, 16^3 brick) work items: FP32 filter -> FP64 intervals -> UNKNOWN;
 4. exact host decision (native GMP predicate) of UNKNOWN voxels of otherwise passing sources.
@@ -215,11 +215,11 @@ class GeometryRows:
 
 
 class WindowVerifier:
-    def __init__(self, fac, ctx, S, w, s, cls, kmax=1024, ucap=4096, lock=None, check_solid=True, mem_budget=96 << 20, kernel2=True):
+    def __init__(self, fac, ctx, task, cls, kmax=1024, ucap=4096, lock=None, check_solid=True, mem_budget=96 << 20, kernel2=True):
         from fractions import Fraction
         from rind3d.lite_acceptance import DRIVER_RADIUS
         self.fac = fac; self.rt = rt = fac._cuda(); self.ctx = ctx; self.m = _module(rt); self.lock = lock
-        self.o = np.asarray(S.origin(w), np.int64); self.L = int(S.W[w]["L"]); self.N = 1024
+        self.o = np.asarray(task.origin, np.int64); self.L = int(task.L); self.N = int(task.N)
         r2 = float(DRIVER_RADIUS) ** 2
         if Fraction(r2) < Fraction(DRIVER_RADIUS) ** 2:
             r2 = float(np.nextafter(r2, np.inf))
@@ -229,9 +229,6 @@ class WindowVerifier:
         if g is None or g[0] is not rt:
             g = (rt, GeometryRows(rt, ctx)); _MOD[key] = g
         self.G = g[1]
-        def raw(j):
-            o, n = S._pos[(w, j)]
-            return np.frombuffer(S.dz.decompress(S.blob[o:o + n]), np.uint8)
         self.cls = cls
         bufs = _BUFS.get(id(rt))
         if bufs is None:                     # process-wide reusable device buffers (no per-label alloc / free)
@@ -239,7 +236,8 @@ class WindowVerifier:
                                                              "nmis", "recn", "rec", "nunk", "unk", "lcode2", "dump",
                                                              "bcode", "tcode", "bcode2", "tcode2")}
         self.buf = bufs
-        self.d_lit = bufs["lit"].put(raw(s)); self.d_sol = bufs["sol"].put(raw(-1))
+        self.d_lit = bufs["lit"].put(np.asarray(task.lit_bits, np.uint8))
+        self.d_sol = bufs["sol"].put(np.asarray(task.solid_bits, np.uint8))
         self.lcode = leaf_codes(cls, False); self.d_lcode = bufs["lcode"].put(self.lcode)
         self.kernel2 = kernel2
         self.bcode, self.tcode = coarse_codes(self.lcode, self.L)
@@ -252,9 +250,7 @@ class WindowVerifier:
         self.kmax = int(min(kmax, max(16, mem_budget // per_src)))           # device memory guard per worker
         self.stats = dict(batches=0, points=0, legal_fail=0, box_fail=0, host_legal=0, host_rows=0, unknown_voxels=0,
                           unknown_sources=0, work_items=0, gpu_s=0.0, legal_s=0.0, host_s=0.0, exact_s=0.0)
-        import json
-        sj = json.loads((S.dir / "privileged" / "sources.json").read_text())
-        self.true_source = np.array([float.fromhex(v) for v in sj["sources_hex"][s]])
+        self.bind_point = np.asarray(task.bind_point, "<f8").reshape(3)
         self.solid_key = (ctx.geometry_id, tuple(int(v) for v in self.o), self.L)
         if check_solid and self.solid_key not in _SOLID_OK:
             self.solid_check(); _SOLID_OK.add(self.solid_key)
@@ -335,7 +331,7 @@ class WindowVerifier:
             if nunk[0] > self.ucap:
                 raise RuntimeError("solid check: UNKNOWN overflow")
             idx = unk[0, :nunk[0]]
-            cpu = self.ctx.bind(self.true_source)           # membership does not depend on the source
+            cpu = self.ctx.bind(self.bind_point)            # membership does not depend on the source
             _, mm, _ = cpu.native.points(np.ascontiguousarray(self._centres(idx), "<f8"), False)
             x, y, z = self._vox(idx).T
             if np.any(mm < 0) or np.any((mm == 1) != (self.cls[x, y, z] == 2)):
@@ -371,7 +367,7 @@ class WindowVerifier:
         return out
 
     def _batch(self, pts, ids, out, dump):
-        from rind3d_1k.physical import legal_source
+        from .inputs import legal_source
         K = len(ids)
         if K == 0:
             return
