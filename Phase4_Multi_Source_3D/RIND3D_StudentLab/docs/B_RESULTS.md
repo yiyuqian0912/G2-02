@@ -554,3 +554,53 @@ The headline HPD-MAE of each model hides two opposite regimes:
 * strong over-confidence where it fails.
 
 P0's good overall MAE (0.024) is a cancellation: it is under-confident on law-obeying rows (+0.057) and over-confident on violating rows (−0.222).
+
+## 10. Confirmatory evaluation (1K val split, opened once)
+
+**Protocol.**
+* Run once on 2026-11-14 with `scripts/confirm.sh F5_s0`, after the selection of §4.7 was committed (06ad9ca).
+* Pre-declared comparisons: plan §7 with amendments A1–A3.
+* Final checkpoints only; all 10 evaluations are logged in `$RIND3D_LAB_OUT/CONFIRM_LOG.jsonl`. Outputs are in `docs/confirm/`.
+* Confirm T*: 6,321 natural windows, all with certified labels. B1K: 4,000 release windows.
+
+| run | T* IG | B1K IG | T* KL | HPD-MAE | T* IG L64 / L128 / L256 |
+|---|---|---|---|---|---|
+| pilot FL_MIS s0 | 3.98 [3.85, 4.09] | — | 6.37 | 0.037 | 3.47 / 4.08 / 4.38 |
+| G0 s0 | 3.96 [3.85, 4.07] | 3.92 | 6.38 | 0.033 | 3.39 / 4.05 / 4.44 |
+| G0 s1 | 3.94 [3.81, 4.05] | 3.91 | 6.40 | 0.027 | 3.40 / 4.00 / 4.42 |
+| P0 (no learning) | 7.32 [7.12, 7.51] | 7.40 | 3.02 | 0.036 | 5.28 / 7.00 / 9.68 |
+| F1 s0 | 7.91 [7.72, 8.09] | 7.98 | 2.47 | 0.023 | 5.97 / 7.64 / 10.10 |
+| F1 s1 | 7.91 [7.72, 8.10] | 7.99 | 2.46 | 0.023 | 5.99 / 7.64 / 10.10 |
+| **F5 s0** | **8.13 [7.93, 8.31]** | **8.23** | **2.23** | **0.010** | 6.04 / 7.82 / 10.51 |
+| F5 s0, M = 4 at test (A2) | 8.25 [8.06, 8.44] | 8.37 | 2.12 | 0.011 | 6.06 / 7.92 / 10.76 |
+
+| id | comparison (paired) | T* | B1K | dev T* | verdict |
+|---|---|---|---|---|---|
+| C1 | F1 − G0, s0 | **+3.94 [3.81, 4.07]** | +4.06 [3.94, 4.19] | +3.81 | confirmed |
+| C1 | F1 − G0, s1 | **+3.97 [3.85, 4.10]** | +4.08 [3.97, 4.21] | +3.84 | confirmed |
+| C2 | P0 − G0 s0 | **+3.36 [3.21, 3.51]** | +3.49 [3.34, 3.63] | +3.30 | confirmed |
+| C1′ | F5 − G0 s0 | +4.16 [4.04, 4.29] | +4.32 [4.19, 4.46] | +4.07 | descriptive |
+| C1′ | F5 − F1 s0 | **+0.22 [0.19, 0.25]** | +0.25 [0.22, 0.28] | +0.25 | replicated |
+| A2 | F5 (M = 4) − F5 | +0.12 [0.11, 0.14] | +0.13 [0.12, 0.16] | +0.12 | replicated (secondary) |
+| A2 | F5 (M = 4) − F1 s0 | +0.34 [0.31, 0.37] | +0.39 [0.35, 0.42] | +0.38 | replicated (secondary) |
+| C4 | G0 s0 − pilot FL_MIS s0 | −0.02 [−0.04, 0.01] | — | −0.02 | reproduction confirmed |
+
+**C3: hard cases with certified references (G0 s0 vs F5 s0).**
+
+| set | rows (with reference) | label IG | G0 IG / KL | F5 IG / KL | F5 − G0, IG | F5 − G0, KL |
+|---|---|---|---|---|---|---|
+| solid-separated | 499 (499) | 1.90 | 0.89 / 1.14 | 0.46 / 1.51 | **−0.44 [−0.55, −0.30]** | +0.37 [0.26, 0.45] |
+| all-lit | 2,500 (180) | 0.36 | −0.05 / 0.38 | −0.03 / 0.36 | +0.02 [−0.00, 0.05] | −0.02 |
+| all-dark | 2,043 (180) | 1.63 | 0.22 / 1.38 | 0.25 / 1.37 | +0.01 [−0.04, 0.07] | −0.01 |
+
+The IG columns are on the reference rows; the paired IG differences are over all rows of each set.
+
+**Readings.**
+* **Every dev effect replicates on held-out worlds**, with magnitudes within 0.15 nats of dev. Seed agreement is again ≤ 0.03.
+* **F5 is also the best calibrated model.** HPD-MAE is 0.010 on confirm T*, against 0.023 for F1 and 0.033 for G0.
+* **The solid-separated deficit is real and larger out of sample.** F5 trails G0 by 0.44 nats there (dev, F1: −0.04 to −0.21). These windows have no facets, and the projective Students' generic field is weaker than G0's.
+  * On dev, dropout + flag repaired this with the cell-centre factor (F1drop: +0.27), but not with quadrature (F6, §4.7).
+  * No dropout arm was declared for confirm, so the repair is dev-only evidence.
+* **Hard cases carry information no Student extracts.**
+  * The full-world label has 1.6–1.9 nats on all-dark and solid-separated windows, and 0.36 on all-lit. Both models stay at 0–0.9.
+  * How much of this is X-measurable is unknown: these labels condition on the hidden world, and windows without lit/dark interfaces have no facets.
