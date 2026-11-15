@@ -1,6 +1,6 @@
 # B — Results: projective structure, projective Students, and what remains
 
-**Status.** Working document. Every number is exploratory **dev-split** evidence unless it is marked *confirm*.
+**Status.** Complete for the 2026-11-14 study: all queued arms are run and analysed. Every number is exploratory **dev-split** evidence unless it is marked *confirm*.
 * dev = pilot-select, 102 scenes of the 1K train split;
 * confirm = the 1K val split, used once (§10);
 * the 1K test split is sealed and was never read.
@@ -567,6 +567,99 @@ Counts:
 
 This motivates F3 (occluder hypothesis) and F4 (consensus).
 
+## 8. Q6 (H6): does the Student generalise?
+
+Three kinds of shift, all on dev. The OOD sets are never trained on.
+* (a) A window size never seen in training.
+* (b) Scene families never seen in training.
+* (c) The facet-free hard cases. These are summarised from §3, §6 and §10.
+
+Arms (a) and (b) are retrained copies of G0 and F1: same budget, seed 0, final checkpoints. Their only difference is the training-row filter.
+
+### 8.1 Window-size transfer: trained on L64 + L128 only, evaluated on L256
+
+* The side arms G0side and F1side train on 72,868 rows of all 684 scenes, against 124,502 for G0 and F1.
+* Both models carry a learned embedding of the window-size bucket (L64 / L128 / L256: `side_emb`, plus a one-hot in the decoder). In these arms the L256 bucket receives no gradient.
+* The diagnostic `side_bucket_max = 1` is applied only at evaluation, on dev. It makes L256 windows reuse the L128 bucket. As a check, the L64 and L128 rows are bit-identical with and without it.
+
+| dev T*, L256 rows (n = 2,920) | IG | vs the same model trained on all sides | HPD-MAE | 50% HPD coverage − 0.5 |
+|---|---|---|---|---|
+| G0 (all sides) | 4.26 [4.10, 4.42] | — | 0.057 | −0.070 |
+| G0side | 2.64 [2.54, 2.75] | −1.62 [−1.72, −1.52] | 0.147 | −0.200 |
+| G0side, L256 bucket → L128 | 3.30 [3.16, 3.43] | −0.97 [−1.03, −0.91] | 0.039 | +0.049 |
+| F1 (all sides) | 9.71 [9.43, 9.99] | — | 0.061 | −0.080 |
+| F1side | 9.70 [9.43, 9.97] | −0.01 [−0.05, 0.03] | 0.021 | +0.023 |
+| F1side, L256 bucket → L128 | 9.76 [9.48, 10.03] | +0.05 [0.02, 0.09] | 0.013 | −0.022 |
+
+On the trained sides (L64 + L128, n = 2,298) the side arms match the full arms: G0side − G0 +0.07 [0.02, 0.12], F1side − F1 +0.03 [0.00, 0.06].
+
+**Readings.**
+* **The projective Student transfers to an unseen window size with no loss**, and is better calibrated there than when trained on it. This is expected if the transferable part is the plane factor: a plane through the source is the same object at every window size. The learned reliability head only has to rate a facet's fit quality, which does not depend on the window size.
+* **The generic Student does not transfer.**
+  * Without L256 training it loses 1.62 nats at L256 and becomes over-confident.
+  * Two-fifths of that loss (0.65) is the untrained size embedding.
+  * The remaining 0.97 nats is a real failure to extrapolate: the encoder sees an L256 window at 8 voxels per pooled cell, a scale it never saw.
+  * With the clamp, G0side at L256 (3.30) is below its own L128 score (3.88), while F1side at L256 (9.76) is well above its L128 score (7.40).
+* **The generic field transfers poorly for both models.** On facet-free all-lit L256 windows (n = 485), both side arms lose 0.16–0.22 nats against their all-sides counterparts, clamp or not. F1's size transfer therefore comes from the plane factor, not from its generic field.
+
+### 8.2 Family transfer: corridors and thin_slabs held out of training
+
+**Design.**
+* G0fam and F1fam train on the other seven families: 521 of 684 scenes, 92,191 rows.
+* Of the 5,218 dev T* rows, 497 are corridors and 691 are thin_slabs. These are the two hardest families for both full models (F1: 6.97 and 6.48 nats, against 8.03 on the rest).
+* thin_slabs is the main source of occluder-interface facets (§2.2). Holding it out tests whether the exception to the facet law has to be seen in training.
+
+| dev T* stratum | n | G0fam − G0 | F1fam − F1 | F1fam IG | HPD-MAE F1fam / F1 |
+|---|---|---|---|---|---|
+| other families (trained) | 4,030 | −0.01 [−0.05, 0.03] | −0.07 [−0.12, −0.03] | 7.95 | 0.067 / 0.039 |
+| corridors (held out) | 497 | +0.06 [0.02, 0.10] | +0.05 [−0.04, 0.15] | 7.01 | 0.060 / 0.052 |
+| thin_slabs (held out) | 691 | **−0.40 [−0.52, −0.24]** | **−0.23 [−0.34, −0.10]** | 6.25 | 0.160 / 0.134 |
+
+The table below splits the held-out rows by whether any large facet (≥ 100 inliers) misses the true source by more than 4 voxels. This is the §9 stratification; the true source is used only to stratify.
+
+| held-out stratum | n | G0fam − G0 | F1fam − F1 | F1 IG (trained on it) |
+|---|---|---|---|---|
+| thin_slabs, every large facet obeys | 452 | −0.21 [−0.37, −0.08] | −0.08 [−0.16, −0.01] | 7.05 |
+| thin_slabs, violating | 228 | −0.82 [−1.18, −0.31] | **−0.65 [−0.81, −0.42]** | 5.44 |
+| corridors, every large facet obeys | 438 | +0.04 [−0.05, 0.11] | +0.05 [−0.03, 0.15] | 7.30 |
+| corridors, violating | 43 | +0.63 [−0.01, 1.55] | −0.04 [−0.26, 0.09] | 5.74 |
+
+**Readings.**
+* **Where the facet law holds, the projective Student transfers to unseen families.** On held-out corridors F1 loses nothing. On thin_slabs rows whose large facets all obey the law it loses 0.08 nats, close to the −0.07 on the trained families. That is about what 26% fewer training rows would cost at the §6 slope of ~0.1 nats per doubling.
+* **The exception has to be seen in training.**
+  * 33% of thin_slabs rows carry a law-violating facet. Without thin_slabs worlds in training, F1 loses 0.65 nats on those rows, and its calibration error on the family rises from 0.134 to 0.160.
+  * The reliability head learns to distrust occluder-interface facets from examples of them. A Student trained on families with few sub-voxel occluders will be over-confident on families with many.
+  * The family composition of a training set therefore matters through the rate of occluder interfaces, not through the plane geometry.
+* **The generic Student behaves the same way, with larger losses:** −0.40 on thin_slabs, −0.82 on its violating rows. Even untrained on them, F1fam scores 6.25 nats on thin_slabs, about twice G0 trained on them (3.20).
+* **Calibration degrades for both models on every stratum,** including the trained families: HPD-MAE 0.077 vs 0.042 for G0 and 0.067 vs 0.039 for F1. This matches the small-data trend of §6 and is not specific to the held-out families.
+
+### 8.3 The facet-free hard cases, and the position-only control (Gblind)
+
+**Gblind** is G0 with the window content zeroed: the same architecture and capacity, seeing only the window's origin and size. It measures how much a Student can get from *where* a window is, without looking at it.
+
+| dev | T* | solid-separated | all-lit | all-dark |
+|---|---|---|---|---|
+| Gblind IG | −0.07 [−0.11, −0.03] | −0.22 [−0.28, −0.15] | −0.29 [−0.33, −0.24] | +0.08 [0.00, 0.18] |
+| G0 − Gblind | +3.97 [3.85, 4.11] | +0.79 [0.60, 0.98] | +0.24 [0.18, 0.28] | +0.13 [−0.02, 0.27] |
+| F5 − Gblind | +8.04 [7.81, 8.27] | +0.64 [0.47, 0.84] | +0.26 [0.21, 0.31] | +0.21 [0.08, 0.32] |
+| label IG (confirm, §10) | — | 1.90 | 0.36 | 1.63 |
+
+**Readings.**
+* **Position alone carries no transferable information.** Gblind scores slightly *below* the uniform-legal prior, and its dev NLL rises from 14.55 to 14.64 during training: it fits the positions of the 684 training sources, and those do not carry over to new worlds. The uniform-legal prior is therefore the right position-only baseline, and every IG in this report comes from the window content.
+* **On facet-free windows the generic field extracts something, but little.** G0 gets 0.13–0.79 nats beyond position on the three hard sets, F5 0.21–0.64. The full-world labels hold 0.36–1.90 nats there (confirm). How much of that is X-measurable is unknown (§10).
+* **The projective Students' solid-separated deficit is stable.**
+  * It is −0.21 on dev (s0), −0.44 on confirm (F5), and the same at every training fraction (§6).
+  * The facet factor is idle on these windows. The generic field co-adapted with it during training and is weaker than G0's alone.
+  * Facet dropout repaired this only with the cell-centre factor (F1drop, §4.6).
+
+**Verdict on H6.** H6 is supported where the facet law holds, and not supported elsewhere.
+* **Where the facet law holds, the projective Student generalises.**
+  * Unseen window size: no loss, better calibration.
+  * Unseen families: no loss on law-obeying rows.
+* **The occluder-interface exception does not generalise:** −0.65 nats on violating rows of an unseen family.
+* **Neither model generalises on facet-free windows:** at most 0.8 nats beyond position, against 0.4–1.9 in the labels.
+* **The generic Student generalises worse on every axis:** −0.97 nats on the unseen size after removing the embedding confound, and −0.40 on thin_slabs.
+
 ## 9. Failure analysis (deliverable E): where the remaining 2.7 nats go
 
 Run with `scripts/failure_analysis.py` on dev T*. The true source is used only to *score* facets.
@@ -671,6 +764,12 @@ The IG columns are on the reference rows; the paired IG differences are over all
 * The observation contains a *projective* structure: every planar lit/dark interface lies on a plane through the source.
 * A Student is accurate when its output representation can express that structure *exactly*. Concretely: an exactly normalised density over the 128³ cells, factorised as a learned generic field times analytic plane factors whose planes are measured from X, each factor integrated over the cell.
 * That design doubles the information gain of the established Student (3.9 → 8.1 nats on confirm T*) and cuts KL to the full-world label from 6.4 to 2.2 nats. It trains in ~1k steps, and its non-learned core needs no training at all.
+* **Efficient:** it reaches 96% of its score from 86 training worlds (§6), where the generic Student reaches 43% of its own.
+* **Generalisable:** it transfers to an unseen window size with no loss, and to unseen families wherever the facet law holds (§8).
+* **Where it falls short:**
+  * the exception to the law (occluder interfaces), which must be seen in training;
+  * facet-free windows, where no Student extracts much;
+  * near-pencil facet sets, which fix a line rather than a point.
 
 ### What is demonstrated (dev, replicated on the confirm split)
 
@@ -698,6 +797,10 @@ The IG columns are on the reference rows; the paired IG differences are over all
    * G0 gains 2.2 nats over the same 8× range, with shrinking returns per doubling (1.02 → 0.76 → 0.43) at a fixed step budget.
    * 4× more steps at full data add +0.91 to G0 (G0long) but leave F1 − G0long at +2.90, and make G0 over-confident.
    * At 1K scale, neither more steps nor more worlds lets the generic decoder find the projective operator.
+8. **The projective Student generalises where the facet law holds** (H6, dev only, §8).
+   * Trained without L256 windows, F1 loses nothing on them (−0.01 [−0.05, 0.03]) and is better calibrated. G0 loses 0.97 nats even after the untrained size embedding is factored out.
+   * Trained without corridors and thin_slabs, F1 loses nothing on held-out rows where every large facet obeys the law. It loses 0.65 nats on thin_slabs rows with an occluder-interface facet: the reliability head must see that exception in training.
+   * A position-only control (Gblind) scores −0.07 nats, so all reported information comes from the window content.
 
 ### What is falsified
 
@@ -711,7 +814,8 @@ The IG columns are on the reference rows; the paired IG differences are over all
 * Why facet dropout repairs facet-free windows with the cell-centre factor (F1drop, +0.27) but not with quadrature (F6).
 * How much of the hard-case label information (all-dark 1.6, solid-separated 1.9 nats on confirm) is X-measurable at all.
 * The X-only floor on pencil-degenerate rows.
-* [G0long, Q4 and Q6 readings: §6 and §8]
+* Whether the generic decoder would find the projective operator with ~100× more worlds *and* matched compute. At fixed compute, its gain per doubling shrinks (§6); one seed per point.
+* Whether a training set with more sub-voxel occluders would teach the reliability head a transferable rule, or only a per-family rate (§8.2).
 
 ### Strongest design, and the most efficient next experiments
 

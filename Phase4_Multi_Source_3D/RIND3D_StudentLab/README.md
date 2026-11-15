@@ -16,6 +16,7 @@ the validated production code. Nothing here changes the 1K release, its labels, 
 | `scripts/analyze_counterfactual.py` | label divergence across X-identical worlds; JSD floors vs Students |
 | `scripts/failure_analysis.py` | dev T* failure strata: facet-law violation × facet count, family, lower tail, gap shares |
 | `scripts/quadrature_probe.py` | non-learned probe of the cell-integral approximation (sub-cell quadrature of the facet product) |
+| `scripts/generalisation.py` | Q6 readout: side-holdout (with the `side_bucket_max` diagnostic) and family-holdout arms vs the full arms, by stratum |
 | `scripts/confirm.sh` | the pre-declared confirmatory evaluation (`docs/A_RESEARCH_PLAN.md` §7), run once |
 | `slab/figures.py` | posterior projections, curves, IG by facet count, scaling, counterfactual panels |
 | `configs/` | arm configurations |
