@@ -2,7 +2,9 @@
 
 > **2026-11-13:** paths under `RIND3D_Research/` refer to the archive tag `archive/rind3d-research-2026-11-13` (removed from the active branch). Current RIND3D overview: `RIND3D_HANDOFF/README.md`.
 
-RIND3D is the 3D inverse-ray-geometry dataset and research line of G2-02.
+RIND3D is the 3D inverse-ray-geometry dataset and research line of G2-02. Its task is inverse inference of a hidden
+driver source from one local window of binary responses produced by occlusion. Terminology, and the boundary between
+full-world (teacher) information and local-only Student inputs: [GLOSSARY.md](GLOSSARY.md).
 
 Each entry below has a status:
 * **proven**: a mathematical statement with proof;
@@ -12,6 +14,7 @@ Each entry below has a status:
 
 | # | Topic | Authoritative document(s) | Status |
 |---|---|---|---|
+| 0 | Terminology and information boundaries | [GLOSSARY.md](GLOSSARY.md) | definitions |
 | 1 | Scientific goals | [GOALS.md](GOALS.md) | design |
 | 2 | Canonical geometry and physical response semantics | [SEMANTICS.md](SEMANTICS.md); `RIND3D_Generator/docs/` | implemented; certified renderer tested |
 | 3 | Local windows and Student-visible inputs | `RIND3D_Dataset1K/docs/SELECTION_LAW_1K.md` §1; `RIND3D_Dataset1K/rind3d_1k/loader.py` | implemented |
