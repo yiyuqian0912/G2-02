@@ -145,6 +145,14 @@
     "decision": "exact (rind3d_100k.local_eval.evaluate_proposal_interface): constructive bisection proofs, the exact all-active hull certificate and exact 64^3 tile scans including edges across tile faces; screening changes cost, never a decision",
     "fallback": "none: a proposal is accepted only if it is eligible; an unfilled side rejects the scene attempt (quota_unfilled) as in v2"
   },
-  "families_note": "the nine historical convex-polyhedral families (round robin slot % 9, as in v2). Curved families (spheres) are physical-research only until a certified posterior labeller supports them; they are not part of T*_v3",
-  "terminology": "driver source (legacy: source / light); response-active / response-inactive receiver (legacy keys: lit / dark); response interface (legacy: lit/dark boundary). Serialized keys keep their legacy names"
+  "families_note": "the nine historical convex-polyhedral families (round robin slot % 9, as in v2). Curved families (spheres) are physical-research only until a certified posterior labeller supports them; they are not part of T*_v3; thin bodies (all of thin_slabs, 25% of occluder_clusters) follow geometry.thin_law",
+  "terminology": "driver source (legacy: source / light); response-active / response-inactive receiver (legacy keys: lit / dark); response interface (legacy: lit/dark boundary). Serialized keys keep their legacy names",
+  "geometry": {
+    "generator": "lite-convex-recipes-v0.1+thin-min-v3 (rind3d_100k.geometry_v3.generate_v3)",
+    "thin_min_thickness_vox": 2.0,
+    "thin_law": "log2(half thickness) ~ U(log2(T_min / (2 N)), -5): the v0.1 law 2^U(-20, -5) conditioned on full thickness >= T_min voxels; same single uniform, so every other draw equals v0.1's for the same (seed, slot, attempt)",
+    "thin_check": "exact: the voxel-centre sampling of every thin slab (receivers inside the closed slab) is nonempty and 6-connected; the same canonical body defines SOLID and visibility; nothing is repaired on the voxel side",
+    "on_invalid": "geometry proposal failure: the scene attempt is rejected (reason thin_slab_invalid) and retried under max_attempts",
+    "why": "observable, spatially coherent thin occluders (docs/THIN_SLABS_V3.md); not intended to remove difficult shadow geometry"
+  }
 }

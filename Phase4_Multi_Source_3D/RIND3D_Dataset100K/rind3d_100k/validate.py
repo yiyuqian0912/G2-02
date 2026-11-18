@@ -95,6 +95,8 @@ def validate_scene(root, slot, rec=None, physics=0, deep=False, seed=0):
             m_hist[m - 1] += 1
     if "sampling" in meta:
         check_sampling_v2(meta, W, k, errs)
+    if "geometry_rule" in meta:
+        check_thin_slabs(S, meta, errs)
     phys = None
     if physics or deep:
         phys = physics_spot_check(S, n_points=int(physics or 512), seed=seed, deep=deep)
@@ -131,6 +133,26 @@ def check_sampling_v2(meta, W, k, errs):
                 errs.append(f"w{w} acceptance inconsistent with U < c(m)")
         if int(sd.get("rate_exact", 0)) != int(sd["rate_n"]) or int(sum(sd["rate_m"])) != int(sd["rate_A"]):
             errs.append(f"L{Lp} rate stream histogram incomplete")
+
+
+def check_thin_slabs(S, meta, errs):
+    """Contract v3: every thin slab (recorded by leaf id) has an exact voxel-centre sampling that is nonempty and
+    6-connected, and at least the declared minimum thickness; recomputed from the stored canonical geometry."""
+    from fractions import Fraction
+    from rind3d.rendering.backends import BackendFactory
+    from rind3d_1k.physical import POLICY
+    from .geometry_v3 import sampled_solid_components
+    ctx = BackendFactory(cuda_allowed=False).context(S.geometry(), POLICY)
+    by = {c.leaf_id: c.rows for c in ctx.components}
+    tmin = float(meta["geometry_rule"]["thin_min_thickness_vox"])
+    for r in meta.get("thin_slabs", []):
+        if r["leaf_id"] not in by:
+            errs.append(f"thin slab {r['leaf_id'][:8]} missing"); continue
+        rep = sampled_solid_components([tuple(Fraction(v) for v in row) for row in by[r["leaf_id"]]], int(meta["resolution"]))
+        if rep["n_vox"] == 0 or rep["n_components"] != 1 or rep["n_vox"] != r["n_vox"]:
+            errs.append(f"thin slab {r['leaf_id'][:8]} sampling {rep}")
+        if r["thickness_vox"] < tmin * (1 - 1e-12):
+            errs.append(f"thin slab {r['leaf_id'][:8]} thinner than {tmin} voxels")
 
 
 def physics_spot_check(S, n_points=512, n_windows=3, independent_points=32, seed=0, deep=False):

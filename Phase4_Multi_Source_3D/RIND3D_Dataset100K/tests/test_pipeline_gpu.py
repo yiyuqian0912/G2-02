@@ -109,3 +109,30 @@ def _v3_decisions(slot, n_prop):
 def test_v3_direct_interface_decisions_are_exact(slot):
     n, bad = _spawn(_v3_decisions, slot, 16)
     assert n >= 8 and not bad, bad
+
+
+def _v3_scene(root, slot):
+    from rind3d.rendering.backends import BackendFactory
+    from rind3d_100k import sampling as SM
+    from rind3d_100k.physical import run_scene
+    from rind3d_100k.storage import scene_path, atomic_write
+    from rind3d_100k.validate import validate_scene
+    cfg = json.loads((HERE / "contract" / "RIND3D_100K_CONTRACT_v3.json").read_text())
+    k, _ = SM.kappa_draw(cfg, slot)
+    for attempt in range(3):
+        rec, payload = run_scene(cfg, slot, k, None, BackendFactory(), attempt)
+        if payload is not None:
+            break
+    atomic_write(scene_path(root, slot), payload)
+    v = validate_scene(root, slot, None, physics=64, deep=True)
+    from rind3d_100k.storage import SceneFile
+    S = SceneFile(scene_path(root, slot))
+    return v["ok"], v["errors"], rec["family"], len(S.meta.get("thin_slabs", [])), "mixed_mask" in S.W.dtype.names
+
+
+@needs_cuda
+@pytest.mark.parametrize("slot", [1, 8])
+def test_v3_scene_with_thin_slab_rule_validates(tmp_path, slot):
+    ok, errs, fam, n_thin, has_mixed = _spawn(_v3_scene, str(tmp_path), slot)
+    assert ok, errs
+    assert has_mixed and (n_thin > 0 or fam != "thin_slabs")

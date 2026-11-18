@@ -212,10 +212,21 @@ def run_scene(cfg, slot, k, c_table, factory, attempt=0):
     t0 = time.perf_counter()
     fams = cfg["families"]
     family = fams[slot % len(fams)]
-    bundle, recipe = generate(seed, slot, family, attempt)
+    gcfg = cfg.get("geometry") or {}
+    if gcfg:                                  # contract v3: observable thin slabs (geometry_v3, docs/THIN_SLABS_V3.md)
+        from .geometry_v3 import generate_v3, thin_slab_report
+        bundle, recipe = generate_v3(seed, slot, family, attempt, thin_min_vox=float(gcfg["thin_min_thickness_vox"]))
+    else:
+        bundle, recipe = generate(seed, slot, family, attempt)
     if bundle is None or recipe["proposal_failures"]:
         return dict(slot=slot, attempt=attempt, status="rejected", reason="geometry_proposal_failure", k=k), None
     context = factory.context(bundle, POLICY)
+    thin = None
+    if gcfg:
+        thin = thin_slab_report(context, recipe, N, min_thickness_vox=float(gcfg["thin_min_thickness_vox"]))
+        if not all(r["ok"] for r in thin):
+            return dict(slot=slot, attempt=attempt, status="rejected", reason="thin_slab_invalid", k=k, family=family,
+                        thin_slabs=[r for r in thin if not r["ok"]], timing=dict(geometry=time.perf_counter() - t0)), None
     acceptance = geometry_acceptance(context, family, seed, slot, attempt)
     T["geometry"] = time.perf_counter() - t0
     t = time.perf_counter()
@@ -281,6 +292,9 @@ def run_scene(cfg, slot, k, c_table, factory, attempt=0):
                 windows_full=[dict({kk: v for kk, v in r.items() if kk not in ("lits", "solid")}, **wstats[w])
                               for w, r in enumerate(windows)],
                 sources_report=srep, recipe_keys=sorted(recipe.keys()))
+    if thin is not None:
+        meta["geometry_rule"] = dict(gcfg, generator=recipe["version"])
+        meta["thin_slabs"] = [dict(leaf_id=recipe["objects"][r["object"]]["leaf_id"], **r) for r in thin]
     if v2:
         ku = SM.kappa_draw(cfg, slot)
         meta["sampling"] = dict(law="declared", kappa=[float(x) for x in SM.kappa(cfg)], k=k, kappa_u=ku[1],
