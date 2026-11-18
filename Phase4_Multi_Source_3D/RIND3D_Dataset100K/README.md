@@ -5,7 +5,7 @@
 **The profile** (contract v2, `contract/RIND3D_100K_CONTRACT_v2.json`, **provisional**):
 * **Scenes:** 100,000 at 1024³, from nine geometry families.
 * **Windows:** exactly 12 per scene, 4 / 4 / 4 of sides 64 / 128 / 256.
-* **Sources:** K ~ κ = (0.15, 0.15, 0.15, 0.55) declared per slot (provisional default). Responses are source-separated.
+* **Driver sources:** K ~ κ = (0.15, 0.15, 0.15, 0.55) declared per slot (provisional default). Responses are source-separated: one source-specific response channel per source and window.
 * **Target population T\*:**
   * natural acceptance of every admissible window, with no m-dependent thinning;
   * an optional coverage slot: L64 only, in K = 4 scenes, 3 natural + 1 coverage window, c(m) = (1/8, 1/4, 1/2, 1);
@@ -29,6 +29,7 @@
 | label cost | `docs/LABEL_COST_100K.md` (TPE, v1); FastLabel: `../RIND3D_Posterior/docs/FASTLABEL_CORE.md` |
 | operator guide and environment | `handoff/README_H20.md`, `handoff/env/` |
 | earlier go / no-go (v1, TPE) | `docs/GO_NO_GO_100K.md` (historical) |
+| terminology and information boundaries | `../docs/RIND3D/GLOSSARY.md` |
 
 ## Code (`rind3d_100k/`)
 

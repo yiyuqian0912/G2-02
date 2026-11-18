@@ -1,9 +1,9 @@
 # Phase4: multi-source 3D source localization (RIND3D-100K)
 
-**The question.** Phase4 studies global source localization from limited local observations in three-dimensional multi-source worlds.
+**The question.** Phase4 studies global driver-source localization from limited local observations in three-dimensional multi-source worlds: inverse inference of a hidden driver source from one local window of binary responses produced by occlusion.
 * **The worlds:** 1024³ worlds of closed convex polyhedra with 1–4 point driver sources and exact closed-segment
   source-to-receiver visibility.
-* **What a Student sees:** one local window of one source channel: the SOLID crop, the binary response, the side and the origin.
+* **What a Student sees:** one local window and one source-specific response channel: the SOLID crop, that source's binary response, the side and the origin.
 * **What it predicts:** that source's posterior on a global 128³ grid.
 * **Supervision:** certified posterior labels computed from the full geometry, which the Student never sees.
 
@@ -26,6 +26,8 @@
   source misses the closed solid. The general vocabulary does not mean other response mechanisms are supported.
 * Serialized keys and APIs keep their legacy names (`lit`, `dark`, `lit_frac`, `cls` 0/1/2) for compatibility with 1K
   and v2.
+* Definitions, legacy names, and the boundary between full-world (teacher) information and local-only Student inputs:
+  `docs/RIND3D/GLOSSARY.md`.
 
 ## Where things are
 
@@ -38,7 +40,7 @@
 | `RIND3D_StudentResearch/` | task definition, Student reference (`pilot/`), coverage and generalization studies |
 | `RIND3D_Audit/` | scientific foundations audit |
 | `RIND3D_HANDOFF/` | environment (`env.sh`), entry points, implementation facts, validation record, figure sources |
-| `docs/` | **the Chinese dataset document** `RIND3D_数据集设计与技术说明.md` (nine figures in `docs/assets/`), RIND3D goals, semantics and history |
+| `docs/` | **the Chinese dataset document** `RIND3D_数据集设计与技术说明.md` (nine figures in `docs/assets/`), RIND3D goals, semantics, glossary and history |
 
 ## Set up and run the lightweight tests
 
