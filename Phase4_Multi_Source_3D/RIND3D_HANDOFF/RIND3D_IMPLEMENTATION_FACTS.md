@@ -11,6 +11,8 @@ marked **[proj]** (projection) or **[derived]** (read-only aggregation of releas
 
 **Paths.** Every path below is relative to `Phase4_Multi_Source_3D/`. The RIND3D components moved there from the repository root on 2026-11-14.
 
+**Terminology (2026-11-18).** This sheet keeps the legacy light/shadow wording of 2026-11-13: lit = response-active, dark = response-inactive, lit/dark boundary = response interface, all-lit / all-dark = all-active / all-inactive (`docs/RIND3D/GLOSSARY.md`).
+
 **Abbreviations:**
 * `G` = `RIND3D_Generator/src/rind3d`
 * `N` = `RIND3D_Generator/native`

@@ -5,6 +5,8 @@
 > `../RIND3D_StudentResearch/D_BACKFILL_REPORT.md`. The m-balanced window law below is the release's *selection law*,
 > not the Student's target: training must declare a population (`loader.flatten(population=...)`, see
 > `../RIND3D_StudentResearch/A_TASK_DEFINITION.md` and `C_LOADER.md`). Handoff overview: `../RIND3D_HANDOFF/`.
+>
+> **Terminology (2026-11-18).** The frozen 1K contract and its documents keep the legacy names: lit = response-active, dark = response-inactive, all-lit / all-dark = all-active / all-inactive; see `../docs/RIND3D/GLOSSARY.md`.
 
 **Each scene has:**
 * 1 to 4 physical sources;
