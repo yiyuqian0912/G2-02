@@ -472,7 +472,7 @@ def root_clips(EA, EB, Lp, Kp, expl, max_edges=12):
             empty[q] = True
         else:
             u = expl[q]; es, cnt = np.unique(u[u >= 0], return_counts=True)
-            for e in es[np.argsort(-cnt)][:max_edges]:
+            for e in es[np.argsort(-cnt, kind="stable")][:max_edges]:
                 a, b = EA[e], EB[e]; d = (b - a) / np.linalg.norm(b - a)
                 w1 = np.cross(d, [1.0, 0, 0] if abs(d[0]) < 0.9 else [0, 1.0, 0]); w1 /= np.linalg.norm(w1); w2 = np.cross(d, w1)
                 cand = []
@@ -488,3 +488,130 @@ def root_clips(EA, EB, Lp, Kp, expl, max_edges=12):
                     r_q.append(cand[j])
         rows += r_q; off.append(off[-1] + len(r_q))
     return np.array(off, np.int64), np.array(rows, float).reshape(-1, 4), empty
+
+
+@njit(cache=True)
+def _wedge_pair(a, b, l, k, m, r1, r2):
+    """Numba version of wedge_rows: writes the two rows, returns False if degenerate."""
+    la = np.empty(3); ka = np.empty(3); ba = np.empty(3); nl = np.empty(3); nk = np.empty(3)
+    for t in range(3):
+        la[t] = l[t] - a[t]; ka[t] = k[t] - a[t]; ba[t] = b[t] - a[t]
+    _cross(la, ba, nl); _cross(ka, ba, nk)
+    G = ka[0] * nl[0] + ka[1] * nl[1] + ka[2] * nl[2]
+    nn = np.sqrt(nl[0] ** 2 + nl[1] ** 2 + nl[2] ** 2); dk = np.sqrt((k[0] - l[0]) ** 2 + (k[1] - l[1]) ** 2 + (k[2] - l[2]) ** 2)
+    if abs(G) <= 1e-300 or abs(G) < 1e-14 * nn * dk:
+        return False
+    sg = 1.0 if G > 0 else -1.0
+    s1 = abs(nl[0]) + abs(nl[1]) + abs(nl[2]); s2 = abs(nk[0]) + abs(nk[1]) + abs(nk[2])
+    for t in range(3):
+        r1[t] = sg * nl[t]; r2[t] = -sg * nk[t]
+    r1[3] = -sg * (nl[0] * a[0] + nl[1] * a[1] + nl[2] * a[2]) - m * s1
+    r2[3] = sg * (nk[0] * a[0] + nk[1] * a[1] + nk[2] * a[2]) - m * s2
+    return True
+
+
+@njit(cache=True)
+def root_clips_fast(EA, EB, Lp, Kp, expl, max_edges, m, out_off, out_rows, empty):
+    """Numba version of root_clips (same rows: per root, the occluder edges with the most unique explanations, at most
+    max_edges of them, and for each the two extreme wedge planes around line(e) measured from the circular mean of the
+    candidate plane normals). out_rows must hold 2 * max_edges rows per root. Returns the number of rows."""
+    nb, nI = expl.shape; nE = EA.shape[0]
+    cnt = np.zeros(nE, np.int64); r1 = np.empty(4); r2 = np.empty(4)
+    nrow = 0
+    for q in range(nb):
+        out_off[q] = nrow
+        bad = False
+        for i in range(nI):
+            if expl[q, i] == -1:
+                bad = True
+                break
+        empty[q] = bad
+        if bad:
+            continue
+        for i in range(nI):
+            e = expl[q, i]
+            if e >= 0:
+                cnt[e] += 1
+        # the max_edges most frequent explaining edges (ties: smaller index first, as np.unique + stable argsort)
+        chosen = np.empty(max_edges, np.int64); nch = 0
+        while nch < max_edges:
+            best = -1; bc = 0
+            for e in range(nE):
+                if cnt[e] > bc:
+                    bc = cnt[e]; best = e
+            if best < 0:
+                break
+            chosen[nch] = best; nch += 1; cnt[best] = -cnt[best] - 1      # mark (negative) and keep for reset
+        for j in range(nch):
+            e = chosen[j]
+            a = EA[e]; b = EB[e]
+            d = np.empty(3)
+            dn = np.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2)
+            for t in range(3):
+                d[t] = (b[t] - a[t]) / dn
+            ref0 = np.zeros(3)
+            if abs(d[0]) < 0.9:
+                ref0[0] = 1.0
+            else:
+                ref0[1] = 1.0
+            w1 = np.empty(3); w2 = np.empty(3); _cross(d, ref0, w1)
+            w1n = np.sqrt(w1[0] ** 2 + w1[1] ** 2 + w1[2] ** 2)
+            for t in range(3):
+                w1[t] /= w1n
+            _cross(d, w1, w2)
+            # pass 1: circular mean of the candidate normal angles
+            sc = 0.0; ss = 0.0; ncand = 0
+            for i in range(nI):
+                if expl[q, i] != e:
+                    continue
+                if not _wedge_pair(a, b, Lp[i], Kp[i], m, r1, r2):
+                    continue
+                for rr in (r1, r2):
+                    ang = np.arctan2(rr[0] * w2[0] + rr[1] * w2[1] + rr[2] * w2[2], rr[0] * w1[0] + rr[1] * w1[1] + rr[2] * w1[2])
+                    sc += np.cos(ang); ss += np.sin(ang); ncand += 1
+            if ncand == 0:
+                continue
+            ref = np.arctan2(ss / ncand, sc / ncand)
+            # pass 2: extremes of the relative angle (first occurrence wins ties, as argmin / argmax)
+            lo_v = 1e300; hi_v = -1e300; lo_r = np.empty(4); hi_r = np.empty(4)
+            for i in range(nI):
+                if expl[q, i] != e:
+                    continue
+                if not _wedge_pair(a, b, Lp[i], Kp[i], m, r1, r2):
+                    continue
+                for rr in (r1, r2):
+                    ang = np.arctan2(rr[0] * w2[0] + rr[1] * w2[1] + rr[2] * w2[2], rr[0] * w1[0] + rr[1] * w1[1] + rr[2] * w1[2])
+                    rel = np.arctan2(np.sin(ang - ref), np.cos(ang - ref))
+                    if rel < lo_v:
+                        lo_v = rel
+                        for t in range(4):
+                            lo_r[t] = rr[t]
+                    if rel > hi_v:
+                        hi_v = rel
+                        for t in range(4):
+                            hi_r[t] = rr[t]
+            for t in range(4):
+                out_rows[nrow, t] = lo_r[t]
+            nrow += 1
+            same = True
+            for t in range(4):
+                if hi_r[t] != lo_r[t]:
+                    same = False
+            if not same:
+                for t in range(4):
+                    out_rows[nrow, t] = hi_r[t]
+                nrow += 1
+        for e in range(nE):
+            if cnt[e] < 0:
+                cnt[e] = 0
+            else:
+                cnt[e] = 0
+    out_off[nb] = nrow
+    return nrow
+
+
+def root_clips_numba(EA, EB, Lp, Kp, expl, max_edges=12, m=MARGIN):
+    nb = expl.shape[0]; off = np.zeros(nb + 1, np.int64); rows = np.empty((max(nb, 1) * 2 * max_edges, 4)); empty = np.zeros(nb, np.bool_)
+    n = root_clips_fast(np.ascontiguousarray(EA, float), np.ascontiguousarray(EB, float), np.ascontiguousarray(Lp, float),
+                        np.ascontiguousarray(Kp, float), np.ascontiguousarray(expl, np.int64), int(max_edges), float(m), off, rows, empty)
+    return off, rows[:n].copy(), empty

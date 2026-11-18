@@ -320,3 +320,18 @@ def test_filter_from_leaves_covers_coarse_leaves():
     keep = np.array([0, 1, 5000])
     cells, kind, start, ln, boxes = _filter_from_leaves(lo, dep, keep_cells=keep)
     assert set(cells.tolist()) <= set(keep.tolist()) and 0 in cells and np.all(kind == 2)
+
+
+def test_root_clips_numba_equals_python():
+    """root_clips_numba writes the same clip rows (as sets per root) as the reference root_clips."""
+    from rind3d_posterior.localfirst.certregion import root_clips, root_clips_numba
+    rng = np.random.default_rng(11)
+    EA = rng.uniform(0.3, 0.7, (30, 3)); EB = EA + rng.normal(0, 0.05, (30, 3))
+    Lp = rng.uniform(0.8, 0.9, (50, 3)); Kp = Lp.copy(); Kp[np.arange(50), rng.integers(0, 3, 50)] += 1 / N
+    expl = rng.integers(-2, 30, (40, 50)); expl[rng.random((40, 50)) < 0.02] = -1
+    o1, r1, e1 = root_clips(EA, EB, Lp, Kp, expl)
+    o2, r2, e2 = root_clips_numba(EA, EB, Lp, Kp, expl)
+    assert np.array_equal(e1, e2)
+    for q in range(len(expl)):
+        A = {tuple(np.round(x, 12)) for x in r1[o1[q]:o1[q + 1]]}; B = {tuple(np.round(x, 12)) for x in r2[o2[q]:o2[q + 1]]}
+        assert A == B

@@ -68,8 +68,8 @@
     where a deterministic certificate is wanted. It costs about 1/5 of the reference.
   - The function is `rind3d_posterior.localfirst.label_window_localfirst`, with `select="random"` or `"local"`. Both
     give the same runtime.
-* **Testing source-region reduction requires a different experiment.** `LOCALFIRST_AUDIT.md` §5 designs one:
-  certified edge-silhouette constraints under exactly checked H1, with no H2, plus the exact X-only region of the voxel
-  physics.
+* **Testing source-region reduction requires a different experiment.** `LOCALFIRST_AUDIT.md` §5 designed it, and
+  `LOCALFIRST_E123.md` reports it: certified edge-silhouette constraints under exactly checked H1 (no H2), their
+  polytope-level use in the exact phase, and the exact X-only region of voxel physics.
 * **Do not use local-only interface bands for pruning in any certified path** (LOCAL_INVERSE_GEOMETRY.md
   Theorems 3 and 3′).

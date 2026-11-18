@@ -93,20 +93,21 @@ def cmd_one(a):
     off, idx = CR.admissible_edges(Fr, Lp, Kp)
     out["t_constraints"] = time.perf_counter() - tt; out["used_edges"] = int(len(I))
     c7 = np.stack([np.full(len(Bcells), 7), Bcells // (128 * 128), (Bcells // 128) % 128, Bcells % 128], 1).astype(np.int64)
-    CR.explanations_for_roots(EA, EB, Lp[:1], Kp[:1], off[:2], idx, roots[:1], o / N, (o + int(task.L)) / N)   # JIT warm-up
+    _e, _ = CR.explanations_for_roots(EA, EB, Lp[:1], Kp[:1], off[:2], idx, roots[:1], o / N, (o + int(task.L)) / N)   # JIT warm-up
+    CR.root_clips_numba(EA, EB, Lp[:1], Kp[:1], _e)
     variants = [("d4", roots)] + ([("c7", c7)] if len(Bcells) <= C7_MAX_CELLS else [])
     if len(Bcells) > C7_MAX_CELLS:
         out["c7"] = dict(skipped=f"B has {len(Bcells)} cells > {C7_MAX_CELLS}: one root per cell repeats the root work (measured 0.1x)")
     for name, R in variants:
         tt = time.perf_counter()
-        expl, _ = CR.explanations_for_roots(EA, EB, Lp, Kp, off, idx, R, o / N, (o + int(task.L)) / N)
-        coff, crow, empty = CR.root_clips(EA, EB, Lp, Kp, expl)
+        expl, t_expl = CR.explanations_for_roots(EA, EB, Lp, Kp, off, idx, R, o / N, (o + int(task.L)) / N)
+        t1 = time.perf_counter(); coff, crow, empty = CR.root_clips_numba(EA, EB, Lp, Kp, expl); t_rows = time.perf_counter() - t1
         keep = ~empty
         # drop provably empty roots; rebuild the CSR for the kept roots
         cnt = np.diff(coff)[keep]; koff = np.r_[0, np.cumsum(cnt)].astype(np.int64)
         krow = np.concatenate([crow[coff[q]:coff[q + 1]] for q in np.flatnonzero(keep)]) if keep.any() and len(crow) else np.zeros((0, 4))
         tcl = time.perf_counter() - tt
-        rec = dict(roots=int(len(R)), roots_empty=int(empty.sum()), clip_rows=int(len(krow)), t_clip_build=tcl,
+        rec = dict(roots=int(len(R)), roots_empty=int(empty.sum()), clip_rows=int(len(krow)), t_clip_build=tcl, t_expl=t_expl, t_rows=t_rows,
                    unique_share=float(np.mean(expl >= 0)), multi_share=float(np.mean(expl == -2)))
         if keep.any():
             r = run_engine(geom, win, codes, kls, R[keep], bf, koff, krow)

@@ -130,9 +130,13 @@ Readings:
   receiver items on the BSP pieces that contain F. Even with F itself as the filter, the same nodes are evaluated.
 * **The heuristic band contains B entirely** in all 45 exact-phase tasks: inside-band share of Vol(B) = 1.000. As a
   region it is weaker than the receiver-subset outer bound.
-* **Consequence.** In this pathway no region reduction, local or otherwise, can give more than about 1.1× on the exact
-  phase or about 1.55× end to end at the median. The receiver ablation's null result is therefore expected whatever the
-  geometric content of the local interfaces. It measures a pathway that cannot express that content as a speed-up.
+* **Consequence, corrected after E1–E3.** No restriction of the exact phase to a set of *boxes*, local or otherwise,
+  gives more than about 1.1× on the exact phase (1.55× end to end) at the median. The receiver ablation's null result
+  is expected for that reason.
+  - Afterwards measured (`LOCALFIRST_E123.md` §5): *polytope-level* restriction is not bounded by this oracle. Certified
+    clipping of the root polytopes by Proposition A′ wedges narrows the engine's τ-ranges, which no box can do. It gave
+    a median 1.54× on the exact phase (max 4.61×), with identical certificates.
+  - The 1.1× figure therefore bounds box filters only, not region information in general.
 
 ### 3.4 Would the local constraints have been safe?
 
@@ -168,6 +172,12 @@ No.
   certifying F against all receivers.
 
 ## 5. An experiment that tests (II) soundly
+
+**Executed.** See `LOCALFIRST_E123.md` (branch `yushu/3d-localfirst-research`).
+* Proposition A was corrected and strengthened to A′: it has no exceptional set, and adds the silhouette condition
+  (iii).
+* E1, E2 and E3 were run on the 54 tasks below.
+* The plan as written here is kept unchanged as the pre-registration.
 
 **Design constraints.**
 * Theorem 3 (v2) and Theorem 3′ (v3) of `docs/LOCAL_INVERSE_GEOMETRY.md` rule out constraints computed from X alone in
