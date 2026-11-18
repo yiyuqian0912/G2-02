@@ -146,3 +146,43 @@ def select_receivers(cls, n_boundary=256, n_interior=128, seed=0, comps=None, pe
     if n_interior and len(free):
         vox = np.concatenate([vox, free[rng.choice(len(free), min(n_interior, len(free)), replace=False)]])
     return np.unique(vox, axis=0), comps
+
+
+def edge_free_mask(rows_exact, origin, N, lit, dark, margin=1e-12):
+    """DIAGNOSTIC that reads the world geometry: True where the closed receiver edge [u, v] (u = lit[i], v = dark[i],
+    window voxel coords) misses every closed convex body (hypothesis H1 of LOCAL_INVERSE_GEOMETRY.md). rows_exact:
+    per body a list of exact rational rows (a, b, c, d), a.x + d <= 0 inside (context.components[i].rows).
+    Axis-aligned edges of length 1/N: Cyrus-Beck in float64, exact rational recheck when any bound is within margin."""
+    from fractions import Fraction
+    u = (np.asarray(origin, float) + lit + 0.5) / N; v = (np.asarray(origin, float) + dark + 0.5) / N
+    d = v - u
+    free = np.ones(len(u), bool)
+    for rows in rows_exact:
+        R = np.array([[float(x) for x in r] for r in rows])
+        al = u @ R[:, :3].T + R[:, 3]                       # (n, rows): value at t = 0
+        be = d @ R[:, :3].T                                 # slope in t
+        with np.errstate(divide="ignore", invalid="ignore"):
+            t = -al / be
+        lo = np.where(be < 0, t, -np.inf).max(1); hi = np.where(be > 0, t, np.inf).min(1)
+        par_out = np.any((be == 0) & (al > 0), axis=1)
+        hit = (~par_out) & (np.maximum(lo, 0) <= np.minimum(hi, 1))
+        amb = (np.abs(np.maximum(lo, 0) - np.minimum(hi, 1)) <= margin) | np.any((be == 0) & (np.abs(al) <= margin), axis=1)
+        for i in np.flatnonzero(amb):
+            uq = [Fraction(2 * int(origin[k] + lit[i][k]) + 1, 2 * N) for k in range(3)]
+            vq = [Fraction(2 * int(origin[k] + dark[i][k]) + 1, 2 * N) for k in range(3)]
+            a0, a1 = Fraction(0), Fraction(1); out = False
+            for r in rows:
+                r = [Fraction(x) for x in r]
+                A = r[0] * uq[0] + r[1] * uq[1] + r[2] * uq[2] + r[3]; B = sum(r[k] * (vq[k] - uq[k]) for k in range(3))
+                if B == 0:
+                    if A > 0:
+                        out = True; break
+                elif B > 0:
+                    a1 = min(a1, -A / B)
+                else:
+                    a0 = max(a0, -A / B)
+                if a0 > a1:
+                    out = True; break
+            hit[i] = not out
+        free &= ~hit
+    return free

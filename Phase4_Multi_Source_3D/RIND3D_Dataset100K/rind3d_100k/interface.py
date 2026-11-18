@@ -64,18 +64,26 @@ class TileScan:
         self.faces = {}                       # offset -> {axis: (lo face (lit, free), hi face (lit, free))}
         self.found = False; self.nl = 0; self.nd = 0; self.ns = 0; self.tiles = 0
 
-    def add(self, off, lit, solid):
-        lit = np.asarray(lit, bool); solid = np.asarray(solid, bool); free = ~solid
+    def add(self, off, lit, solid, counts=None):
+        """lit / solid: bool [64,64,64] ZYX arrays, or a Python bool for a uniform tile (then counts = (nl, nd, ns)
+        must be given). A uniform lit or uniform FREE tile has constant faces and no interior interface edge."""
         self.tiles += 1
-        self.nl += int(np.count_nonzero(lit)); self.ns += int(np.count_nonzero(solid))
-        self.nd += int(lit.size - np.count_nonzero(lit) - np.count_nonzero(solid))
-        if not self.found and has_interface(lit, solid):
+        uni_l = isinstance(lit, (bool, np.bool_)); uni_s = isinstance(solid, (bool, np.bool_))
+        if counts is None:
+            lit = np.asarray(lit, bool); solid = np.asarray(solid, bool)
+            nl = int(np.count_nonzero(lit)); ns = int(np.count_nonzero(solid)); counts = (nl, lit.size - nl - ns, ns)
+        self.nl += int(counts[0]); self.nd += int(counts[1]); self.ns += int(counts[2])
+        free = (not solid) if uni_s else ~np.asarray(solid, bool)
+        if not self.found and not uni_l and has_interface(lit, np.zeros_like(lit) if uni_s and not solid else
+                                                          (np.ones_like(lit) if uni_s else solid)):
             self.found = True
         # faces in ZYX array axes: offset axis x -> array axis 2, y -> 1, z -> 0
         f = {}
         for t, arr_ax in ((0, 2), (1, 1), (2, 0)):
             lo = [slice(None)] * 3; hi = [slice(None)] * 3; lo[arr_ax] = 0; hi[arr_ax] = -1
-            f[t] = ((lit[tuple(lo)], free[tuple(lo)]), (lit[tuple(hi)], free[tuple(hi)]))
+            fl = (lambda s: np.bool_(lit)) if uni_l else (lambda s: lit[s])
+            ff = (lambda s: np.bool_(free)) if uni_s else (lambda s: free[s])
+            f[t] = ((fl(tuple(lo)), ff(tuple(lo))), (fl(tuple(hi)), ff(tuple(hi))))
         off = tuple(int(v) for v in off)
         self.faces[off] = f
         if not self.found:

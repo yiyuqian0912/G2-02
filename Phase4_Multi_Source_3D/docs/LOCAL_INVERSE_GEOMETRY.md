@@ -9,17 +9,30 @@ region?
    ruled by rays from the source. Every tangent plane of the interface contains the source. For polyhedra its pieces
    are planes through the source and an occluder edge or face (the "facet law"). For a ball it is a right circular
    cone with apex at the source.
-2. *Theorem 3, impossibility.* For the declared world class (finite unions of closed convex polytopes, sub-voxel bodies
-   included, as `thin_slabs` produces), local-only certified pruning is impossible. For every observation, almost
-   every source position outside the window is feasible for some world that reproduces the observation exactly. Any
-   local outer bound therefore has full measure.
-3. *Restricted results.*
+2. *Theorem 3 (impossibility) applies to the old distribution.* For finite unions of closed convex polytopes,
+   including sub-voxel bodies, local-only certified pruning is impossible: for every observation, almost every source
+   position outside the window is feasible for some world that reproduces the observation exactly. This covers v2,
+   whose `thin_slabs` are sub-voxel.
+3. *Under the actual v3 distribution (§3b) the picture changes, but the obstruction does not disappear.*
+   - **What v3 removes.** Every v3 body contains a ball of radius ≥ 1 voxel, and slab samplings are nonempty and
+     6-connected. The construction of Theorem 3 is not realizable, and its full-measure conclusion is withdrawn for v3.
+   - **What v3 does not remove (Theorem 3′).** Connected sampled solids are not locally observable occluders. Large
+     convex bodies have sub-voxel *parts* near sharp edges and vertices, and such a part may be the only portion of
+     the body inside the window. An explicit v3-admissible scene (a `wedges` knife edge of 7.2°) has 273 direct
+     interface edges crossing the sub-voxel strip, and no plane through the true source crosses them all. The
+     conclusion holds on an open set of generator parameters, so it has positive probability.
+   - **What would make H1 certifiable (Proposition 11).** H1 is locally certifiable away from SOLID receivers and the
+     window boundary, given a declared *local-thickness radius*. v3 does not declare one, and the always-valid bound
+     is hundreds of voxels. H2 (one shadow plane per component) stays undecidable from the observation.
+   - **New structure (Lemma 10).** The interface extends away from the source along rulings, through free space. Its
+     creases and the ends of its pieces lie on lines through the source.
+4. *Restricted results that hold in both distributions.*
    - *Propositions 4–5.* The local constraint "the source lies on the stabbing set of a component" is safe under two
      hypotheses: H1, every interface edge is free; H2, the component is crossed by a single shadow plane. Its
      region's size is governed by the singular values of the stacked plane normals and a boundedness threshold.
    - *Proposition 6.* H1 becomes locally checkable only under an inner-rolling-ball condition that polytopes violate.
    - *Estimate 7.* Curved interfaces carry apex information that is second order in the angular extent of the patch.
-4. *Certified pathway (Proposition 8).* A sound local-first algorithm uses the local geometry only to choose which
+5. *Certified pathway (Proposition 8).* A sound local-first algorithm uses the local geometry only to choose which
    receivers' exact constraints to evaluate first. It obtains the certificate from the exact constraints themselves:
    an outer bound from a receiver subset, then the exact tau-pencil computation restricted to that bound. This is
    implemented in `RIND3D_Posterior/src/rind3d_posterior/localfirst/`. The measured comparison is in
@@ -218,6 +231,113 @@ do not. So H1 is locally checkable for sphere-only worlds with a minimum radius,
 A curved patch is not unique evidence of one cone. A polyhedral occluder with small facets produces a piecewise-planar
 interface that approximates it. By Theorem 1, every facet plane still contains s, so the constraint set is the same;
 only its conditioning changes.
+
+## 3b. The actual v3 distribution
+
+**v3 world class.** The support of the v3 generator: the nine v0.1 recipes with `thin` bodies at least
+T_min = 2 voxels thick, each slab's voxel-centre sampling nonempty and 6-connected (`rind3d_100k/geometry_v3.py`).
+
+**Proposition 9 (no sub-voxel bodies).** Every v3 body contains a closed ball of radius ≥ h.
+* *Proof.* Read off the recipe ranges.
+  - Thin slabs have half-thickness ≥ T_min h/2 = h.
+  - Corridor and barrier walls have half-thickness ≥ 0.002 > 2h.
+  - The other kinds have half-sizes ≥ 0.008 (small boxes) and plane offsets ≥ 0.58 on half-sizes ≥ 0.02.
+  - Each body is an affine image of a fixed convex shape. The ball's radius follows from the smallest half-size
+    times the shape's inradius.
+  - The test `test_v3_bodies_contain_a_voxel_ball` checks the Chebyshev inradius by LP on generated scenes of every
+    family. ∎
+* *Consequences.*
+  - The covering radius of the cubic lattice is (√3/2) h < h, so every v3 body contains a receiver: no body is
+    invisible.
+  - The construction of Theorem 3 (bodies of circumradius δ < h placed at chosen points) is not realizable.
+  - Whether ∪_G F(G, X) still has full measure for v3 is open. Theorem 3's proof no longer shows it.
+
+**Connected sampling is not local observability.** v3 guarantees a *global* property of each body: nonempty,
+connected sampling. A local-first argument needs a *local* property: every piece of solid that meets a receiver edge
+of the window is seen as SOLID in the window. Two mechanisms separate the two.
+* **Sub-voxel parts of large bodies.** Near an edge of dihedral angle θ, a convex body is thinner than h within about
+  h / (2 tan(θ/2)) of the edge, and contains no receiver there.
+  - The `wedges` recipe allows θ down to about 7° (half-sizes 0.16 and 0.02), so the strip is about 8 voxels wide.
+  - Random `convex_polyhedra` planes allow arbitrarily small angles.
+  - Rims of boxes and slabs (90°) and vertices behave the same way at the voxel scale.
+* **Window-boundary entry.** A body whose thick, observable part lies outside the window can enter the window only
+  through such a thin part. Its sampling is then connected, but contains no receiver of the window.
+
+**Theorem 3′ (v3 counterexample; explicit and verified, `test_local_geometry_v3.py`).** There is a v3-admissible
+scene, of positive probability under the v3 generator, with all of the following properties:
+* **Admissibility.**
+  - Family `wedges`: two wedges, half-sizes (0.159, 0.10, 0.0201) inside the recipe range LU(0.02, 0.16), a generic
+    rotation, and a knife edge of 7.2°.
+  - Every body has a nonempty, 6-connected sampling.
+  - The source is legal and outside the window.
+* **The window.** An L = 64 window with 2,924 direct interface edges. Of these, 273 are not free: [u, v] crosses the
+  sub-voxel knife strip, a strip about 3.5 × 40 voxels.
+* **Exact failure.** No plane through the true source s crosses all 273 edges with the right orientation (the exact
+  LP of Proposition 4 is infeasible). Hence s ∉ U(C) for that component.
+* **Contrast.** The free edges are all crossed by one plane through s.
+
+*Positive probability.* The conclusion depends on finitely many strict inequalities: receiver classifications with no
+ties, and LP infeasibility with a positive Farkas margin. So it holds on an open neighbourhood of the scene's
+parameters (rotation, half-sizes, centres, source, window origin). The generator has a positive density there. The
+test perturbs the rotation (0.3°), the source (2 voxels) and the window origin (±1 voxel); the conclusion holds in
+every trial.
+
+*Consequence.* Under v3, a local constraint of the form "s lies on a plane stabbing this component" can exclude the
+true source. Local-only certified pruning remains impossible for the v3 population, now with an explicit
+occluder-face component rather than the old full-measure construction. Interfaces that do not contain the source are
+rarer than in v2 (Observation below), but not absent.
+
+**Observation (v3 canary).** See §3c for the measured share of direct interface edges that are not free, v2 thin
+slabs versus v3.
+
+**Lemma 10 (ruling extension).** Let p ∈ ∂Sh(s) \ S and p′ = s + t(p − s) with t > 1. If the closed segment [p, p′]
+misses S, then [p, p′] ⊂ ∂Sh(s).
+
+*Proof.*
+* Every y on [p, p′] is shadowed, because [s, y] ⊇ [s, p] meets S.
+* Take active points qₙ → p, i.e. [s, qₙ] ∩ S = ∅. For y = s + τ(p − s) with τ ∈ [1, t], set yₙ = s + τ(qₙ − s).
+* [p, y] has positive distance from the closed S, and [qₙ, yₙ] → [p, y]. So [qₙ, yₙ] misses S for large n.
+* Hence [s, yₙ] misses S, yₙ is active, and yₙ → y. ∎
+
+*Consequences, for any occluder shape.*
+* Within free space, the interface continues away from the source along every ruling until it meets solid.
+* A planar piece that ends in free space ends along a ray through s.
+* Two pieces meet along a line through s: two distinct planes through s meet in a line through s.
+
+These are strong *line* constraints on s from a single window. They are usable only where the free space along the
+ruling is certified (the observability problem below), and with the digitization tolerance of §5.
+
+**Proposition 11 (local certificate for H1, given a declared local-thickness radius).**
+* *Assumption.* Every point of every body lies within distance R of the centre of a ball of radius (√3/2) h contained
+  in the body.
+* *Claim.* A direct interface edge whose distance to every SOLID receiver of the window and to the window's faces
+  exceeds R + (√3/2) h + h is free.
+* *Proof.* Suppose p ∈ [u, v] ∩ S. The ball near p contains a receiver q (covering radius), with |q − p| ≤ R + (√3/2) h.
+  That q is SOLID. If q lies in the window, the distance condition fails. If not, p is within R + (√3/2) h of the
+  window's boundary, and the condition fails again. ∎
+
+*Size of R.*
+* **Always valid.** R ≤ diam(C) (√3/2) h / r_in(C): the convex hull of p and the inscribed ball B(c, r_in) contains
+  the ball of radius (√3/2) h centred on [p, c] at distance |p − c| (√3/2) h / r_in from p. For v3 slabs (diameter up
+  to about 700 voxels, r_in = 1 voxel) this gives R ≈ 600 voxels, so the certificate is vacuous in L ≤ 256 windows.
+* **Estimate, not proved here.** For bodies whose vertices all admit an inscribed circular cone of half-angle ≥ α, the
+  local bound is R ≈ (√3/2) h / sin α. That would require a declared sharpness bound, which v3 does not have
+  (knife edges near 7° give R ≈ 14 voxels).
+
+**What remains undecidable locally (H2).** Even when every edge is free, a component may merge pieces of different
+shadow planes. Their crease is a line through s, but the merge can make the stabbing set miss s (counterexample C2).
+A component may also contain a free shadow-plane piece next to a non-free occluder-face piece (Theorem 3′).
+Segmentation is a heuristic, and no local test certifies it.
+
+**Answer to the question for v3.** Improving physical observability removed the *sub-voxel body* obstruction, but
+not the *sharp-feature* and *window-boundary* obstructions. A deterministic local-first algorithm can be certified
+only in one of two ways:
+* a declared sharpness bound, so that H1 is certifiable with margin R, plus a certified segmentation (H2), which no
+  local test provides;
+* the route of Proposition 8, which takes the certificate from exact receiver constraints with the world geometry.
+
+Response-interface planes, creases, ruling ends and tangent planes of curved patches therefore stay what the
+prototype uses them for: a guide for which receivers to evaluate. They are not pruning.
 
 ## 4. Counterexamples
 

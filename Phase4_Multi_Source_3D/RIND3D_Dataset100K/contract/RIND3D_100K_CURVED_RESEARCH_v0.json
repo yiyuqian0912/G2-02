@@ -1,0 +1,116 @@
+{
+  "contract": "rind3d-100k-curved-research-v0",
+  "status": "RESEARCH contract for physical canaries and generator benchmarks of curved occluders (balls). Not a production population: no certified posterior labeller supports balls, so these scenes have no labels and are not part of T*_v3",
+  "supersedes": null,
+  "seed": 20261119,
+  "resolution": 1024,
+  "n_scenes": 100000,
+  "families": [
+    "spheres",
+    "spheres_polyhedra"
+  ],
+  "quota": {
+    "64": 4,
+    "128": 4,
+    "256": 4
+  },
+  "cap": {
+    "64": 6000,
+    "128": 6000,
+    "256": 6000
+  },
+  "rate_n": {
+    "64": 256,
+    "128": 128,
+    "256": 64
+  },
+  "rate_exact": "all",
+  "n_probe": {
+    "64": 64,
+    "128": 256,
+    "256": 512
+  },
+  "hull_certificate": true,
+  "backend": "cuda_certified",
+  "max_attempts": 3,
+  "source_count": {
+    "law": "declared",
+    "kappa": [
+      0.15,
+      0.15,
+      0.15,
+      0.55
+    ],
+    "draw": "k = 1 + #{i < 3 : u >= cumsum(kappa)[i]}, u = keyed_rng(seed, slot, 56000).random(); independent of the geometry, the sources and the attempt",
+    "status": "provisional default pending the canary (>= 50% K = 4 scenes; J_COMPLEXITY_COVERAGE.md)"
+  },
+  "source_rule": {
+    "prior": "uniform on D(G) = open cube, outside the closed solid, certified clearance > 2^-26",
+    "anti_duplicate_linf": 9.5367431640625e-07
+  },
+  "selection": {
+    "target": "T*_v3: natural multi-source worlds; natural admissible windows (origin uniform on {0..N-L}^3, admissible iff no source in the closed box, FREE > 0 and m >= 1 under the direct-interface rule); every channel with a direct interface is one example",
+    "natural": {
+      "acceptance": "every admissible proposal (c = 1); no m-dependent thinning"
+    },
+    "coverage": {
+      "enabled": true,
+      "sides": [
+        64
+      ],
+      "k": [
+        4
+      ],
+      "slots": 1,
+      "c_m": [
+        0.125,
+        0.25,
+        0.5,
+        1.0
+      ],
+      "cap": 2000,
+      "fallback": "natural (the slot is filled from the natural stream and recorded as natural_fallback)",
+      "streams": "separate keyed origin / U streams (58000 + L, 59000 + L); logically distinct from the natural stream"
+    },
+    "rate_stream": "R natural proposals per side with EXACT v3 m for every proposal: P_A_hat = rate_A / rate_n, Lambda_cov_hat = sum_m c(m) rate_m / rate_n; the v2 rule of the same proposals is recorded too (rate_A_mixed, rate_m_mixed), diagnostic only",
+    "weights": "T* balance heuristic per natural proposal: w(m) = 1 / sum_s n_s c_s(m) / Lambda_s (natural: c = 1, Lambda = P_A; coverage: c(m), Lambda_cov)"
+  },
+  "planning": {
+    "epoch_scenes": 1000,
+    "rule": "declared: the plan of a slot depends only on (seed, slot); no barrier between epochs"
+  },
+  "exclusion": "every source outside every accepted closed window box [o/N, (o+L)/N]^3",
+  "informative": "see eligibility.definition (direct FREE-FREE response interface); v2's 'mixed' mask of each stored window is kept as windows.mixed_mask",
+  "splits": "sha256(scene_id) mod 100: < 80 train, < 90 val, else test",
+  "labels": {
+    "engine": null,
+    "note": "no certified labeller for balls; physical stage only"
+  },
+  "storage": {
+    "scene_file": "scenes/<slot//1000:04d>/<slot:06d>.npz (one atomic container per scene; tmp, fsync, rename, directory fsync)",
+    "labels": "append-only journals labels/journal/*.r3lj, consolidated to labels/scenes/<shard>/<slot:06d>.labels.npz with a sha256 record in labels/consolidated.jsonl",
+    "responses": "per (window, source) packed bits (Z,Y,X), zstd; SOLID once per window",
+    "global_response_fields": "never stored"
+  },
+  "eligibility": {
+    "rule": "direct_interface",
+    "definition": "channel j of window W is informative iff W contains two 6-adjacent receivers u, v (|u - v|_1 = 1 voxel) that are both FREE and have different binary responses R_j(u) != R_j(v); m(W) = number of informative channels",
+    "excluded": [
+      "windows whose only active/inactive contacts pass through SOLID (SOLID-separated mixed channels)",
+      "all-active windows",
+      "all-inactive windows",
+      "windows without FREE receivers"
+    ],
+    "note": "a research-scope choice for the primary population, not a claim that the excluded configurations are physically invalid; historical OOD diagnostic sets are unchanged",
+    "decision": "exact (rind3d_100k.local_eval.evaluate_proposal_interface): constructive bisection proofs, the exact all-active hull certificate and exact 64^3 tile scans including edges across tile faces; screening changes cost, never a decision",
+    "fallback": "none: a proposal is accepted only if it is eligible; an unfilled side rejects the scene attempt (quota_unfilled) as in v2"
+  },
+  "families_note": "rind3d_curved.families (curved-spheres-v0): sphere-only scenes and v3 convex_polyhedra plus balls",
+  "terminology": "driver source (legacy: source / light); response-active / response-inactive receiver (legacy keys: lit / dark); response interface (legacy: lit/dark boundary). Serialized keys keep their legacy names",
+  "geometry": {
+    "generator": "rind3d_curved.families.generate_curved (curved-spheres-v0)",
+    "balls": "closed balls B(c, r), binary64 centre and radius; r ~ LU(0.02, 0.12); strictly inside the open world; nonempty 6-connected voxel-centre sampling (exact)",
+    "thin_min_thickness_vox": 2.0,
+    "physics": "union with the certified polytope engine; ball tests exact (directed-rounding intervals on CPU/CUDA, rational fallback)"
+  }
+}

@@ -50,6 +50,11 @@ class LocalScene:
     def enable_hull(self, context):
         self.hull = HullCert(context, self.N)
 
+    def _packed(self, j, origins, side=TILE):
+        """Certified packed tiles [(lit bits, solid bits)] of channel j (bitorder little, ZYX); overridden by the
+        curved-occluder scene (rind3d_100k.curved_scene)."""
+        return self.src[j].packed_batch(origins, side, self.N)
+
     def close(self):
         for s in self.src:
             s.close()
@@ -84,7 +89,7 @@ class LocalScene:
         step = min(first, self.batch)
         while done < nt:
             chunk = origins[done:done + step]
-            out = self.src[j].packed_batch(chunk, TILE, self.N)
+            out = self._packed(j, chunk)
             for pl, ps in out:
                 a = np.bitwise_count(np.frombuffer(pl, np.uint8)).sum(dtype=np.int64)
                 b = np.bitwise_count(np.frombuffer(ps, np.uint8)).sum(dtype=np.int64)
@@ -107,11 +112,23 @@ class LocalScene:
         step = min(first, self.batch)
         while done < nt and not scan.found:
             chunk = origins[done:done + step]
-            out = self.src[j].packed_batch(chunk, TILE, self.N)
+            out = self._packed(j, chunk)
+            per = TILE ** 3
             for off, (pl, ps) in zip(offs[done:done + len(chunk)], out):
-                tl = np.unpackbits(np.frombuffer(pl, np.uint8), bitorder="little").astype(bool).reshape(TILE, TILE, TILE)
-                ts = np.unpackbits(np.frombuffer(ps, np.uint8), bitorder="little").astype(bool).reshape(TILE, TILE, TILE)
-                scan.add(off, tl, ts)
+                a = int(np.bitwise_count(np.frombuffer(pl, np.uint8)).sum(dtype=np.int64))
+                s = int(np.bitwise_count(np.frombuffer(ps, np.uint8)).sum(dtype=np.int64))
+                cnt = (a, per - a - s, s)
+                unpack = lambda b_: np.unpackbits(np.frombuffer(b_, np.uint8), bitorder="little").astype(bool).reshape(TILE, TILE, TILE)
+                if s == 0 and 0 < a < per:        # all FREE with both responses: the 6-connected tile has an interface
+                    scan.add(off, False, False, cnt); scan.found = True
+                elif a == 0 and (s == 0 or s == per):
+                    scan.add(off, False, bool(s == per), cnt)     # uniform inactive FREE, or all SOLID
+                elif a == per:
+                    scan.add(off, True, False, cnt)               # uniform active FREE
+                elif a == 0:
+                    scan.add(off, False, unpack(ps), cnt)         # inactive + SOLID: no interior edge, faces needed
+                else:
+                    scan.add(off, unpack(pl), unpack(ps), cnt)
             done += len(chunk); step = self.batch
             self.stats["tiles"] += len(chunk)
         self.stats["render_s"] += time.perf_counter() - t; self.stats["rendered_channels"] += 1
@@ -129,7 +146,7 @@ class LocalScene:
         origins = np.array([o + np.array([a, b, c]) * side for (a, b, c) in offs], np.int32)
         out = []
         for i in range(0, len(origins), self.batch):
-            out += self.src[j].packed_batch(origins[i:i + self.batch], side, self.N)
+            out += self._packed(j, origins[i:i + self.batch], side)
         lit = np.empty((L, L, L), bool); sol = np.empty((L, L, L), bool)
         for (a, b, c), (pl, ps) in zip(offs, out):
             tl = np.unpackbits(np.frombuffer(pl, np.uint8), bitorder="little").astype(bool).reshape(64, 64, 64)
@@ -380,7 +397,7 @@ def evaluate_proposal_interface(scene, sources, o, L, U, c_row, rng, n_probe=48,
 
 def render_accepted(scene, o, L, rule="mixed"):
     """All channels of an accepted window, exactly: (lit crops list, solid crop, counts (k,3), m, mask)."""
-    k = scene.k
+    k = scene.k; t0 = time.perf_counter()
     lits = []; sol_ref = None; counts = np.zeros((k, 3), np.int64)
     for j in range(k):
         lit, sol = scene.render(j, o, L)
@@ -394,6 +411,8 @@ def render_accepted(scene, o, L, rule="mixed"):
         counts[j] = (int(lit.sum()), int((fr & ~lit).sum()), int(sol.sum()))
         lits.append(lit)
     inf = (counts[:, 0] > 0) & (counts[:, 1] > 0)
+    scene.stats["accept_render_s"] = scene.stats.get("accept_render_s", 0.0) + time.perf_counter() - t0
+    scene.stats["accepted_windows"] = scene.stats.get("accepted_windows", 0) + 1
     if rule == "mixed":
         return lits, sol_ref, counts, int(inf.sum()), int(sum(1 << j for j in range(k) if inf[j]))
     if rule != "direct_interface":

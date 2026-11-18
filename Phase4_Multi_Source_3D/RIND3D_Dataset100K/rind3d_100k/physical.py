@@ -172,7 +172,7 @@ def select_side_v2(scene, sources, cfg, slot, attempt, Lp, k, probe_rng):
     # rate stream: natural rule, exact m for every proposal (P_A and the coverage acceptance probability)
     R = int(cfg["rate_n"][str(Lp)]) if isinstance(cfg["rate_n"], dict) else int(cfg["rate_n"])
     rr = _rng(seed, slot, STREAM["rate"] + Lp, attempt)
-    mh = np.zeros(5, np.int64); nA = 0; why = {}
+    mh = np.zeros(5, np.int64); nA = 0; why = {}; t_rate = time.perf_counter()
     mh2 = np.zeros(5, np.int64); nA2 = 0                     # v3: the v2 rule on the same proposals
     for i in range(R):
         o = tuple(int(v) for v in rr.integers(0, N - L + 1, 3))
@@ -184,6 +184,7 @@ def select_side_v2(scene, sources, cfg, slot, attempt, Lp, k, probe_rng):
         if v3 and d.m_mixed is not None and d.why not in ("contains_source", "no_free"):
             if d.m_mixed >= 1:
                 nA2 += 1; mh2[d.m_mixed] += 1
+    scene.stats["rate_s"] = scene.stats.get("rate_s", 0.0) + time.perf_counter() - t_rate
     st2 = dict(scene.stats)
     delta = lambda a, b: {kk: round(b[kk] - a[kk], 4) for kk in ("tiles", "render_s", "rendered_channels", "decided_by_probes", "decided_by_render", "probes")}
     rate_m = mh[1:].tolist()
@@ -218,16 +219,23 @@ def run_scene(cfg, slot, k, c_table, factory, attempt=0):
         bundle, recipe = generate_v3(seed, slot, family, attempt, thin_min_vox=float(gcfg["thin_min_thickness_vox"]))
     else:
         bundle, recipe = generate(seed, slot, family, attempt)
+    T["generate"] = time.perf_counter() - t0
     if bundle is None or recipe["proposal_failures"]:
         return dict(slot=slot, attempt=attempt, status="rejected", reason="geometry_proposal_failure", k=k), None
+    t_ctx = time.perf_counter()
     context = factory.context(bundle, POLICY)
+    T["context"] = time.perf_counter() - t_ctx
     thin = None
     if gcfg:
+        t_th = time.perf_counter()
         thin = thin_slab_report(context, recipe, N, min_thickness_vox=float(gcfg["thin_min_thickness_vox"]))
+        T["thin_check"] = time.perf_counter() - t_th
         if not all(r["ok"] for r in thin):
             return dict(slot=slot, attempt=attempt, status="rejected", reason="thin_slab_invalid", k=k, family=family,
                         thin_slabs=[r for r in thin if not r["ok"]], timing=dict(geometry=time.perf_counter() - t0)), None
+    t_acc = time.perf_counter()
     acceptance = geometry_acceptance(context, family, seed, slot, attempt)
+    T["acceptance"] = time.perf_counter() - t_acc
     T["geometry"] = time.perf_counter() - t0
     t = time.perf_counter()
     sources, srep = sample_sources(context, seed, slot, k, attempt)

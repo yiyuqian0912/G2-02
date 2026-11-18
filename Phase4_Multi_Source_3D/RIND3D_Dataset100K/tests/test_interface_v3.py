@@ -143,3 +143,32 @@ def test_contract_v3_declares_the_direct_interface_rule():
     assert "fallback" in v3["eligibility"] and "none" in v3["eligibility"]["fallback"]
     with pytest.raises(ValueError):
         SM.eligibility(dict(eligibility=dict(rule="both_values_somewhere")))
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_tilescan_uniform_fast_paths_equal_full_arrays(seed):
+    """Uniform tiles passed as scalars (as LocalScene.interface does from bit counts) give the same decision."""
+    rng = np.random.default_rng(seed)
+    L = 128; n = 2
+    for kind in ("plane", "separated", "face", "uniform"):
+        lit, sol = _window(rng, L, kind)
+        if seed % 2:
+            sol[:64, :64, :64] = True; lit[:64, :64, :64] = False      # one all-SOLID tile
+        a = TileScan(L); b = TileScan(L)
+        for (x, y, z) in [(i, j, k) for k in range(n) for j in range(n) for i in range(n)]:
+            sl = (slice(z * TILE, (z + 1) * TILE), slice(y * TILE, (y + 1) * TILE), slice(x * TILE, (x + 1) * TILE))
+            tl, ts = lit[sl], sol[sl]
+            a.add((x, y, z), tl, ts)
+            nl, ns = int(tl.sum()), int(ts.sum()); per = TILE ** 3; cnt = (nl, per - nl - ns, ns)
+            if ns == 0 and 0 < nl < per:
+                b.add((x, y, z), False, False, cnt); b.found = True
+            elif nl == 0 and ns in (0, per):
+                b.add((x, y, z), False, bool(ns == per), cnt)
+            elif nl == per:
+                b.add((x, y, z), True, False, cnt)
+            elif nl == 0:
+                b.add((x, y, z), False, ts, cnt)
+            else:
+                b.add((x, y, z), tl, ts, cnt)
+        assert a.found == b.found == has_interface(lit, sol)
+        assert (a.nl, a.nd, a.ns) == (b.nl, b.nd, b.ns) and a.mixed == b.mixed
