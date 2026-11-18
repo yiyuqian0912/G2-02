@@ -40,6 +40,25 @@ class Problem:
         q = int(round(np.log2(L * L)))
         rev = np.array([int(format(i, f"0{q}b")[::-1], 2) for i in range(L * L)], np.int64)
         self.rows = np.ascontiguousarray(rows[np.argsort(rev)])
+        self.pyr, self.poff, self.q = PR.pyramid(self.cls)
+        self.lb = min(3, self.q)                       # inheritance granularity of the block scan (8^3 receivers)
+        self.root_starts = np.array([[self.q, 0, 0, 0]], np.int64)
+        # static sentinels (deterministic): interface receivers and a few interior ones of each class, tested before
+        # the full scan of coarse nodes (any contradicted receiver is a valid OUT witness)
+        lit = self.cls == PR.LIT; dark = self.cls == PR.DARK
+        bd = np.zeros_like(lit)
+        for ax in range(3):
+            a = [slice(None)] * 3; b = [slice(None)] * 3; a[ax] = slice(0, L - 1); b[ax] = slice(1, L)
+            x = (lit[tuple(a)] & dark[tuple(b)]) | (dark[tuple(a)] & lit[tuple(b)]); bd[tuple(a)] |= x; bd[tuple(b)] |= x
+        rng = np.random.default_rng(20261118)
+        picks = []
+        for mask, n in ((bd, 384), (lit & ~bd, 64), (dark & ~bd, 64)):
+            idx = np.flatnonzero(mask.reshape(-1))
+            if len(idx):
+                picks.append(rng.choice(idx, min(n, len(idx)), replace=False))
+        idx = np.sort(np.concatenate(picks)) if picks else np.zeros(0, np.int64)
+        v = np.stack(np.unravel_index(idx, self.cls.shape), 1)
+        self.sentinels = np.concatenate([np.zeros((len(v), 1), np.int64), v.astype(np.int64)], 1)
         self.wlo = self.o / self.N; self.whi = (self.o + L) / self.N
         self.rlo = (self.o + 0.5) / self.N; self.rhi = (self.o + L - 0.5) / self.N
         self.nrm = np.array([[np.sqrt(np.sum((np.abs(scene.RM[c, i, :3]) + scene.RR[c, i, :3]) ** 2)) * (1 + 2 ** -40)
@@ -100,18 +119,23 @@ def box_cells(box):
 
 
 class Solver:
-    def __init__(self, prob, cap_fine=4096, cap_amb=1 << 16, max_depth=160, max_fine=48, delta_floor=2.0 ** -49, rcap=256):
-        self.p = prob; self.rcap = rcap; self.cap_fine = cap_fine; self.cap_amb = cap_amb; self.max_depth = max_depth
+    def __init__(self, prob, cap_fine=16384, cap_amb=1 << 16, max_depth=160, max_fine=48, delta_floor=2.0 ** -49, rcap=256,
+                 mode="tree"):
+        self.mode = mode; self.prepass = 3; self.fine_sample = 1 << 30; self.sentinel_min = 0
+        self.p = prob; self.rcap = rcap; self.progress = 0; self.cap_fine = cap_fine; self.cap_amb = cap_amb; self.max_depth = max_depth
         self.max_fine = max_fine; self.delta_floor = delta_floor
         self.PLs = Planes(); self.sl = Slots()
         self.stats = dict(nodes=0, out=0, out_window=0, in_=0, undet=0, empty=0, bisect=0, fine=0, oneshot=0,
                           pencil_split=0, clips=0, slabs=0, out_confirm_fail=0, scan_s=0.0, recv_s=0.0, rows_scanned=0,
                           in_box=0, depth_max=0, clear_fail=0)
-        self.cell_lo = {}; self.cell_hi = {}; self.pool = 0.0
+        self.cell_lo = {}; self.cell_hi = {}; self.pool = 0.0; self.undet_vol = {}
         # certificate: BSP nodes (parent, plane ref of the child's side) and leaves
         self.bsp_parent = []; self.bsp_ref = []; self.leaves = []
         self.comps = np.zeros(max(prob.C, 1), np.int64)
-        self.amb = np.zeros((cap_amb, 4), np.int64); self.wit = np.zeros(4, np.int64)
+        self.hint = np.zeros((16, 2), np.int64); self.nhint = 0
+        self.thint = np.zeros((16, 4), np.int64); self.ntint = 0
+        self.stats.update(rows_hint=0, hint_out=0)
+        self.amb = np.zeros((cap_amb, 4), np.int64); self._bm0 = np.zeros(prob.L ** 3, np.int64); self.cnt = np.zeros(4, np.int64); self.wit = np.zeros(4, np.int64)
         self.hs_m = np.zeros((PR.MH, 4)); self.hs_r = np.zeros((PR.MH, 4)); self.hs_key = np.zeros((PR.MH, 4), np.int64)
         self.hs_s = np.zeros(PR.MH, np.int64)
 
@@ -143,14 +167,109 @@ class Solver:
         self.sl.put(node.slot)
         return out
 
+    def _scan_tree_node(self, node, Vm, Vr, nv, lo, hi, comps, nc, prep, t0):
+        p = self.p
+        if self.ntint:
+            bm = np.zeros(1 << (3 * (p.q - 0)), np.int64) if False else self._bm0
+            code, _ = PR.scan_tree(Vm, Vr, nv, self.thint[:self.ntint], self.ntint, 0, p.pyr, p.poff, p.q, p.cls, p.o, p.N,
+                                   p.L, comps, nc, p.RM, p.RR, p.K, p.ADJ, self.amb, self.cap_amb, bm, self.wit, 0, *prep)
+            if code == PR.SC_OUT:
+                self.stats["scan_s"] += time.perf_counter() - t0; self.stats["hint_out"] += 1
+                self._leaf(node, "OUT", tuple(int(v) for v in self.wit)); self.stats["out"] += 1
+                return []
+        if self.prepass:
+            code, _ = PR.scan_tree(Vm, Vr, nv, node.rows, len(node.rows), p.lb, p.pyr, p.poff, p.q, p.cls, p.o, p.N, p.L,
+                                   comps, nc, p.RM, p.RR, p.K, p.ADJ, self.amb, self.cap_amb, self._bm0, self.wit, 0, *prep,
+                                   self.prepass)
+            if code == PR.SC_OUT:
+                self.stats["scan_s"] += time.perf_counter() - t0; self.stats["prepass_out"] = self.stats.get("prepass_out", 0) + 1
+                self._add_thint(int(self.wit[0]), int(self.wit[1]), int(self.wit[2]))
+                self._leaf(node, "OUT", tuple(int(v) for v in self.wit)); self.stats["out"] += 1
+                return []
+        if len(node.rows) > self.sentinel_min and len(p.sentinels):
+            code, _ = PR.scan_tree(Vm, Vr, nv, p.sentinels, len(p.sentinels), 0, p.pyr, p.poff, p.q, p.cls, p.o, p.N, p.L,
+                                   comps, nc, p.RM, p.RR, p.K, p.ADJ, self.amb, self.cap_amb, self._bm0, self.wit, 0, *prep)
+            if code == PR.SC_OUT:
+                self.stats["scan_s"] += time.perf_counter() - t0; self.stats["sentinel_out"] = self.stats.get("sentinel_out", 0) + 1
+                self._add_thint(int(self.wit[0]), int(self.wit[1]), int(self.wit[2]))
+                self._leaf(node, "OUT", tuple(int(v) for v in self.wit)); self.stats["out"] += 1
+                return []
+        nbk = p.L >> p.lb
+        bmark = np.zeros(nbk ** 3, np.int64)
+        code, namb = PR.scan_tree(Vm, Vr, nv, node.rows, len(node.rows), p.lb, p.pyr, p.poff, p.q, p.cls, p.o, p.N, p.L,
+                                  comps, nc, p.RM, p.RR, p.K, p.ADJ, self.amb, self.cap_amb, bmark, self.wit, self.rcap,
+                                  *prep, 0, self.cnt)
+        self.stats["starts"] = self.stats.get("starts", 0) + len(node.rows)
+        if code == PR.SC_MANY:
+            self.stats["scan_s"] += time.perf_counter() - t0; self.stats["many"] = self.stats.get("many", 0) + 1
+            if node.depth >= self.max_depth:
+                return self._undet(node, "depth_many")
+            return self._bisect(node, lo, hi, node.rows)
+        self.stats["scan_s"] += time.perf_counter() - t0; self.stats["rows_scanned"] += len(node.rows)
+        if code == PR.SC_BUG:
+            raise AssertionError(f"inconsistent sure classification at receiver block {self.wit.tolist()}")
+        if code == PR.SC_OUT:
+            self._add_thint(int(self.wit[0]), int(self.wit[1]), int(self.wit[2]))
+            self._leaf(node, "OUT", tuple(int(v) for v in self.wit)); self.stats["out"] += 1
+            return []
+        idx = np.flatnonzero(bmark)
+        nst = np.empty((len(idx), 4), np.int64); nst[:, 0] = p.lb
+        nst[:, 1] = idx // (nbk * nbk); nst[:, 2] = (idx // nbk) % nbk; nst[:, 3] = idx % nbk
+        if namb == 0:
+            return self._in_or_split(node, lo, hi)
+        if node.depth >= self.max_depth or node.fine >= self.max_fine:
+            return self._undet(node, "depth_guard")
+        if namb > self.cap_fine:
+            return self._bisect(node, lo, hi, nst)
+        return self._fine(node, nst, namb, comps)
+
+    def _add_thint(self, X, Y, t):
+        h = self.thint
+        for k in range(self.ntint):
+            if h[k, 1] == X and h[k, 2] == Y and h[k, 3] == t:
+                return
+        if self.ntint < len(h):
+            self.ntint += 1
+        h[1:self.ntint] = h[:self.ntint - 1].copy(); h[0] = (0, X, Y, t)
+
+    def _add_hint(self, X, Y):
+        h = self.hint
+        for k in range(self.nhint):
+            if h[k, 0] == X and h[k, 1] == Y:
+                return
+        if self.nhint < len(h):
+            self.nhint += 1
+        h[1:self.nhint] = h[:self.nhint - 1].copy(); h[0, 0] = X; h[0, 1] = Y
+
     # ------------------------------------------------------------------ geometry helpers
+    def _side(self, s, pid):
+        """Exact position of the polytope in slot s w.r.t. plane pid (SoS signs of its vertices, certify.poly):
+        -1 inside {h <= 0}, +1 inside {h >= 0}, 0 straddling."""
+        A = self.sl.a; nv = int(A["nV"][s]); neg = pos = 0
+        for v in range(nv):
+            p, q, r = (int(x) for x in A["Vp"][s, v])
+            if pid in (p, q, r):
+                continue
+            g = PY.sos_sign(self.PLs.PL, pid, p, q, r, A["Vm"][s, v], A["Vr"][s, v])
+            if g > 0:
+                pos += 1
+            else:
+                neg += 1
+        if pos == 0:
+            return -1
+        if neg == 0:
+            return 1
+        return 0
+
+
     def _verts(self, s):
         a = self.sl.a; nv = int(a["nV"][s])
         return a["Vm"][s, :nv], a["Vr"][s, :nv], nv
 
     def _bbox(self, s):
+        """Rigorous bounding box of the exact polytope (vertex enclosures, outward rounding)."""
         Vm, Vr, nv = self._verts(s)
-        return np.min(Vm - Vr, 0), np.max(Vm + Vr, 0)
+        return np.nextafter(np.min(Vm - Vr, 0), -np.inf), np.nextafter(np.max(Vm + Vr, 0), np.inf)
 
     # ------------------------------------------------------------------ main loop
     def run(self, time_limit=None):
@@ -159,13 +278,19 @@ class Solver:
         s = self.sl.get()
         ax = np.array([[PLs.axis_plane(k, 0.0), PLs.axis_plane(k, 1.0)] for k in range(3)], np.int64)
         PY.set_box(PLs.PL, s, ax, *self.sl.args())
-        root = Node(s, p.rows, 0, (np.zeros(3), np.ones(3)), 0, self._new_nid(-1, -1))
+        self.root_axes = ax
+        root = Node(s, p.root_starts if self.mode == "tree" else p.rows, 0, (np.zeros(3), np.ones(3)), 0, self._new_nid(-1, -1))
         stack = [root]
         while stack:
             if time_limit is not None and time.perf_counter() - t0 > time_limit:
                 raise TimeoutError
             node = stack.pop()
             self.stats["nodes"] += 1
+            if self.progress and self.stats["nodes"] % self.progress == 0:
+                import sys
+                print(f"[xlf] t={time.perf_counter() - t0:.1f}s nodes={self.stats['nodes']} stack={len(stack)} "
+                      f"out={self.stats['out']} in={self.stats['in_']} undet={self.stats['undet']} fine={self.stats['fine']} "
+                      f"scan={self.stats['scan_s']:.1f}s recv={self.stats['recv_s']:.1f}s", file=sys.stderr, flush=True)
             if node.depth > self.stats["depth_max"]:
                 self.stats["depth_max"] = node.depth
             stack.extend(self._process(node))
@@ -178,7 +303,10 @@ class Solver:
         if nv == 0:
             self._leaf(node, "EMPTY"); self.stats["empty"] += 1
             return []
-        lo, hi = np.min(Vm - Vr, 0), np.max(Vm + Vr, 0)
+        if node.depth > self.max_depth:
+            self.stats["depth_guard"] = self.stats.get("depth_guard", 0) + 1
+            return self._undet(node, "tree_depth_fine")
+        lo, hi = np.nextafter(np.min(Vm - Vr, 0), -np.inf), np.nextafter(np.max(Vm + Vr, 0), np.inf)
         # inside the closed window box: outside D
         if np.all(lo >= p.wlo) and np.all(hi <= p.whi):
             self._leaf(node, "OUT_WINDOW"); self.stats["out_window"] += 1
@@ -186,28 +314,47 @@ class Solver:
         nc = PR.relevant_comps(Vm, Vr, nv, p.rlo, p.rhi, p.AL, p.AH, p.C, self.comps)
         comps = self.comps[:nc].copy()
         rows = node.rows
-        rowflag = np.zeros(len(rows), np.int64)
         t0 = time.perf_counter()
-        code, namb = PR.scan_rows(Vm, Vr, nv, rows, len(rows), p.cls, p.o, p.N, p.L, comps, nc, p.RM, p.RR, p.K, p.ADJ,
-                                  self.amb, self.cap_amb, rowflag, self.wit, self.rcap)
+        # witness hints first: receivers that refuted recent nodes often refute this one (any contradicted receiver is
+        # a valid OUT witness, whatever rows the node inherited)
+        prep = PR.prep_all(Vm, Vr, nv, comps, nc, p.RM, p.RR, p.K, p.ADJ)
+        self.stats["prep_s"] = self.stats.get("prep_s", 0.0) + time.perf_counter() - t0
+        self.stats["ncomp_sum"] = self.stats.get("ncomp_sum", 0) + nc; self.stats["nv_sum"] = self.stats.get("nv_sum", 0) + nv
+        self.stats["nd_sum"] = self.stats.get("nd_sum", 0) + int(np.sum(np.maximum(prep[0], 0))); self.stats["nl_sum"] = self.stats.get("nl_sum", 0) + int(np.sum(prep[1]))
+        if self.mode == "tree":
+            return self._scan_tree_node(node, Vm, Vr, nv, lo, hi, comps, nc, prep, t0)
+        if self.nhint:
+            hf = np.zeros(self.nhint, np.int64)
+            code, _ = PR.scan_core(Vm, Vr, nv, self.hint[:self.nhint], self.nhint, p.cls, p.o, p.N, p.L, comps, nc, p.RM,
+                                   p.RR, p.K, p.ADJ, self.amb, self.cap_amb, hf, self.wit, 0, *prep)
+            self.stats["rows_hint"] += self.nhint
+            if code == PR.SC_OUT:
+                self.stats["scan_s"] += time.perf_counter() - t0; self.stats["hint_out"] += 1
+                self._leaf(node, "OUT", tuple(int(v) for v in self.wit)); self.stats["out"] += 1
+                return []
+        rowflag = np.zeros(len(rows), np.int64)
+        code, namb = PR.scan_core(Vm, Vr, nv, rows, len(rows), p.cls, p.o, p.N, p.L, comps, nc, p.RM, p.RR, p.K, p.ADJ,
+                                  self.amb, self.cap_amb, rowflag, self.wit, self.rcap, *prep)
         self.stats["scan_s"] += time.perf_counter() - t0; self.stats["rows_scanned"] += len(rows)
         if code == PR.SC_BUG:
             raise AssertionError(f"inconsistent sure classification at receiver {self.wit.tolist()}")
         if code == PR.SC_OUT:
+            self._add_hint(int(self.wit[0]), int(self.wit[1]))
             self._leaf(node, "OUT", tuple(int(v) for v in self.wit)); self.stats["out"] += 1
             return []
         nrows = rows[rowflag == 1]
         if namb == 0:
             return self._in_or_split(node, lo, hi)
         if node.depth >= self.max_depth or node.fine >= self.max_fine:
-            return self._undet(node)
+            return self._undet(node, "rows_depth_fine")
         if namb > self.cap_fine:
             return self._bisect(node, lo, hi, nrows)
         return self._fine(node, nrows, namb, comps)
 
     # ------------------------------------------------------------------ leaves
-    def _undet(self, node):
+    def _undet(self, node, why="?"):
         vlo, vhi = PY.volume(node.slot, self.sl.a["Fn"], self.sl.a["Fv"], self.sl.a["Vm"], self.sl.a["Vr"], self.sl.a["nF"])
+        self.undet_vol[why] = self.undet_vol.get(why, 0.0) + vhi
         if node.cell >= 0:
             self.cell_hi[node.cell] = self.cell_hi.get(node.cell, 0.0) + vhi
         else:
@@ -233,26 +380,32 @@ class Solver:
 
     def _in_or_split(self, node, lo, hi):
         p = self.p
-        # disjoint from the closed window box? else split by one of its planes
-        disj = np.any(hi <= p.wlo) or np.any(lo >= p.whi)
+        # disjoint from the open window box (exact side tests on its six face planes)? else split by a straddling face
+        sides = []
+        for k in range(3):
+            for val, outside in ((p.wlo[k], -1), (p.whi[k], 1)):
+                pid = self.PLs.axis_plane(k, val)
+                sides.append((k, val, pid, outside, self._side(node.slot, pid)))
+        disj = any(sd == outside for (k, val, pid, outside, sd) in sides)
         if not disj:
-            for k in range(3):
-                for val in (p.wlo[k], p.whi[k]):
-                    if lo[k] < val < hi[k]:
-                        pid = self.PLs.axis_plane(k, val)
-                        bl = bh = None
-                        if node.box is not None:
-                            b0, b1 = node.box
-                            l0 = b0.copy(); h0 = b1.copy(); h0[k] = val
-                            l1 = b0.copy(); h1 = b1.copy(); l1[k] = val
-                            bl, bh = (l0, l1), (h0, h1)
-                        return self._split(node, pid, bl, bh)
-            return self._undet(node)
+            if all(sd == -outside for (k, val, pid, outside, sd) in sides):
+                self._leaf(node, "OUT_WINDOW"); self.stats["out_window"] += 1
+                return []
+            for (k, val, pid, outside, sd) in sides:
+                if sd == 0:
+                    bl = bh = None
+                    if node.box is not None:
+                        b0, b1 = node.box
+                        l0 = b0.copy(); h0 = b1.copy(); h0[k] = val
+                        l1 = b0.copy(); h1 = b1.copy(); l1[k] = val
+                        bl, bh = (l0, l1), (h0, h1)
+                    return self._split(node, pid, bl, bh)
+            return self._undet(node, "window_unsplittable")
         Vm, Vr, nv = self._verts(node.slot)
         if not self._clear(Vm, Vr, nv, lo, hi):
             self.stats["clear_fail"] += 1
             if node.depth >= self.max_depth or (hi - lo).max() < 1e-9:
-                return self._undet(node)
+                return self._undet(node, "clear_fail")
             return self._bisect(node, lo, hi, node.rows)
         a = self.sl.a
         if node.cell >= 0:
@@ -335,10 +488,11 @@ class Solver:
         p = self.p; s = node.slot
         Vm, Vr, nv = self._verts(s)
         t0 = time.perf_counter()
-        cap = 4 * PR.MH * max(namb, 1)
+        ns = min(namb, self.cap_amb, self.fine_sample)
+        cap = 4 * PR.MH * max(ns, 1)
         HM = np.empty((cap, 4)); HR = np.empty((cap, 4)); HK = np.empty((cap, 4), np.int64); HS = np.empty(cap, np.int64)
         HPHI = np.empty(cap); HREC = np.empty(cap, np.int64)
-        code, n, nconv, fnc = PR.fine_collect(Vm, Vr, nv, self.amb, min(namb, self.cap_amb), p.cls, p.o, p.N, comps,
+        code, n, nconv, fnc = PR.fine_collect(Vm, Vr, nv, self.amb, ns, p.cls, p.o, p.N, comps,
                                               len(comps), p.RM, p.RR, p.K, p.ADJ, HM, HR, HK, HS, HPHI, HREC, cap, self.wit)
         self.stats["recv_s"] += time.perf_counter() - t0
         if code == 1:
@@ -349,7 +503,14 @@ class Solver:
                 X, Y, t = (int(v) for v in self.amb[fnc, :3])
                 st, nh, obs = self._recv(s, X, Y, t, comps)
                 return self._pencil_split(node, (X, Y, t, self.hs_m[:nh].copy(), self.hs_r[:nh].copy()), nrows)
-            return self._undet(node)
+            # every receiver left ambiguous by the collective scan is consistent under the exact source-form test (and
+            # all others were consistent in the scan): the node is fully consistent
+            if namb <= ns:
+                lo, hi = self._bbox(s)
+                return self._in_or_split(node, lo, hi)
+            lo, hi = self._bbox(s)
+            return self._bisect(node, lo, hi, nrows)
+            return self._undet(node, "fine_nothing")
         # binding halfspaces: per (pencil, sense) group the angular extremes
         keys = np.concatenate([HK[:n], HS[:n, None]], 1)
         order = np.lexsort((HPHI[:n], keys[:, 4], keys[:, 3], keys[:, 2], keys[:, 1], keys[:, 0]))
@@ -425,24 +586,26 @@ class Solver:
             pieces = new
         for pc, slab in pieces:
             if slab:
-                self._undet(pc)
+                self._undet(pc, "slab")
             else:
                 rest.append(pc)
         return rest
 
     def _cell_volumes(self, s0, is_in):
         """Per-cell volume enclosures of the polytope in slot s0 by recursive clipping at cell boundaries (exact
-        partition); IN adds [lo, hi], UNDET adds hi. Slot s0 is left untouched."""
+        partition); IN adds [lo, hi], UNDET adds hi. The cell range of every piece is tracked explicitly: it starts as
+        the range of the rigorous bounding box and every split halves it, so a piece reaching a single-cell range lies
+        in that closed cell (bounding box + the split half-spaces on its path). Slot s0 is left untouched."""
         a = self.sl.args(); A = self.sl.a
-        stack = []
-        s = self.sl.get(); PY.copy_slot(s0, s, *a); stack.append(s)
+        lo, hi = self._bbox(s0)
+        ca = np.clip(np.floor(lo * NCELL).astype(np.int64), 0, NCELL - 1)
+        cb = np.clip(np.floor(hi * NCELL).astype(np.int64), 0, NCELL - 1)
+        s = self.sl.get(); PY.copy_slot(s0, s, *a)
+        stack = [(s, ca, cb)]
         while stack:
-            s = stack.pop()
+            s, ca, cb = stack.pop()
             if A["nV"][s] == 0:
                 self.sl.put(s); continue
-            lo, hi = self._bbox(s)
-            ca = np.clip(np.floor(lo * NCELL).astype(np.int64), 0, NCELL - 1)
-            cb = np.clip(np.ceil(hi * NCELL).astype(np.int64) - 1, 0, NCELL - 1)
             span = cb - ca
             if np.all(span == 0):
                 vlo, vhi = PY.volume(s, A["Fn"], A["Fv"], A["Vm"], A["Vr"], A["nF"])
@@ -451,7 +614,7 @@ class Solver:
                     self.cell_lo[cid] = self.cell_lo.get(cid, 0.0) + vlo
                 self.cell_hi[cid] = self.cell_hi.get(cid, 0.0) + vhi
                 self.sl.put(s); continue
-            k = int(np.argmax(span)); val = (ca[k] + (span[k] + 1) // 2) / NCELL
+            k = int(np.argmax(span)); m = int(ca[k] + (span[k] + 1) // 2); val = m / NCELL
             pid = self.PLs.axis_plane(k, val)
             for side in (0, 1):
                 t = self.sl.get(); PY.copy_slot(s, t, *a)
@@ -459,10 +622,24 @@ class Solver:
                 if st == PY.OVERFLOW:
                     raise RuntimeError("polytope overflow")
                 if st == PY.EMPTY:
-                    self.sl.put(t)
+                    self.sl.put(t); continue
+                na, nb = ca.copy(), cb.copy()
+                if side == 0:
+                    nb[k] = m - 1            # {x_k <= m / NCELL}
                 else:
-                    stack.append(t)
+                    na[k] = m                # {x_k >= m / NCELL}
+                stack.append((t, na, nb))
             self.sl.put(s)
+
+    def certificate(self):
+        """Partition certificate for xlf.check: plane table, BSP (parent, signed plane ref), leaf claims."""
+        kinds = []; nodes = []; wits = []
+        for nid, kind, data in self.leaves:
+            kinds.append(kind); nodes.append(nid)
+            wits.append(list(data)[:4] if kind == "OUT" else [0, 0, 0, 0])
+        return dict(PL=self.PLs.PL[:self.PLs.n].copy(), parent=np.array(self.bsp_parent, np.int64),
+                    ref=np.array(self.bsp_ref, np.int64), leaf_kind=np.array(kinds), leaf_node=np.array(nodes, np.int64),
+                    leaf_wit=np.array(wits, np.int64).reshape(-1, 4), root_axes=self.root_axes)
 
     # ------------------------------------------------------------------ result
     def result(self):

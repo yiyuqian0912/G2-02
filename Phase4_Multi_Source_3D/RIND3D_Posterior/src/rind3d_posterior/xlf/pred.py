@@ -300,19 +300,58 @@ def _prep_comp(c, Vm, Vr, nv, RM, RR, K, ADJ, dm, dr, rm, rr):
             for t in range(4):
                 dm[nd, t] = RM[c, i, t]; dr[nd, t] = RR[c, i, t]
             nd += 1
+    # Only the angular extremes of w_v = (f_i(v), f_j(v)) over V_ij bind: B_ij(v, r) = cross(w_v, w_r) is linear in
+    # w_v, and a w_v proven (interval cross products >= 0) inside the cone of the two extremes is their nonnegative
+    # combination, so its constraint is implied. Unproven vertices keep their own constraint.
+    vs = np.empty(nv, np.int64); keep = np.empty(nv, np.bool_)
     for i in range(Kc):
         for j in range(Kc):
             if not ADJ[c, i, j]:
                 continue
+            m = 0
             for v in range(nv):
                 if sg[v, i] == 1 and sg[v, j] == -1:
-                    if nd >= dm.shape[0]:
-                        return -1, nl
-                    pair_coef(fm[v, i], fr[v, i], fm[v, j], fr[v, j], RM[c, i], RR[c, i], RM[c, j], RR[c, j], gm, gr)
-                    for t in range(4):
-                        dm[nd, t] = gm[t]; dr[nd, t] = gr[t]
-                    nd += 1
+                    vs[m] = v; m += 1
+            if m == 0:
+                continue
+            for a in range(m):
+                keep[a] = True
+            if m > 2:
+                amin = 0; amax = 0
+                tmin = np.arctan2(fm[vs[0], j], fm[vs[0], i]); tmax = tmin
+                for a in range(1, m):
+                    th = np.arctan2(fm[vs[a], j], fm[vs[a], i])
+                    if th < tmin:
+                        tmin = th; amin = a
+                    if th > tmax:
+                        tmax = th; amax = a
+                for a in range(m):
+                    if a == amin or a == amax:
+                        continue
+                    if (_cross_lo(fm[vs[amin], i], fr[vs[amin], i], fm[vs[amin], j], fr[vs[amin], j],
+                                  fm[vs[a], i], fr[vs[a], i], fm[vs[a], j], fr[vs[a], j]) >= 0.0 and
+                            _cross_lo(fm[vs[a], i], fr[vs[a], i], fm[vs[a], j], fr[vs[a], j],
+                                      fm[vs[amax], i], fr[vs[amax], i], fm[vs[amax], j], fr[vs[amax], j]) >= 0.0):
+                        keep[a] = False
+            for a in range(m):
+                if not keep[a]:
+                    continue
+                v = vs[a]
+                if nd >= dm.shape[0]:
+                    return -1, nl
+                pair_coef(fm[v, i], fr[v, i], fm[v, j], fr[v, j], RM[c, i], RR[c, i], RM[c, j], RR[c, j], gm, gr)
+                for t in range(4):
+                    dm[nd, t] = gm[t]; dr[nd, t] = gr[t]
+                nd += 1
     return nd, nl
+
+
+@njit(cache=True, inline="always")
+def _cross_lo(a0, ra0, a1, ra1, b0, rb0, b1, rb1):
+    """Rigorous lower bound of a0 b1 - a1 b0 for a = (a0, a1) +- (ra0, ra1), b likewise."""
+    p = a0 * b1; q = a1 * b0
+    r = (abs(a0) * rb1 + ra0 * (abs(b1) + rb1) + abs(a1) * rb0 + ra1 * (abs(b0) + rb0) + G2 * (abs(p) + abs(q))) * INFL + TINY
+    return dn((p - q) - r)
 
 
 @njit(cache=True, inline="always")
@@ -409,7 +448,7 @@ def _gt_ray(cm, cr, x, y, oz, N, L):
     return 0, 0
 
 
-SC_OK, SC_OUT, SC_BUG = 0, 1, 2
+SC_OK, SC_OUT, SC_BUG, SC_MANY = 0, 1, 2, 3
 
 
 @njit(cache=True)
@@ -422,12 +461,27 @@ def scan_rows(Vm, Vr, nv, rows, nrows, cls, o, N, L, comps, ncomp, RM, RR, K, AD
     coincide (impossible with correct arithmetic; reported, never used). If at most rcap receivers are ambiguous for
     the collective test, each is re-tested exactly in the source form (recv_test; lemma L there uses the plane through
     the receiver itself, which the receiver form can only approach), and only those still ambiguous are returned."""
-    KD = 4096; KL = 512
+    nd, nl, DM, DR, LM, LR = prep_all(Vm, Vr, nv, comps, ncomp, RM, RR, K, ADJ)
+    return scan_core(Vm, Vr, nv, rows, nrows, cls, o, N, L, comps, ncomp, RM, RR, K, ADJ, amb, cap, rowflag, wit, rcap,
+                     nd, nl, DM, DR, LM, LR)
+
+
+@njit(cache=True)
+def prep_all(Vm, Vr, nv, comps, ncomp, RM, RR, K, ADJ):
+    """Receiver-space data of every relevant component for the polytope Q (see _prep_comp); computed once per node."""
+    KD = 1024; KL = 256
     nd = np.empty(ncomp, np.int64); nl = np.empty(ncomp, np.int64)
     DM = np.empty((ncomp, KD, 4)); DR = np.empty((ncomp, KD, 4)); LM = np.empty((ncomp, KL, 4)); LR = np.empty((ncomp, KL, 4))
     for q in range(ncomp):
         a, b = _prep_comp(comps[q], Vm, Vr, nv, RM, RR, K, ADJ, DM[q], DR[q], LM[q], LR[q])
         nd[q] = a; nl[q] = b
+    return nd, nl, DM, DR, LM, LR
+
+
+@njit(cache=True)
+def scan_core(Vm, Vr, nv, rows, nrows, cls, o, N, L, comps, ncomp, RM, RR, K, ADJ, amb, cap, rowflag, wit, rcap,
+              nd, nl, DM, DR, LM, LR):
+    """Row pass of scan_rows on prepared component data (prep_all of the same polytope)."""
     ox = o[0]; oy = o[1]; oz = o[2]
     A = np.empty(ncomp, np.int64); B = np.empty(ncomp, np.int64); P = np.empty(ncomp, np.int64); Qh = np.empty(ncomp, np.int64)
     namb = 0
@@ -558,3 +612,177 @@ def fine_collect(Vm, Vr, nv, amb, namb, cls, o, N, comps, ncomp, RM, RR, K, ADJ,
                 HPHI[n] = 0.0
             n += 1
     return 0, n, nconv, first_nc
+
+
+# ------------------------------------------------------------------------------------------- hierarchical scan
+P_DARK, P_LIT, P_SOLID, P_MIXED = 0, 1, 2, 3
+
+
+def pyramid(cls):
+    """Pure-class pyramid of the window (tpl.window convention): codes[off[l] + (bx n + by) n + bz], n = L >> l, code
+    DARK / LIT / SOLID if every receiver of the 2^l block has that class, MIXED otherwise."""
+    L = cls.shape[0]; q = int(round(np.log2(L)))
+    d = cls == DARK; li = cls == LIT; s = cls == SOLID
+    codes = []
+    for l in range(q + 1):
+        code = np.full(d.shape, P_MIXED, np.uint8)
+        code[d] = P_DARK; code[li] = P_LIT; code[s] = P_SOLID
+        codes.append(code.reshape(-1))
+        if l < q:
+            n = d.shape[0] // 2
+            d = d.reshape(n, 2, n, 2, n, 2).all(axis=(1, 3, 5))
+            li = li.reshape(n, 2, n, 2, n, 2).all(axis=(1, 3, 5))
+            s = s.reshape(n, 2, n, 2, n, 2).all(axis=(1, 3, 5))
+    off = np.zeros(q + 2, np.int64)
+    for l in range(q + 1):
+        off[l + 1] = off[l] + codes[l].size
+    return np.concatenate(codes), off, q
+
+
+@njit(cache=True)
+def scan_tree(Vm, Vr, nv, starts, nstart, lb, pyr, poff, q, cls, o, N, L, comps, ncomp, RM, RR, K, ADJ,
+              amb, cap, bmark, wit, rcap, nd, nl, DM, DR, LM, LR, stop_level=0, cnt=np.zeros(4, np.int64),
+              amb_limit=1 << 62):
+    """Collective classification (same lemmas and outputs as scan_core) over receiver BLOCKS: an octree descent of the
+    window from the start blocks (starts[i] = (level, bx, by, bz)), carrying per component only the constraints that
+    are still undecided on the block (rigorous range of each affine constraint over the block's receiver box: centre
+    +- half extent). A block is consistent when its observation is pure and its status is decided for all its
+    receivers; contradicted when pure and decided against the observation (witness = a receiver of the block).
+    bmark[(bx n + by) n + bz] = 1 (n = L >> lb) for every level-lb block holding an ambiguous receiver (the start
+    blocks of the children). Returns (code, n_amb). With stop_level > 0 blocks are not descended below that level
+    (a refutation-only pre-pass: SC_OUT is valid, SC_OK carries no completeness information). If more than amb_limit
+    receivers are ambiguous the descent stops and SC_MANY is returned (no contradiction found so far; no marks)."""
+    KD = DM.shape[1]; KL = LM.shape[1]
+    NLV = q + 2
+    aD = np.empty((NLV, ncomp, KD), np.int64); naD = np.empty((NLV, ncomp), np.int64)
+    aL = np.empty((NLV, ncomp, KL), np.int64); naL = np.empty((NLV, ncomp), np.int64)
+    sD = np.empty((NLV, ncomp), np.int64)      # dark status per comp: 0 undecided, 1 sure-dark on block, 2 impossible
+    sL = np.empty((NLV, ncomp), np.int64)      # lit status per comp: 0 undecided, 1 lit-sure on block
+    top = q + 1                                 # virtual parent of the start blocks: all constraints active
+    for c in range(ncomp):
+        if nd[c] < 0:
+            naD[top, c] = 0; sD[top, c] = 2
+        else:
+            for h in range(nd[c]):
+                aD[top, c, h] = h
+            naD[top, c] = nd[c]; sD[top, c] = 1 if nd[c] == 0 else 0
+        for h in range(nl[c]):
+            aL[top, c, h] = h
+        naL[top, c] = nl[c]; sL[top, c] = 0
+    ox = o[0]; oy = o[1]; oz = o[2]
+    stk = np.empty((8 * (q + 2) + nstart + 8, 5), np.int64)
+    namb = 0
+    nb = L >> lb
+    for si in range(nstart):
+        sp = 0
+        stk[0, 0] = starts[si, 0]; stk[0, 1] = starts[si, 1]; stk[0, 2] = starts[si, 2]; stk[0, 3] = starts[si, 3]
+        stk[0, 4] = 1
+        sp = 1
+        while sp > 0:
+            sp -= 1
+            l = stk[sp, 0]; bx = stk[sp, 1]; by = stk[sp, 2]; bz = stk[sp, 3]; isstart = stk[sp, 4]
+            n = L >> l
+            code = pyr[poff[l] + (bx * n + by) * n + bz]
+            if code == P_SOLID:
+                continue
+            sz = 1 << l
+            x0 = bx * sz; y0 = by * sz; z0 = bz * sz
+            cx = (ox + x0 + 0.5 * sz) / N; cy = (oy + y0 + 0.5 * sz) / N; cz = (oz + z0 + 0.5 * sz) / N
+            hh = (sz - 1) * 0.5 / N
+            par = top if isstart == 1 else l + 1
+            cnt[0] += 1
+            anyd = False; alllit = True
+            for c in range(ncomp):
+                # ---- dark constraints
+                st = sD[par, c]; m = 0
+                if st == 0:
+                    cnt[1] += naD[par, c]
+                    for u in range(naD[par, c]):
+                        h = aD[par, c, u]
+                        mm, rr = aff(DM[c, h], DR[c, h], cx, cy, cz, hh, hh, hh)
+                        if up(mm + rr) <= 0.0:
+                            continue
+                        if dn(mm - rr) > 0.0:
+                            st = 2; m = 0
+                            break
+                        aD[l, c, m] = h; m += 1
+                    if st == 0 and m == 0:
+                        st = 1
+                naD[l, c] = m; sD[l, c] = st
+                if st == 1:
+                    anyd = True
+                # ---- lit planes
+                sl = sL[par, c]; m = 0
+                if sl == 0:
+                    cnt[2] += naL[par, c]
+                    for u in range(naL[par, c]):
+                        h = aL[par, c, u]
+                        mm, rr = aff(LM[c, h], LR[c, h], cx, cy, cz, hh, hh, hh)
+                        if dn(mm - rr) > 0.0:
+                            sl = 1; m = 0
+                            break
+                        if up(mm + rr) <= 0.0:
+                            continue
+                        aL[l, c, m] = h; m += 1
+                naL[l, c] = m; sL[l, c] = sl
+                if sl == 0:
+                    alllit = False
+            if anyd and alllit:
+                wit[0] = x0; wit[1] = y0; wit[2] = z0; wit[3] = 9
+                return SC_BUG, namb
+            if code == P_DARK:
+                if anyd:
+                    continue
+                if alllit:
+                    wit[0] = x0; wit[1] = y0; wit[2] = z0; wit[3] = 0
+                    return SC_OUT, namb
+            elif code == P_LIT:
+                if alllit:
+                    continue
+                if anyd:
+                    wit[0] = x0; wit[1] = y0; wit[2] = z0; wit[3] = 1
+                    return SC_OUT, namb
+            if stop_level > 0 and l <= stop_level:
+                continue
+            if l == 0:
+                if code == P_DARK or code == P_LIT:     # single receiver, undecided
+                    if namb < cap:
+                        amb[namb, 0] = x0; amb[namb, 1] = y0; amb[namb, 2] = z0
+                        amb[namb, 3] = ((x0 >> lb) * nb + (y0 >> lb)) * nb + (z0 >> lb)
+                    namb += 1
+                    bmark[((x0 >> lb) * nb + (y0 >> lb)) * nb + (z0 >> lb)] = 1
+                    if namb > amb_limit:
+                        return SC_MANY, namb
+                continue
+            for dx in range(2):
+                for dy in range(2):
+                    for dz in range(2):
+                        stk[sp, 0] = l - 1; stk[sp, 1] = 2 * bx + dx; stk[sp, 2] = 2 * by + dy; stk[sp, 3] = 2 * bz + dz
+                        stk[sp, 4] = 0
+                        sp += 1
+    if namb == 0 or namb > rcap or namb > cap:
+        return SC_OK, namb
+    hs_m = np.empty((MH, 4)); hs_r = np.empty((MH, 4)); hs_key = np.empty((MH, 4), np.int64); hs_s = np.empty(MH, np.int64)
+    for a in range(namb):
+        bmark[amb[a, 3]] = 0
+    m = 0
+    for a in range(namb):
+        X = amb[a, 0]; Y = amb[a, 1]; t = amb[a, 2]
+        ob = cls[X, Y, t]
+        st, nh, w = recv_test(Vm, Vr, nv, (ox + X + 0.5) / N, (oy + Y + 0.5) / N, (oz + t + 0.5) / N, ob, comps, ncomp,
+                              RM, RR, K, ADJ, hs_m, hs_r, hs_key, hs_s)
+        if st == R_DARK:
+            if ob == DARK:
+                continue
+            wit[0] = X; wit[1] = Y; wit[2] = t; wit[3] = 3
+            return SC_OUT, m
+        if st == R_LIT:
+            if ob == LIT:
+                continue
+            wit[0] = X; wit[1] = Y; wit[2] = t; wit[3] = 2
+            return SC_OUT, m
+        for u in range(4):
+            amb[m, u] = amb[a, u]
+        bmark[amb[a, 3]] = 1
+        m += 1
+    return SC_OK, m
