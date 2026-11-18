@@ -287,8 +287,21 @@ true source. Local-only certified pruning remains impossible for the v3 populati
 occluder-face component rather than the old full-measure construction. Interfaces that do not contain the source are
 rarer than in v2 (Observation below), but not absent.
 
-**Observation (v3 canary).** See §3c for the measured share of direct interface edges that are not free, v2 thin
-slabs versus v3.
+**Observation (v3 canary; `RIND3D_Posterior/experiments/localfirst/measure_h1.py`).** Every stored direct-interface
+channel was tested, each interface edge checked exactly against the scene's canonical bodies:
+
+| scenes (72 or 32 per arm, laptop canary) | channels | interface edges not free | channels with any non-free edge (L64 / L128 / L256) | channels with a non-free planar component ≥ 24 edges |
+|---|---|---|---|---|
+| v3 rule, v0.1 slabs (v3 seed) | 1,592 | 1.9% | 44% (14% / 34% / 67%) | 17% |
+| **v3 contract** (slabs ≥ 2 voxels) | 1,586 | **0.035%** | **43%** (13% / 33% / 67%) | **14%** |
+| slab families, T_min = 0 (v2 seed) | 740 | 4.5% | 48% | 30% |
+| slab families, T_min = 2 (same streams) | 735 | 0.025% | 41% | 13% |
+
+**Reading.** The thin-slab rule removes 55–180× of the non-free edges. But sharp edges, rims and vertices of *all*
+bodies still produce some in most channels (two thirds at L256). In one channel in seven or eight, they form a planar
+component of at least 24 edges on an occluder face. Theorem 3′ is therefore the common case, not an isolated
+construction. A local-first pruning rule that trusted interface planes would be unsafe for a substantial fraction of
+v3 labels.
 
 **Lemma 10 (ruling extension).** Let p ∈ ∂In(s) \ S and p′ = s + t(p − s) with t > 1. If the closed segment [p, p′]
 misses S, then [p, p′] ⊂ ∂In(s).
