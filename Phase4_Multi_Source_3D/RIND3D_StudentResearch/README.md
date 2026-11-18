@@ -3,6 +3,8 @@
 The brief is "RIND3D — Scientific Decisions, Loader Corrections, 1K Backfill, and Student Generalization Research",
 with its addendum on cost-gated extreme responses. **Start with `I_EXECUTIVE_DECISION.md`.**
 
+> **Terminology (2026-11-18).** These records keep their original light/shadow wording: lit = response-active, dark = response-inactive (so "all-dark S6" is the all-inactive prototype); see `../docs/RIND3D/GLOSSARY.md`.
+
 | file | content |
 |---|---|
 | `A_TASK_DEFINITION.md` | multi-source worlds, the single-channel target T*, four populations compared, labels exact for T* |
