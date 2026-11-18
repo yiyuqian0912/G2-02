@@ -226,6 +226,7 @@ def _verify_once(scene, cls, origin, N, cert, shell_eps, arena, plane_cap, max_r
     dbgV = np.zeros((64, 256, 3)); dbgI = np.zeros(1 + 4 * 64, np.int64)
     dbgF = np.zeros((64, 256, 5), np.int64); dbgA = np.zeros((64, 256, 3), np.int64)
     dbgINV = np.zeros((256, 256, 3)); dbgIN = np.zeros(257, np.int64)
+    audV = np.zeros((2048, 64, 3)); audI = np.zeros(1 + 2 * 2048, np.int64)
     nrec = 0
     pos = 0
     roots = np.asarray(cert["root_order"], np.int64)
@@ -241,7 +242,7 @@ def _verify_once(scene, cls, origin, N, cert, shell_eps, arena, plane_cap, max_r
         pos, nrec, code = tree.verify_root(PLn.PL, PLn.npl, gid, wid, ev, pos, rclip_ref, int(r[0]), int(r[1]), int(r[2]),
                                            int(r[3]), AC, AK, AM, items_code, items_cls, WC, WK, WM, geo, win, shell_eps,
                                            sl.a, scr, rec_cell, rec_lo, rec_hi, rec_kind, nrec, pool, stats, SPL, FST, AOST,
-                                           (dbgV, dbgI, dbgF, dbgA, dbgINV, dbgIN), (scene.E_c, scene.E_i, scene.E_j, scene.E_A, scene.E_B, scene.E_r, int(scene.nE)))
+                                           (dbgV, dbgI, dbgF, dbgA, dbgINV, dbgIN, audV, audI), (scene.E_c, scene.E_i, scene.E_j, scene.E_A, scene.E_B, scene.E_r, int(scene.nE)))
         root_status.append(code)
         if trace:
             print(f"root {r.tolist()} pos {pos} {time.perf_counter() - tr0:.3f}s evals {int(stats[tree.ST_EVALS])}", file=sys.stderr, flush=True)
@@ -268,6 +269,7 @@ def _verify_once(scene, cls, origin, N, cert, shell_eps, arena, plane_cap, max_r
                              kind=rec_kind[:nrec].copy())
     report["pool"] = float(pool[0])
     report["debug_in_pieces"] = [dbgINV[k, :dbgIN[1 + k]].copy() for k in range(int(dbgIN[0]))]
+    report["audit_out_regions"] = [(int(audI[2 + 2 * k]), audV[k, :audI[1 + 2 * k]].copy()) for k in range(int(audI[0]))]
     report["debug_out_fail"] = [dict(pos=int(dbgI[1 + 4 * k]), V=dbgV[k, :dbgI[2 + 4 * k]].copy(), nfa=int(dbgI[3 + 4 * k]),
                                      nao=int(dbgI[4 + 4 * k]), F=dbgF[k, :min(int(dbgI[3 + 4 * k]), 256)].copy(),
                                      A=dbgA[k, :min(int(dbgI[4 + 4 * k]), 256)].copy()) for k in range(int(dbgI[0]))]

@@ -737,7 +737,7 @@ def _refine_claim(PL, npl, q0, P0, NP, budget, dmax, claim_in, wkind, wcode, wcl
             continue
         if used >= budget or dep[top] >= dmax or top + 2 > NP:
             stats[ST_APEX_FAIL] += 1
-            dbgV, dbgI, dbgF, dbgA, _d4, _d5 = dbg
+            dbgV, dbgI, dbgF, dbgA, _d4, _d5, _d6, _d7 = dbg
             k_ = dbgI[0]
             if k_ < dbgV.shape[0] and dep[top] >= dmax:
                 nvv = min(nV[q], dbgV.shape[1])
@@ -939,6 +939,16 @@ def verify_root(PL, npl, gid, wid, ev, pos, rclip_ref, root_d, root_ix, root_iy,
                     xc = _vox_point(ev[pos, 5], L, o, N, xp)
                     wcode = np.int64(((xc // (L * L)) << 32) | (((xc // L) % L) << 16) | (xc % L)); wcls = cls_flat[xc]
                     wkind = 0
+            if t == EV_OUT:
+                aV = dbg[6]; aI = dbg[7]
+                k_ = aI[0]
+                if k_ < aV.shape[0]:
+                    nvv = min(nV[s], aV.shape[1])
+                    for v in range(nvv):
+                        for kk in range(3):
+                            aV[k_, v, kk] = Vm[s, v, kk]
+                    aI[1 + 2 * k_] = nvv; aI[2 + 2 * k_] = pos
+                    aI[0] = k_ + 1
             r = 2
             if t != EV_UNDET:
                 r = _check_claim(PL, s, claim_in, wkind, wcode, wcls, wid, fr_off[s], fr_len[s], atop, AC, AK, AM, WC, WK,
@@ -992,7 +1002,7 @@ def verify_root(PL, npl, gid, wid, ev, pos, rclip_ref, root_d, root_ix, root_iy,
                         stats[ST_IN_FAIL] += 1
                     elif t == EV_OUT:
                         stats[ST_OUT_FAIL] += 1
-                        dbgV, dbgI, dbgF, dbgA, _d4, _d5 = dbg
+                        dbgV, dbgI, dbgF, dbgA, _d4, _d5, _d6, _d7 = dbg
                         k_ = dbgI[0]
                         if k_ < dbgV.shape[0]:
                             nvv = min(nV[s], dbgV.shape[1])
