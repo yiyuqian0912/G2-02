@@ -109,7 +109,25 @@ T_min because the seed is the same; only the thickness draw changes.
 * **Direct interfaces.** v3's direct-interface rule excludes more windows once slabs are thick (L64: 0.4% → 1.3% of
   v2-admissible proposals). A sub-voxel slab let the two sides of a slab touch as a false FREE–FREE "interface"
   (an occluder interface). A 2-voxel slab is SOLID, and such windows are honestly SOLID-separated.
-* **Labelling.** See `RIND3D_Posterior/docs/LOCALFIRST_COMPARISON.md`.
+* **Labelling.** Measured on 36 labelling tasks per arm, drawn from the T_min = 0 and T_min = 2 canaries.
+  - The tasks are 2 per (family, L) group over the two thin-slab families. They are only partly paired: windows depend
+    on the geometry, and 15 of 36 task keys coincide.
+  - Laptop, one process per label, as in `RIND3D_Posterior/docs/LOCALFIRST_COMPARISON.md`.
+  - Data: `RIND3D_100K_v3_work/cmp_tfT0`, `cmp_tfT2`.
+
+  | arm | engine | certified | wall s, p50 / p95 / max | non-free interface edges (H1) | channels with a non-free component |
+  |---|---|---|---|---|---|
+  | T_min = 0 | deterministic (B, then exact on B) | 35/36, 1 timeout at 1800 s | 2.6 / 67 / > 1800 | 4.5% | 30% |
+  | T_min = 0 | FastLabel v3.4 | 36/36 (29 statistical, 7 exact) | 1.9 / 2.6 / 10.8 | | |
+  | T_min = 2 | deterministic (B, then exact on B) | 36/36 | 2.5 / 21 / 51 | 0.025% | 13% |
+  | T_min = 2 | FastLabel v3.4 | 36/36 (28 statistical, 8 exact) | 1.6 / 2.4 / 2.4 | | |
+
+  - *Tails.* Sub-voxel slabs produce the heavy tails. The only deterministic timeout is an `occluder_clusters` L64
+    window under T_min = 0, and FastLabel's slowest label falls from 10.8 s to 2.4 s.
+  - *Medians.* They are unchanged.
+  - *Interface quality.* The H1 numbers (`docs/LOCAL_INVERSE_GEOMETRY.md` §3b) show the thickness rule removing
+    almost all occluder-crossing interface edges. The channel-level share stays at 13%, because knife edges and rims
+    remain.
 
 **What observability does not remove.** Visible SOLID does not make every response interface source-containing.
 Sharp edges and vertices of any convex body (wedges with 7° knife edges, random polyhedra, box and slab rims) have

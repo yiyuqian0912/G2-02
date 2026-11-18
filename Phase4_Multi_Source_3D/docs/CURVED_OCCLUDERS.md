@@ -119,3 +119,34 @@ path.
   implemented.
 * **Interface statistics.** The local interface of a ball is a cone with apex at the source (Corollary 1b). Local
   plane fits leave curvature residuals. See §6 once measured.
+
+## 6. Local interface statistics of curved scenes
+
+**Setup.**
+* Scenes: 4 per family under the curved research contract (`RIND3D_Posterior/experiments/localfirst/curved_stats.py`).
+* Data: `RIND3D_100K_v3_work/curved_stats/`, outside Git.
+* No labels exist for balls, so these are X-only diagnostics, plus the containment of the true driver source in the
+  HEURISTIC band.
+
+| family | channels | component rms off-plane residual (voxels), p50 L64 / L128 / L256 | p90 | rank of the component normals, 0 / 1 / 2 / 3 | true source in the heuristic band |
+|---|---|---|---|---|---|
+| spheres | 89 | 0.37 / 0.46 / 0.49 | 0.53 | 3 / 14 / 41 / 31 | 85/89 |
+| spheres_polyhedra | 70 | 0.29 / 0.40 / 0.47 | 0.53 | 1 / 15 / 32 / 22 | 69/70 |
+| v3 polytope families (54 `cmp_v3` tasks, components ≥ 24 edges) | — | 0.21 overall | 0.27 | (see LOCALFIRST_COMPARISON.md) | 54/54 |
+
+**Readings.**
+* **Curvature is visible.**
+  - Ball interfaces leave about twice the polytope off-plane residual.
+  - The residual grows with the window side, as Estimate 7 of `LOCAL_INVERSE_GEOMETRY.md` predicts: the sagitta grows
+    with the square of the patch extent.
+  - A planar decomposition still explains almost all edges: the median explained share is 0.999 and 1.0.
+* **Rank is higher.** Rank 2 and 3 dominate: 81% of channels for spheres, 77% for the mixed family. A curved patch is
+  split into several planes with different normals.
+  - This is exactly the conditioning Estimate 7 warns about. The extra "planes" are facets of one cone, not independent
+    shadow planes.
+  - Their singular values overstate the localization a source-region constraint would deliver.
+* **The band is not safe here.** It misses the true source in 4 of 89 spheres channels and 1 of 70 mixed channels.
+  This is the expected failure of the planar band (one plane per component, H2) on cone-shaped interfaces.
+  - Any source-region use of curved interfaces needs the cone form of Proposition A (`RIND3D_Posterior/docs/LOCALFIRST_AUDIT.md` §5.1):
+    "∂b meets the triangle conv{s, l, k}".
+  - The band must not be used to prune.
