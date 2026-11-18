@@ -1,0 +1,654 @@
+{
+ "archive": [
+  {
+   "slot": 61,
+   "w": 1,
+   "s": 1,
+   "L": 64,
+   "family": "barriers",
+   "key": "000061_w01_s1"
+  },
+  {
+   "slot": 43,
+   "w": 2,
+   "s": 1,
+   "L": 64,
+   "family": "barriers",
+   "key": "000043_w02_s1"
+  },
+  {
+   "slot": 16,
+   "w": 6,
+   "s": 2,
+   "L": 128,
+   "family": "barriers",
+   "key": "000016_w06_s2"
+  },
+  {
+   "slot": 16,
+   "w": 5,
+   "s": 3,
+   "L": 128,
+   "family": "barriers",
+   "key": "000016_w05_s3"
+  },
+  {
+   "slot": 7,
+   "w": 8,
+   "s": 2,
+   "L": 256,
+   "family": "barriers",
+   "key": "000007_w08_s2"
+  },
+  {
+   "slot": 7,
+   "w": 9,
+   "s": 2,
+   "L": 256,
+   "family": "barriers",
+   "key": "000007_w09_s2"
+  },
+  {
+   "slot": 58,
+   "w": 3,
+   "s": 2,
+   "L": 64,
+   "family": "convex_polyhedra",
+   "key": "000058_w03_s2"
+  },
+  {
+   "slot": 49,
+   "w": 3,
+   "s": 0,
+   "L": 64,
+   "family": "convex_polyhedra",
+   "key": "000049_w03_s0"
+  },
+  {
+   "slot": 40,
+   "w": 7,
+   "s": 1,
+   "L": 128,
+   "family": "convex_polyhedra",
+   "key": "000040_w07_s1"
+  },
+  {
+   "slot": 49,
+   "w": 6,
+   "s": 0,
+   "L": 128,
+   "family": "convex_polyhedra",
+   "key": "000049_w06_s0"
+  },
+  {
+   "slot": 58,
+   "w": 9,
+   "s": 0,
+   "L": 256,
+   "family": "convex_polyhedra",
+   "key": "000058_w09_s0"
+  },
+  {
+   "slot": 49,
+   "w": 9,
+   "s": 0,
+   "L": 256,
+   "family": "convex_polyhedra",
+   "key": "000049_w09_s0"
+  },
+  {
+   "slot": 69,
+   "w": 1,
+   "s": 0,
+   "L": 64,
+   "family": "corridors",
+   "key": "000069_w01_s0"
+  },
+  {
+   "slot": 33,
+   "w": 3,
+   "s": 2,
+   "L": 64,
+   "family": "corridors",
+   "key": "000033_w03_s2"
+  },
+  {
+   "slot": 60,
+   "w": 4,
+   "s": 0,
+   "L": 128,
+   "family": "corridors",
+   "key": "000060_w04_s0"
+  },
+  {
+   "slot": 60,
+   "w": 6,
+   "s": 0,
+   "L": 128,
+   "family": "corridors",
+   "key": "000060_w06_s0"
+  },
+  {
+   "slot": 33,
+   "w": 9,
+   "s": 0,
+   "L": 256,
+   "family": "corridors",
+   "key": "000033_w09_s0"
+  },
+  {
+   "slot": 60,
+   "w": 11,
+   "s": 2,
+   "L": 256,
+   "family": "corridors",
+   "key": "000060_w11_s2"
+  },
+  {
+   "slot": 5,
+   "w": 1,
+   "s": 1,
+   "L": 64,
+   "family": "multiscale_convex",
+   "key": "000005_w01_s1"
+  },
+  {
+   "slot": 59,
+   "w": 1,
+   "s": 3,
+   "L": 64,
+   "family": "multiscale_convex",
+   "key": "000059_w01_s3"
+  },
+  {
+   "slot": 14,
+   "w": 7,
+   "s": 1,
+   "L": 128,
+   "family": "multiscale_convex",
+   "key": "000014_w07_s1"
+  },
+  {
+   "slot": 59,
+   "w": 7,
+   "s": 0,
+   "L": 128,
+   "family": "multiscale_convex",
+   "key": "000059_w07_s0"
+  },
+  {
+   "slot": 59,
+   "w": 11,
+   "s": 3,
+   "L": 256,
+   "family": "multiscale_convex",
+   "key": "000059_w11_s3"
+  },
+  {
+   "slot": 5,
+   "w": 8,
+   "s": 2,
+   "L": 256,
+   "family": "multiscale_convex",
+   "key": "000005_w08_s2"
+  },
+  {
+   "slot": 17,
+   "w": 3,
+   "s": 3,
+   "L": 64,
+   "family": "occluder_clusters",
+   "key": "000017_w03_s3"
+  },
+  {
+   "slot": 8,
+   "w": 1,
+   "s": 0,
+   "L": 64,
+   "family": "occluder_clusters",
+   "key": "000008_w01_s0"
+  },
+  {
+   "slot": 35,
+   "w": 5,
+   "s": 1,
+   "L": 128,
+   "family": "occluder_clusters",
+   "key": "000035_w05_s1"
+  },
+  {
+   "slot": 35,
+   "w": 5,
+   "s": 2,
+   "L": 128,
+   "family": "occluder_clusters",
+   "key": "000035_w05_s2"
+  },
+  {
+   "slot": 8,
+   "w": 11,
+   "s": 2,
+   "L": 256,
+   "family": "occluder_clusters",
+   "key": "000008_w11_s2"
+  },
+  {
+   "slot": 8,
+   "w": 8,
+   "s": 1,
+   "L": 256,
+   "family": "occluder_clusters",
+   "key": "000008_w08_s1"
+  },
+  {
+   "slot": 47,
+   "w": 0,
+   "s": 2,
+   "L": 64,
+   "family": "prisms",
+   "key": "000047_w00_s2"
+  },
+  {
+   "slot": 38,
+   "w": 0,
+   "s": 1,
+   "L": 64,
+   "family": "prisms",
+   "key": "000038_w00_s1"
+  },
+  {
+   "slot": 11,
+   "w": 6,
+   "s": 2,
+   "L": 128,
+   "family": "prisms",
+   "key": "000011_w06_s2"
+  },
+  {
+   "slot": 38,
+   "w": 6,
+   "s": 2,
+   "L": 128,
+   "family": "prisms",
+   "key": "000038_w06_s2"
+  },
+  {
+   "slot": 29,
+   "w": 8,
+   "s": 1,
+   "L": 256,
+   "family": "prisms",
+   "key": "000029_w08_s1"
+  },
+  {
+   "slot": 29,
+   "w": 10,
+   "s": 0,
+   "L": 256,
+   "family": "prisms",
+   "key": "000029_w10_s0"
+  },
+  {
+   "slot": 63,
+   "w": 3,
+   "s": 1,
+   "L": 64,
+   "family": "rotated_boxes",
+   "key": "000063_w03_s1"
+  },
+  {
+   "slot": 54,
+   "w": 0,
+   "s": 1,
+   "L": 64,
+   "family": "rotated_boxes",
+   "key": "000054_w00_s1"
+  },
+  {
+   "slot": 45,
+   "w": 4,
+   "s": 3,
+   "L": 128,
+   "family": "rotated_boxes",
+   "key": "000045_w04_s3"
+  },
+  {
+   "slot": 63,
+   "w": 5,
+   "s": 1,
+   "L": 128,
+   "family": "rotated_boxes",
+   "key": "000063_w05_s1"
+  },
+  {
+   "slot": 54,
+   "w": 11,
+   "s": 1,
+   "L": 256,
+   "family": "rotated_boxes",
+   "key": "000054_w11_s1"
+  },
+  {
+   "slot": 45,
+   "w": 10,
+   "s": 0,
+   "L": 256,
+   "family": "rotated_boxes",
+   "key": "000045_w10_s0"
+  },
+  {
+   "slot": 55,
+   "w": 2,
+   "s": 1,
+   "L": 64,
+   "family": "thin_slabs",
+   "key": "000055_w02_s1"
+  },
+  {
+   "slot": 19,
+   "w": 2,
+   "s": 0,
+   "L": 64,
+   "family": "thin_slabs",
+   "key": "000019_w02_s0"
+  },
+  {
+   "slot": 28,
+   "w": 6,
+   "s": 0,
+   "L": 128,
+   "family": "thin_slabs",
+   "key": "000028_w06_s0"
+  },
+  {
+   "slot": 37,
+   "w": 6,
+   "s": 0,
+   "L": 128,
+   "family": "thin_slabs",
+   "key": "000037_w06_s0"
+  },
+  {
+   "slot": 19,
+   "w": 10,
+   "s": 3,
+   "L": 256,
+   "family": "thin_slabs",
+   "key": "000019_w10_s3"
+  },
+  {
+   "slot": 28,
+   "w": 11,
+   "s": 3,
+   "L": 256,
+   "family": "thin_slabs",
+   "key": "000028_w11_s3"
+  },
+  {
+   "slot": 30,
+   "w": 1,
+   "s": 0,
+   "L": 64,
+   "family": "wedges",
+   "key": "000030_w01_s0"
+  },
+  {
+   "slot": 30,
+   "w": 3,
+   "s": 1,
+   "L": 64,
+   "family": "wedges",
+   "key": "000030_w03_s1"
+  },
+  {
+   "slot": 57,
+   "w": 7,
+   "s": 0,
+   "L": 128,
+   "family": "wedges",
+   "key": "000057_w07_s0"
+  },
+  {
+   "slot": 3,
+   "w": 7,
+   "s": 0,
+   "L": 128,
+   "family": "wedges",
+   "key": "000003_w07_s0"
+  },
+  {
+   "slot": 39,
+   "w": 9,
+   "s": 2,
+   "L": 256,
+   "family": "wedges",
+   "key": "000039_w09_s2"
+  },
+  {
+   "slot": 30,
+   "w": 10,
+   "s": 0,
+   "L": 256,
+   "family": "wedges",
+   "key": "000030_w10_s0"
+  }
+ ],
+ "holdout": [
+  {
+   "slot": 25,
+   "w": 0,
+   "s": 0,
+   "L": 64,
+   "family": "barriers",
+   "key": "000025_w00_s0"
+  },
+  {
+   "slot": 25,
+   "w": 4,
+   "s": 0,
+   "L": 128,
+   "family": "barriers",
+   "key": "000025_w04_s0"
+  },
+  {
+   "slot": 25,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "barriers",
+   "key": "000025_w08_s0"
+  },
+  {
+   "slot": 4,
+   "w": 0,
+   "s": 0,
+   "L": 64,
+   "family": "convex_polyhedra",
+   "key": "000004_w00_s0"
+  },
+  {
+   "slot": 4,
+   "w": 4,
+   "s": 0,
+   "L": 128,
+   "family": "convex_polyhedra",
+   "key": "000004_w04_s0"
+  },
+  {
+   "slot": 4,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "convex_polyhedra",
+   "key": "000004_w08_s0"
+  },
+  {
+   "slot": 6,
+   "w": 0,
+   "s": 0,
+   "L": 64,
+   "family": "corridors",
+   "key": "000006_w00_s0"
+  },
+  {
+   "slot": 6,
+   "w": 4,
+   "s": 0,
+   "L": 128,
+   "family": "corridors",
+   "key": "000006_w04_s0"
+  },
+  {
+   "slot": 6,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "corridors",
+   "key": "000006_w08_s0"
+  },
+  {
+   "slot": 23,
+   "w": 0,
+   "s": 1,
+   "L": 64,
+   "family": "multiscale_convex",
+   "key": "000023_w00_s1"
+  },
+  {
+   "slot": 23,
+   "w": 4,
+   "s": 0,
+   "L": 128,
+   "family": "multiscale_convex",
+   "key": "000023_w04_s0"
+  },
+  {
+   "slot": 23,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "multiscale_convex",
+   "key": "000023_w08_s0"
+  },
+  {
+   "slot": 26,
+   "w": 0,
+   "s": 0,
+   "L": 64,
+   "family": "occluder_clusters",
+   "key": "000026_w00_s0"
+  },
+  {
+   "slot": 26,
+   "w": 4,
+   "s": 0,
+   "L": 128,
+   "family": "occluder_clusters",
+   "key": "000026_w04_s0"
+  },
+  {
+   "slot": 26,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "occluder_clusters",
+   "key": "000026_w08_s0"
+  },
+  {
+   "slot": 2,
+   "w": 0,
+   "s": 2,
+   "L": 64,
+   "family": "prisms",
+   "key": "000002_w00_s2"
+  },
+  {
+   "slot": 2,
+   "w": 4,
+   "s": 2,
+   "L": 128,
+   "family": "prisms",
+   "key": "000002_w04_s2"
+  },
+  {
+   "slot": 2,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "prisms",
+   "key": "000002_w08_s0"
+  },
+  {
+   "slot": 0,
+   "w": 0,
+   "s": 0,
+   "L": 64,
+   "family": "rotated_boxes",
+   "key": "000000_w00_s0"
+  },
+  {
+   "slot": 0,
+   "w": 4,
+   "s": 0,
+   "L": 128,
+   "family": "rotated_boxes",
+   "key": "000000_w04_s0"
+  },
+  {
+   "slot": 0,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "rotated_boxes",
+   "key": "000000_w08_s0"
+  },
+  {
+   "slot": 1,
+   "w": 0,
+   "s": 0,
+   "L": 64,
+   "family": "thin_slabs",
+   "key": "000001_w00_s0"
+  },
+  {
+   "slot": 1,
+   "w": 4,
+   "s": 1,
+   "L": 128,
+   "family": "thin_slabs",
+   "key": "000001_w04_s1"
+  },
+  {
+   "slot": 1,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "thin_slabs",
+   "key": "000001_w08_s0"
+  },
+  {
+   "slot": 12,
+   "w": 0,
+   "s": 2,
+   "L": 64,
+   "family": "wedges",
+   "key": "000012_w00_s2"
+  },
+  {
+   "slot": 12,
+   "w": 4,
+   "s": 1,
+   "L": 128,
+   "family": "wedges",
+   "key": "000012_w04_s1"
+  },
+  {
+   "slot": 12,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "wedges",
+   "key": "000012_w08_s0"
+  }
+ ]
+}

@@ -1,0 +1,76 @@
+{
+ "holdout": [
+  {
+   "slot": 34,
+   "w": 0,
+   "s": 1,
+   "L": 64,
+   "family": "barriers",
+   "key": "000034_w00_s1"
+  },
+  {
+   "slot": 13,
+   "w": 4,
+   "s": 0,
+   "L": 128,
+   "family": "convex_polyhedra",
+   "key": "000013_w04_s0"
+  },
+  {
+   "slot": 15,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "corridors",
+   "key": "000015_w08_s0"
+  },
+  {
+   "slot": 32,
+   "w": 0,
+   "s": 3,
+   "L": 64,
+   "family": "multiscale_convex",
+   "key": "000032_w00_s3"
+  },
+  {
+   "slot": 44,
+   "w": 4,
+   "s": 0,
+   "L": 128,
+   "family": "occluder_clusters",
+   "key": "000044_w04_s0"
+  },
+  {
+   "slot": 20,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "prisms",
+   "key": "000020_w08_s0"
+  },
+  {
+   "slot": 9,
+   "w": 0,
+   "s": 0,
+   "L": 64,
+   "family": "rotated_boxes",
+   "key": "000009_w00_s0"
+  },
+  {
+   "slot": 10,
+   "w": 4,
+   "s": 1,
+   "L": 128,
+   "family": "thin_slabs",
+   "key": "000010_w04_s1"
+  },
+  {
+   "slot": 21,
+   "w": 8,
+   "s": 0,
+   "L": 256,
+   "family": "wedges",
+   "key": "000021_w08_s0"
+  }
+ ]
+}

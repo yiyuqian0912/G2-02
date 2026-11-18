@@ -1,0 +1,7 @@
+# Raw solver checkpoints are exported losslessly as versioned gzip files.
+/records/*.jsonl
+# Small post-hoc distributions and timing receipts for this exact experiment.
+!/records/reference/*.npz
+!/records/fresh_reference/*.npz
+!/records/grid_*.log
+!/records/regression.log
