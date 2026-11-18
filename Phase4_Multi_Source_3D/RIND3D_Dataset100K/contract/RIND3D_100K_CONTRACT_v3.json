@@ -1,0 +1,150 @@
+{
+  "contract": "rind3d-100k-contract-v3",
+  "status": "provisional pre-production contract (not run at scale). It changes the target population of v2: only windows with a direct FREE-FREE response interface are eligible. kappa, quotas, caps and the coverage design are v2's and are NOT yet re-validated for the v3 population (docs/SAMPLING_IMPACT_V3.md; H20 canary still required)",
+  "supersedes": "rind3d-100k-contract-v2 (window rule 'mixed'; kept unchanged for regression and reproducibility)",
+  "seed": 20261118,
+  "resolution": 1024,
+  "n_scenes": 100000,
+  "families": [
+    "rotated_boxes",
+    "thin_slabs",
+    "prisms",
+    "wedges",
+    "convex_polyhedra",
+    "multiscale_convex",
+    "corridors",
+    "barriers",
+    "occluder_clusters"
+  ],
+  "quota": {
+    "64": 4,
+    "128": 4,
+    "256": 4
+  },
+  "cap": {
+    "64": 6000,
+    "128": 6000,
+    "256": 6000
+  },
+  "rate_n": {
+    "64": 256,
+    "128": 128,
+    "256": 64
+  },
+  "rate_exact": "all",
+  "n_probe": {
+    "64": 64,
+    "128": 256,
+    "256": 512
+  },
+  "hull_certificate": true,
+  "backend": "cuda_certified",
+  "max_attempts": 3,
+  "source_count": {
+    "law": "declared",
+    "kappa": [
+      0.15,
+      0.15,
+      0.15,
+      0.55
+    ],
+    "draw": "k = 1 + #{i < 3 : u >= cumsum(kappa)[i]}, u = keyed_rng(seed, slot, 56000).random(); independent of the geometry, the sources and the attempt",
+    "status": "provisional default pending the canary (>= 50% K = 4 scenes; J_COMPLEXITY_COVERAGE.md)"
+  },
+  "source_rule": {
+    "prior": "uniform on D(G) = open cube, outside the closed solid, certified clearance > 2^-26",
+    "anti_duplicate_linf": 9.5367431640625e-07
+  },
+  "selection": {
+    "target": "T*_v3: natural multi-source worlds; natural admissible windows (origin uniform on {0..N-L}^3, admissible iff no source in the closed box, FREE > 0 and m >= 1 under the direct-interface rule); every channel with a direct interface is one example",
+    "natural": {
+      "acceptance": "every admissible proposal (c = 1); no m-dependent thinning"
+    },
+    "coverage": {
+      "enabled": true,
+      "sides": [
+        64
+      ],
+      "k": [
+        4
+      ],
+      "slots": 1,
+      "c_m": [
+        0.125,
+        0.25,
+        0.5,
+        1.0
+      ],
+      "cap": 2000,
+      "fallback": "natural (the slot is filled from the natural stream and recorded as natural_fallback)",
+      "streams": "separate keyed origin / U streams (58000 + L, 59000 + L); logically distinct from the natural stream"
+    },
+    "rate_stream": "R natural proposals per side with EXACT v3 m for every proposal: P_A_hat = rate_A / rate_n, Lambda_cov_hat = sum_m c(m) rate_m / rate_n; the v2 rule of the same proposals is recorded too (rate_A_mixed, rate_m_mixed), diagnostic only",
+    "weights": "T* balance heuristic per natural proposal: w(m) = 1 / sum_s n_s c_s(m) / Lambda_s (natural: c = 1, Lambda = P_A; coverage: c(m), Lambda_cov)"
+  },
+  "planning": {
+    "epoch_scenes": 1000,
+    "rule": "declared: the plan of a slot depends only on (seed, slot); no barrier between epochs"
+  },
+  "exclusion": "every source outside every accepted closed window box [o/N, (o+L)/N]^3",
+  "informative": "see eligibility.definition (direct FREE-FREE response interface); v2's 'mixed' mask of each stored window is kept as windows.mixed_mask",
+  "splits": "sha256(scene_id) mod 100: < 80 train, < 90 val, else test",
+  "labels": {
+    "engine": "fastlabel",
+    "engine_version": "fastlabel-v3.4 (rind3d_posterior.fastlabel)",
+    "reference_engine": "tau-pencil tpe-b4/p2-cpu+g2-gpu-pass-v3.1 (rind3d_posterior.label_window): exact references and regression",
+    "fastlabel": {
+      "n_tasks": 4800000,
+      "n_tasks_rule": "upper bound 100000 scenes x 12 windows x 4 channels, so the union bound over the campaign holds for any realised label count",
+      "base_seed": 20261118,
+      "family_delta": 0.01,
+      "eps": 0.05
+    },
+    "target": "Uniform(F_W^j) over D(G) minus the closed window box, cell masses on the 128^3 grid",
+    "statuses": {
+      "certified": "deterministic tv_bound <= 0.05 (single-cell support or exact path)",
+      "certified_stat": "tv_bound = eps = 0.05 with P(false certificate) <= family_delta / n_tasks per label; certificate in the label meta",
+      "certified_loose": "deterministic 0.05 < tv_bound <= 0.10",
+      "uncertified": "tv_bound > 0.10"
+    },
+    "tier1": {
+      "nq_cap": 33554432,
+      "ne_cap": 67108864,
+      "gpu_cap": 4194304
+    },
+    "tier2": {
+      "nq_cap": 67108864,
+      "ne_cap": 134217728
+    },
+    "timeouts_s": {
+      "64": 1800,
+      "128": 3600,
+      "256": 7200
+    },
+    "tv_primary": 0.05,
+    "tv_secondary": 0.1,
+    "informative_only": true,
+    "uninformative_slots": "kept (responses stored), status not_computed: every channel without a direct interface, including SOLID-separated mixed channels"
+  },
+  "storage": {
+    "scene_file": "scenes/<slot//1000:04d>/<slot:06d>.npz (one atomic container per scene; tmp, fsync, rename, directory fsync)",
+    "labels": "append-only journals labels/journal/*.r3lj, consolidated to labels/scenes/<shard>/<slot:06d>.labels.npz with a sha256 record in labels/consolidated.jsonl",
+    "responses": "per (window, source) packed bits (Z,Y,X), zstd; SOLID once per window",
+    "global_response_fields": "never stored"
+  },
+  "eligibility": {
+    "rule": "direct_interface",
+    "definition": "channel j of window W is informative iff W contains two 6-adjacent receivers u, v (|u - v|_1 = 1 voxel) that are both FREE and have different binary responses R_j(u) != R_j(v); m(W) = number of informative channels",
+    "excluded": [
+      "windows whose only active/inactive contacts pass through SOLID (SOLID-separated mixed channels)",
+      "all-active windows",
+      "all-inactive windows",
+      "windows without FREE receivers"
+    ],
+    "note": "a research-scope choice for the primary population, not a claim that the excluded configurations are physically invalid; historical OOD diagnostic sets are unchanged",
+    "decision": "exact (rind3d_100k.local_eval.evaluate_proposal_interface): constructive bisection proofs, the exact all-active hull certificate and exact 64^3 tile scans including edges across tile faces; screening changes cost, never a decision",
+    "fallback": "none: a proposal is accepted only if it is eligible; an unfilled side rejects the scene attempt (quota_unfilled) as in v2"
+  },
+  "families_note": "the nine historical convex-polyhedral families (round robin slot % 9, as in v2). Curved families (spheres) are physical-research only until a certified posterior labeller supports them; they are not part of T*_v3",
+  "terminology": "driver source (legacy: source / light); response-active / response-inactive receiver (legacy keys: lit / dark); response interface (legacy: lit/dark boundary). Serialized keys keep their legacy names"
+}

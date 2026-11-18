@@ -19,10 +19,19 @@ How the exact facts are obtained (this changes cost, never a decision):
 * **Accepted windows** are always rendered completely for every source: these are the stored responses. Their exact m
   is asserted to reproduce the decision.
 
+**Contract v3 (`rule="direct_interface"`, module `interface`).** A channel is informative iff the window has two
+6-adjacent FREE receivers with different responses (a direct response interface). The same lazy decision is used
+with exact facts of that rule: a constructive interface proof by bisection along a lattice path between an active and
+an inactive FREE probe (exact point queries), the all-active hull certificate (I_j = 0), and an exact tile scan that
+includes the edges crossing tile faces (`interface.TileScan`). Probes that only show both responses no longer prove
+I_j = 1. The v1/v2 path (`rule="mixed"`) is unchanged.
+
 Array layout: bool [Z, Y, X] crops, the same as `RINDPack.read_window` and the 1K public store."""
 import time
 
 import numpy as np
+
+from .interface import TileScan, interface_axes, lattice_path, bisect_interface
 
 TILE = 64
 
@@ -87,6 +96,28 @@ class LocalScene:
         self.stats["render_s"] += time.perf_counter() - t; self.stats["rendered_channels"] += 1
         complete = done == nt
         return (nl > 0 and nd > 0), (nl + nd) > 0, complete, ((nl, nd, ns) if complete else None)
+
+    def interface(self, j, o, L, first=8):
+        """Exact direct-interface indicator of channel j (contract v3), rendering 64^3 tiles progressively and stopping
+        at the first interface edge (inside a tile or across a tile face). Returns (I_j, free_seen, complete, counts or
+        None, mixed or None); counts = (lit, dark, solid) and mixed = the v1/v2 rule, both exact when complete."""
+        t = time.perf_counter()
+        offs, origins = self.tile_origins(o, L)
+        scan = TileScan(L); done = 0; nt = len(origins)
+        step = min(first, self.batch)
+        while done < nt and not scan.found:
+            chunk = origins[done:done + step]
+            out = self.src[j].packed_batch(chunk, TILE, self.N)
+            for off, (pl, ps) in zip(offs[done:done + len(chunk)], out):
+                tl = np.unpackbits(np.frombuffer(pl, np.uint8), bitorder="little").astype(bool).reshape(TILE, TILE, TILE)
+                ts = np.unpackbits(np.frombuffer(ps, np.uint8), bitorder="little").astype(bool).reshape(TILE, TILE, TILE)
+                scan.add(off, tl, ts)
+            done += len(chunk); step = self.batch
+            self.stats["tiles"] += len(chunk)
+        self.stats["render_s"] += time.perf_counter() - t; self.stats["rendered_channels"] += 1
+        complete = scan.complete
+        mixed = True if scan.found else scan.mixed
+        return scan.found, (scan.nl + scan.nd) > 0, complete, ((scan.nl, scan.nd, scan.ns) if complete else None), mixed
 
     def render(self, j, o, L):
         """Exact lit and solid crops bool [L, L, L] (Z, Y, X) of channel j for the window with origin o (x, y, z)."""
@@ -157,17 +188,23 @@ class HullCert:
 
 
 class Decision:
-    __slots__ = ("A", "accept", "m", "m_lo", "m_hi", "mask", "counts", "why", "exact", "crops")
+    __slots__ = ("A", "accept", "m", "m_lo", "m_hi", "mask", "counts", "why", "exact", "crops", "mixed_mask", "m_mixed")
 
     def __init__(self):
         self.A = 0; self.accept = False; self.m = None; self.m_lo = 0; self.m_hi = 0; self.mask = None
         self.counts = None; self.why = None; self.exact = False; self.crops = None
+        self.mixed_mask = None; self.m_mixed = None        # v3 only: the v1/v2 rule on the same proposal (when exact)
 
 
-def evaluate_proposal(scene, sources, o, L, U, c_row, rng, n_probe=48, need_exact=False):
+def evaluate_proposal(scene, sources, o, L, U, c_row, rng, n_probe=48, need_exact=False, rule="mixed"):
     """Exact acceptance decision for one proposal (see module docstring). c_row[m-1] = c(m, L, k).
     need_exact=True forces exact m (every channel not proven informative by probes is decided by rendering).
+    rule: "mixed" (contracts v1/v2) or "direct_interface" (contract v3).
     Returns a Decision; decisions equal the exact rule by construction."""
+    if rule == "direct_interface":
+        return evaluate_proposal_interface(scene, sources, o, L, U, c_row, rng, n_probe, need_exact)
+    if rule != "mixed":
+        raise ValueError(f"unknown eligibility rule {rule!r}")
     N = scene.N; k = scene.k
     d = Decision()
     if contains_any(sources, o, L, N):
@@ -242,7 +279,106 @@ def evaluate_proposal(scene, sources, o, L, U, c_row, rng, n_probe=48, need_exac
     return d
 
 
-def render_accepted(scene, o, L):
+def evaluate_proposal_interface(scene, sources, o, L, U, c_row, rng, n_probe=48, need_exact=False, n_paths=3):
+    """Contract v3 decision: A(W) = [no source in the closed box] and [FREE(W) > 0] and [m(W) >= 1] with
+    m(W) = #channels with a direct FREE-FREE response interface; accepted iff A(W) and U < c(m). Same lazy scheme as
+    the v2 rule, with v3 facts: bisection proofs (I_j = 1), hull all-active certificates (I_j = 0), exact tile scans.
+    With need_exact the v1/v2 'mixed' rule of the same proposal is also exact (Decision.mixed_mask / m_mixed)."""
+    N = scene.N; k = scene.k
+    d = Decision()
+    if contains_any(sources, o, L, N):
+        d.why = "contains_source"; d.exact = True; d.m = 0; scene.stats["contains_source"] += 1
+        return d
+    o = np.asarray(o, np.int64)
+    inf = np.zeros(k, bool); mixed = [None] * k
+    free_known = False
+    st = scene.stats
+    st.setdefault("bisect_q", 0); st.setdefault("bisect_ok", 0); st.setdefault("bisect_fail", 0)
+    if n_probe > 0:
+        vox = o + rng.integers(0, L, (n_probe, 3))
+        for j in range(k):
+            lit, sol = scene.probe(j, vox)
+            fr = ~sol
+            if fr.any():
+                free_known = True
+            la = np.flatnonzero(lit & fr); da = np.flatnonzero(~lit & fr)
+            if len(la) and len(da):
+                mixed[j] = True
+                q = lambda v, j=j: scene.probe(j, v)
+                for t_ in range(min(n_paths, len(la))):
+                    a = vox[la[t_]]; dist = np.abs(vox[da] - a).sum(1); b = vox[da[int(np.argmin(dist))]]
+                    order = ((0, 1, 2), (2, 1, 0), (1, 2, 0))[t_ % 3]
+                    pair, nq = bisect_interface(q, lattice_path(a, b, order), True)
+                    st["bisect_q"] += nq
+                    if pair is not None:
+                        inf[j] = True; st["bisect_ok"] += 1
+                        break
+                else:
+                    st["bisect_fail"] += 1
+    hull = getattr(scene, "hull", None)
+    unres = [j for j in range(k) if not inf[j]]
+    if hull is not None and unres:
+        keep = []
+        for j in unres:
+            if hull.all_lit(sources[j], o, L):
+                free_known = True; mixed[j] = False
+            else:
+                keep.append(j)
+        unres = keep
+    d.m_lo = int(inf.sum()); d.m_hi = d.m_lo + len(unres)
+    rendered = False
+    while True:
+        m_lo = int(inf.sum()); m_hi = m_lo + len(unres)
+        if not need_exact:
+            cs = {m: c_row[m - 1] for m in range(max(m_lo, 1), m_hi + 1)}
+            if free_known and m_lo >= 1 and U < min(cs.values()):
+                d.A = 1; d.accept = True; d.why = "A"; d.m_lo, d.m_hi = m_lo, m_hi
+                scene.stats["decided_by_render" if rendered else "decided_by_probes"] += 1
+                return d
+            if not cs or U >= max(cs.values()):
+                d.A = int(free_known and m_lo >= 1); d.m_lo, d.m_hi = m_lo, m_hi
+                d.why = "thinned" if d.A else "thinned_or_uninformative"
+                scene.stats["decided_by_render" if rendered else "decided_by_probes"] += 1
+                return d
+        if not unres:
+            break
+        j = unres.pop(0)
+        I, fseen, complete, cnt, mx = scene.interface(j, o, L)
+        rendered = True
+        inf[j] = I
+        if mx is not None:
+            mixed[j] = mx
+        if fseen:
+            free_known = True
+        elif complete:
+            d.why = "no_free"; d.exact = True; d.m = 0; scene.stats["decided_by_render"] += 1
+            return d
+    if not free_known:
+        I, fseen, complete, cnt, mx = scene.interface(0, o, L)
+        if not fseen:
+            d.why = "no_free"; d.exact = True; d.m = 0; scene.stats["decided_by_render"] += 1
+            return d
+    m = int(inf.sum())
+    scene.stats["decided_by_render"] += 1
+    d.m = m; d.exact = True; d.m_lo = d.m_hi = m
+    d.mask = int(sum(1 << j for j in range(k) if inf[j]))
+    for j in range(k):                     # an interface implies mixed; resolved channels are otherwise exact
+        if inf[j]:
+            mixed[j] = True
+    if all(x is not None for x in mixed):
+        d.mixed_mask = int(sum(1 << j for j in range(k) if mixed[j])); d.m_mixed = int(sum(bool(x) for x in mixed))
+    if m == 0:
+        d.why = "no_interface" if any(bool(x) for x in mixed) else "uninformative"
+        return d
+    d.A = 1
+    if U < c_row[m - 1]:
+        d.accept = True; d.why = "A"
+    else:
+        d.why = "thinned"
+    return d
+
+
+def render_accepted(scene, o, L, rule="mixed"):
     """All channels of an accepted window, exactly: (lit crops list, solid crop, counts (k,3), m, mask)."""
     k = scene.k
     lits = []; sol_ref = None; counts = np.zeros((k, 3), np.int64)
@@ -258,4 +394,11 @@ def render_accepted(scene, o, L):
         counts[j] = (int(lit.sum()), int((fr & ~lit).sum()), int(sol.sum()))
         lits.append(lit)
     inf = (counts[:, 0] > 0) & (counts[:, 1] > 0)
-    return lits, sol_ref, counts, int(inf.sum()), int(sum(1 << j for j in range(k) if inf[j]))
+    if rule == "mixed":
+        return lits, sol_ref, counts, int(inf.sum()), int(sum(1 << j for j in range(k) if inf[j]))
+    if rule != "direct_interface":
+        raise ValueError(f"unknown eligibility rule {rule!r}")
+    edges = [interface_axes(lit, sol_ref) for lit in lits]          # per channel: interface edges along Z, Y, X
+    itf = np.array([sum(e) > 0 for e in edges])
+    extra = dict(mixed_mask=int(sum(1 << j for j in range(k) if inf[j])), interface_edges=edges)
+    return lits, sol_ref, counts, int(itf.sum()), int(sum(1 << j for j in range(k) if itf[j])), extra

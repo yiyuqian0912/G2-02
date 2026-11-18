@@ -9,7 +9,9 @@
 * one SOLID crop per window, one lit crop per (window, source);
 * no lit SOLID receiver;
 * the counts in windows_full equal the crops;
-* m and mask recomputed from the crops equal the stored ones; every window has m >= 1;
+* m and mask recomputed from the crops equal the stored ones; every window has m >= 1. The rule is the contract's:
+  v1/v2 "mixed" (an active and an inactive FREE receiver), v3 "direct_interface" (two 6-adjacent FREE receivers with
+  different responses; the stored v2 mask `mixed_mask` is checked too);
 * **physics spot check:** random receivers against the certified CPU point predicate and the independent predicate
   (`ctx.bind(s, independent=True)`), as in 1K.
 
@@ -22,6 +24,7 @@ from pathlib import Path
 import numpy as np
 
 from .storage import SceneFile, scene_path, labels_path, sha256_file, task_key
+from .interface import interface_axes
 
 QUOTA = {64: 4, 128: 4, 256: 4}
 
@@ -46,6 +49,11 @@ def validate_scene(root, slot, rec=None, physics=0, deep=False, seed=0):
         errs.append("sources shape")
     seen = set()
     m_hist = np.zeros(4, np.int64)
+    rule = ((meta.get("sampling") or {}).get("eligibility") or {}).get("rule", "mixed")
+    if rule not in ("mixed", "direct_interface"):
+        errs.append(f"unknown eligibility rule {rule}"); rule = "mixed"
+    if rule == "direct_interface" and "mixed_mask" not in W.dtype.names:
+        errs.append("v3 windows without mixed_mask")
     for w, r in enumerate(W):
         L = int(r["L"]); o = np.array([r["x"], r["y"], r["z"]], np.int64)
         if L != int(r["Lp"]) * N // 1024:
@@ -60,7 +68,7 @@ def validate_scene(root, slot, rec=None, physics=0, deep=False, seed=0):
         if np.any(np.all((src >= lo) & (src <= hi), axis=1)):
             errs.append(f"w{w} contains a source")
         sol = S.crop(w, -1); free = ~sol
-        inf = []
+        inf = []; mixed = []
         for j in range(k):
             lit = S.crop(w, j)
             if np.any(lit & sol):
@@ -69,7 +77,17 @@ def validate_scene(root, slot, rec=None, physics=0, deep=False, seed=0):
             cnt = meta["windows_full"][w]["counts"][j]
             if [nl, nd, int(sol.sum())] != list(cnt):
                 errs.append(f"w{w} s{j} counts")
-            inf.append(nl > 0 and nd > 0)
+            mixed.append(nl > 0 and nd > 0)
+            if rule == "direct_interface":
+                e = interface_axes(lit, sol)
+                if list(e) != list(meta["windows_full"][w].get("interface_edges", [[None]] * k)[j]):
+                    errs.append(f"w{w} s{j} interface edges")
+                inf.append(sum(e) > 0)
+            else:
+                inf.append(mixed[-1])
+        if rule == "direct_interface" and "mixed_mask" in W.dtype.names and \
+                int(r["mixed_mask"]) != int(sum(1 << j for j in range(k) if mixed[j])):
+            errs.append(f"w{w} mixed_mask")
         m = int(sum(inf)); mask = int(sum(1 << j for j in range(k) if inf[j]))
         if m != int(r["m"]) or mask != int(r["mask"]) or m < 1:
             errs.append(f"w{w} m/mask")

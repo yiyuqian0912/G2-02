@@ -27,6 +27,18 @@ def declared(cfg):
     return (cfg.get("source_count") or {}).get("law") == "declared"
 
 
+ELIGIBILITY = {"mixed": "mixed", "direct_interface": "direct_interface"}
+
+
+def eligibility(cfg):
+    """Window eligibility rule of the contract: "mixed" (v1/v2: an active and an inactive FREE receiver) or
+    "direct_interface" (v3: two 6-adjacent FREE receivers with different responses; rind3d_100k.interface)."""
+    r = (cfg.get("eligibility") or {}).get("rule", "mixed")
+    if r not in ELIGIBILITY:
+        raise ValueError(f"unknown eligibility rule {r!r}")
+    return r
+
+
 def epoch_size(cfg):
     return int((cfg.get("planning") or cfg.get("controller"))["epoch_scenes"])
 

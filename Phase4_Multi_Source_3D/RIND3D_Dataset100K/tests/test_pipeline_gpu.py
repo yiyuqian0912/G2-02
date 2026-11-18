@@ -63,3 +63,49 @@ def test_v2_fixture_scene_and_fastlabel_labels(tmp_path):
     container = str(tmp_path / "scenes" / "0000" / f"{slot:06d}.npz")
     digests = _spawn(_labels, container, [(r["window"], r["source"]) for r in lab])
     assert digests == [r["digest"] for r in lab]
+
+
+def _v3_decisions(slot, n_prop):
+    """Contract v3: lazy and exact decisions of evaluate_proposal(rule="direct_interface") on a real scene equal the
+    direct-interface rule recomputed from complete certified renderings of every channel."""
+    import numpy as np
+    from rind3d.rendering.backends import BackendFactory
+    from rind3d_1k.families import generate
+    from rind3d_1k.physical import POLICY, sample_sources
+    from rind3d_100k.local_eval import LocalScene, evaluate_proposal, contains_any, render_accepted
+    from rind3d_100k.interface import interface_axes
+    cfg = json.loads((HERE / "contract" / "RIND3D_100K_CONTRACT_v3.json").read_text())
+    fac = BackendFactory()
+    bundle, _ = generate(cfg["seed"], slot, cfg["families"][slot % 9], 0)
+    ctx = fac.context(bundle, POLICY)
+    src, _ = sample_sources(ctx, cfg["seed"], slot, 4, 0)
+    sc = LocalScene(fac, bundle, src, POLICY, 1024); sc.enable_hull(ctx)
+    rng = np.random.default_rng(slot); prng = np.random.default_rng(slot + 1)
+    bad = []; n = 0
+    try:
+        for i in range(n_prop):
+            L = (64, 128)[i % 2]
+            o = rng.integers(0, 1024 - L + 1, 3)
+            if contains_any(src, o, L, 1024):
+                continue
+            d = evaluate_proposal(sc, src, o, L, 0.0, [1.0] * 4, prng, n_probe=64, need_exact=True, rule="direct_interface")
+            lits, sol, counts, m, mask, extra = render_accepted(sc, o, L, "direct_interface")
+            if (~sol).any():
+                n += 1
+                ref = sum(1 << j for j in range(4) if sum(interface_axes(lits[j], sol)) > 0)
+                if (d.mask, d.m, d.mixed_mask) != (ref, bin(ref).count("1"), extra["mixed_mask"]) or mask != ref:
+                    bad.append(("exact", o.tolist(), L))
+                c = sorted(rng.uniform(0.05, 1, 4).tolist()); U = float(rng.random())
+                dl = evaluate_proposal(sc, src, o, L, U, c, prng, n_probe=64, rule="direct_interface")
+                if bool(dl.accept) != bool(m >= 1 and U < c[m - 1]):
+                    bad.append(("lazy", o.tolist(), L))
+    finally:
+        sc.close()
+    return n, bad
+
+
+@needs_cuda
+@pytest.mark.parametrize("slot", [1, 6])
+def test_v3_direct_interface_decisions_are_exact(slot):
+    n, bad = _spawn(_v3_decisions, slot, 16)
+    assert n >= 8 and not bad, bad

@@ -110,9 +110,12 @@ def select_side(scene, sources, cfg, slot, attempt, Lp, c_table, probe_rng):
 
 
 def select_side_v2(scene, sources, cfg, slot, attempt, Lp, k, probe_rng):
-    """Contract v2: natural stream (+ optional coverage stream with natural fallback) and an exact-m rate stream."""
+    """Contract v2/v3: natural stream (+ optional coverage stream with natural fallback) and an exact-m rate stream.
+    The eligibility rule (v2 "mixed", v3 "direct_interface") comes from the contract; under v3 the rate stream also
+    records the v2 rule of the same proposals (rate_m_mixed), for the sampling-impact comparison."""
     seed, N = cfg["seed"], cfg["resolution"]
     L = Lp * N // 1024
+    rule = SM.eligibility(cfg); v3 = rule == "direct_interface"
     streams = SM.side_streams(cfg, Lp, k)
     n_probe = _nprobe(cfg, Lp)
     acc, log, taken = [], [], set()
@@ -128,12 +131,14 @@ def select_side_v2(scene, sources, cfg, slot, attempt, Lp, k, probe_rng):
                 state["reasons"]["repeat"] = state["reasons"].get("repeat", 0) + 1
                 continue
             state["seen"].add(o)
-            d = evaluate_proposal(scene, sources, o, L, U, c_row, probe_rng, n_probe=n_probe)
+            d = evaluate_proposal(scene, sources, o, L, U, c_row, probe_rng, n_probe=n_probe, rule=rule)
             state["reasons"][d.why] = state["reasons"].get(d.why, 0) + 1
             ok = bool(d.accept)
             m_log = d.m if d.exact else -1
             if ok:
-                lits, sol, counts, m, mask = render_accepted(scene, o, L)
+                ra = render_accepted(scene, o, L, rule)
+                lits, sol, counts, m, mask = ra[:5]
+                extra = ra[5] if v3 else {}
                 if not (m >= 1 and U < c_row[m - 1]):
                     raise AssertionError("lazy acceptance contradicted by exact rendering")
                 if d.exact and m != d.m:
@@ -141,7 +146,7 @@ def select_side_v2(scene, sources, cfg, slot, attempt, Lp, k, probe_rng):
                 m_log = m; taken.add(o); got += 1
                 acc.append(dict(origin=o, L=L, Lp=Lp, m=m, mask=mask, counts=counts.tolist(), U=U,
                                 proposal=state["proposals"], stream=name, c_row=[float(x) for x in c_row],
-                                lits=lits, solid=sol))
+                                lits=lits, solid=sol, **extra))
             log.append((o[0], o[1], o[2], d.A, m_log, d.m_lo, d.m_hi, U, int(ok), SM.STREAM_ID[name]))
         return got
 
@@ -168,12 +173,17 @@ def select_side_v2(scene, sources, cfg, slot, attempt, Lp, k, probe_rng):
     R = int(cfg["rate_n"][str(Lp)]) if isinstance(cfg["rate_n"], dict) else int(cfg["rate_n"])
     rr = _rng(seed, slot, STREAM["rate"] + Lp, attempt)
     mh = np.zeros(5, np.int64); nA = 0; why = {}
+    mh2 = np.zeros(5, np.int64); nA2 = 0                     # v3: the v2 rule on the same proposals
     for i in range(R):
         o = tuple(int(v) for v in rr.integers(0, N - L + 1, 3))
-        d = evaluate_proposal(scene, sources, o, L, 0.0, [1.0, 1.0, 1.0, 1.0], probe_rng, n_probe=n_probe, need_exact=True)
+        d = evaluate_proposal(scene, sources, o, L, 0.0, [1.0, 1.0, 1.0, 1.0], probe_rng, n_probe=n_probe, need_exact=True,
+                              rule=rule)
         why[d.why] = why.get(d.why, 0) + 1
         if d.A:
             nA += 1; mh[d.m] += 1
+        if v3 and d.m_mixed is not None and d.why not in ("contains_source", "no_free"):
+            if d.m_mixed >= 1:
+                nA2 += 1; mh2[d.m_mixed] += 1
     st2 = dict(scene.stats)
     delta = lambda a, b: {kk: round(b[kk] - a[kk], 4) for kk in ("tiles", "render_s", "rendered_channels", "decided_by_probes", "decided_by_render", "probes")}
     rate_m = mh[1:].tolist()
@@ -186,6 +196,8 @@ def select_side_v2(scene, sources, cfg, slot, attempt, Lp, k, probe_rng):
                P_A_hat=nA / R, Lambda_hat=nA / R)
     if len(rep_streams) > 1:
         rep["Lambda_cov_hat"] = float(np.sum(np.asarray(rep_streams[1]["c"]) * np.asarray(rate_m, float)) / R)
+    if v3:
+        rep.update(eligibility=rule, rate_A_mixed=int(nA2), rate_m_mixed=mh2[1:].tolist())
     return acc, rep, np.array(log, np.float64).reshape(-1, 10)
 
 
@@ -253,9 +265,11 @@ def run_scene(cfg, slot, k, c_table, factory, attempt=0):
                            min_pair_hamming=min(ham) if ham else None))
     fields = [("window", "<i4"), ("x", "<i4"), ("y", "<i4"), ("z", "<i4"), ("L", "<i4"), ("Lp", "<i4"), ("m", "<i1"),
               ("mask", "<u1"), ("k", "<i1")]
-    W = np.zeros(len(windows), dtype=fields + ([("stream", "<i1")] if v2 else []))
+    v3 = v2 and SM.eligibility(cfg) == "direct_interface"
+    W = np.zeros(len(windows), dtype=fields + ([("stream", "<i1")] if v2 else []) + ([("mixed_mask", "<u1")] if v3 else []))
     for w, r in enumerate(windows):
-        W[w] = (w, *r["origin"], r["L"], r["Lp"], r["m"], r["mask"], k) + ((SM.STREAM_ID[r["stream"]],) if v2 else ())
+        W[w] = (w, *r["origin"], r["L"], r["Lp"], r["m"], r["mask"], k) + ((SM.STREAM_ID[r["stream"]],) if v2 else ()) \
+            + ((int(r["mixed_mask"]),) if v3 else ())
     gbuf = io.BytesIO()
     np.savez_compressed(gbuf, **pack_arrays(bundle))     # same bytes layout as rind3d.geometry.save_geometry
     P, K = geometry_rows(context)
@@ -271,6 +285,8 @@ def run_scene(cfg, slot, k, c_table, factory, attempt=0):
         ku = SM.kappa_draw(cfg, slot)
         meta["sampling"] = dict(law="declared", kappa=[float(x) for x in SM.kappa(cfg)], k=k, kappa_u=ku[1],
                                 k_from_draw=ku[0], selection=cfg["selection"], rate_exact="all")
+        if SM.eligibility(cfg) != "mixed":
+            meta["sampling"]["eligibility"] = cfg["eligibility"]
     out = io.BytesIO()
     np.savez(out, meta=np.frombuffer(json.dumps(meta, default=str).encode(), np.uint8),
              windows=W, obs=np.frombuffer(blobs.getvalue(), np.uint8), obs_index=np.array(index, np.int64),
