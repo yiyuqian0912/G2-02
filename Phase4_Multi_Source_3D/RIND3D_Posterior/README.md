@@ -60,3 +60,7 @@ cells, q, tv = RP.point_estimate(rec)
 * **1024³ windows.** 1–265 CPU-s per label; L = 256 windows dominate.
 * **GPU latency.** The GPU engine is 7.1× faster per window.
 * **Machine throughput.** 6 GPU-assisted + 10 CPU workers reach 2794 windows/h, which is 1.55× a fully used 16-thread CPU.
+
+## Independent continuous-geometry experiments
+
+The rational inverse-visibility prototype reconstructs global posterior labels from the observed channel and canonical geometry. The report includes exact multicell examples, bounded approximations, unresolved windows, independent physical rechecks and the cost of falling back to Tau-pencil. [Research report](docs/ASTRA_GLOBAL_INVERSE.md) · [Reproduce the experiments](experiments/global_inverse/README.md)

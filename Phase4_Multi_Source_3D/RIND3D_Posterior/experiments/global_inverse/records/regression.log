@@ -1,0 +1,4 @@
+..............................s...............                           [100%]
+=========================== short test summary info ============================
+SKIPPED [1] ../../tests/test_fastlabel_core.py:210: needs the 1K release and CUDA
+45 passed, 1 skipped, 5 deselected in 5.87s
