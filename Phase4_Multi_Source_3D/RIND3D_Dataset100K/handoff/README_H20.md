@@ -16,13 +16,15 @@
 
 ## 1. What RIND3D-100K is
 
-* **Scenes.** RIND3D scenes are canonical polyhedral (CSG) worlds at 1024³. There are 1–4 point sources, with exact
-  closed-segment ray visibility.
+* **Scenes.** RIND3D scenes are canonical polyhedral (CSG) worlds at 1024³. There are 1–4 point driver sources, with
+  exact closed-segment ray visibility as the binary response.
 * **Windows.** Each scene has exactly 12 local observation windows: 4 each of sides 64, 128 and 256 voxels. No source
   lies in any closed window box.
-* **Responses.** Each window stores the SOLID crop once, and one binary response channel per physical source.
-* **Effective layers.** m(W) is the number of channels with both lit and dark FREE receivers. A balancing controller
-  targets 25% of windows for each m = 1..4 over the 1.2M windows.
+* **Responses.** Each window stores the SOLID crop once, and one source-specific binary response channel per physical
+  source.
+* **Effective layers.** m(W) is the number of channels with both response-active and response-inactive FREE receivers
+  (legacy: lit and dark; the v1/v2 rule). A balancing controller targets 25% of windows for each m = 1..4 over the
+  1.2M windows.
 * **Posteriors.** Every informative channel (≈ 29 per scene, ≈ 2.9M in total) gets a *global* single-source posterior.
   * The target is Uniform(F_W^j) over the legal source domain minus the closed window box, given the GLOBAL geometry.
   * It is computed by the exact tau-pencil engine (TPE v3.1) as certified cell-mass intervals on the 128³ grid, with a
@@ -38,7 +40,7 @@ proposal from exact count indices.
 **The 100K pipeline** computes only what the selection law needs (`rind3d_100k/local_eval.py`). Every decision equals
 the exact rule:
 * exact CPU receiver probes (≈ 0.5 µs each *[laptop]*) can *prove* a channel informative;
-* an exact rational hull certificate can *prove* a channel all-lit;
+* an exact rational hull certificate can *prove* a channel all-active (legacy: all-lit);
 * a proposal is decided without rendering when U < c(m) is settled for every m still possible;
 * otherwise certified CUDA 64³ tiles are rendered progressively (≈ 0.15 ms per tile *[laptop]*), stopping as soon as
   the channel is decided;
