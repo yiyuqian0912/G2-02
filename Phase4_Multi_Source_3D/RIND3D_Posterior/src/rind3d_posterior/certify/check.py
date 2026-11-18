@@ -14,6 +14,13 @@ conditions (which hold automatically when f_j(x) <= f_j(s)). The roles of s and 
 Box form: B_ij is affine in s for fixed x and affine in x for fixed s, so its extremes over (polytope R) x (receiver
 box Q) are attained at vertex/corner pairs; with f_i(s) > 0 on R and f_i(x) < 0 on Q,
     B_ij <= 0 on R x Q  <=>  max_R tau_ij <= min_Q tau_ij,   tau_ij = f_j / f_i  (linear-fractional, extremes at vertices).
+Silhouette lemma. With s outside C (strict aspect), {x : [s, x] meets C} = {f_i(x) <= 0, i in F} n K(s), and the cone
+K(s) = s + cone(C - s) equals the intersection of the half-spaces B_ij(s, .) <= 0 over the SILHOUETTE pairs only
+(facets i in F, j in B sharing an edge). Proof: each such half-space contains C, hence K(s); conversely every facet
+plane of the polyhedral cone K(s) passes through s and supports C along an edge (a vertex gives no 2-face, a facet of
+C would contain s), and a supporting plane through s and an edge e exists iff the two facets of e face s oppositely,
+i.e. e is a silhouette edge. So COVER needs the gates and the silhouette pairs only (exact adjacency from the exact
+vertex/edge enumeration of certify.scene); every pair row is a necessary condition, so NOCOVER may use any of them.
 Statuses for (region R, receiver box Q, component c):
     COVER   every receiver of Q is response-inactive for every s in R (c meets every segment),
     NOCOVER c meets no segment from R to Q (strict separations),
@@ -112,6 +119,29 @@ def face_at_point(c, i, x0, x1, x2, RM, RL, RR2):
     m = sh + sl
     rad += abs((sh - m) + sl) + 8.0 * DD_EPS * mag + U * abs(m)
     return m, rad * INFL + TINY
+
+
+@njit(cache=True)
+def box_face_values_fast(qlo, qhi, ispt, c, Kc, RM, FB, fqm, fqr, fql, fqh):
+    """Binary64 face values at the box corners with the a priori bound FB (row radius + rounding for |x| <= 2): the
+    fast path; decisions that it leaves undecided are redone with box_face_values (double-double)."""
+    nc = 1 if ispt else 8
+    for i in range(Kc):
+        a0 = RM[c, i, 0]; a1 = RM[c, i, 1]; a2 = RM[c, i, 2]; b = RM[c, i, 3]; r = FB[c, i]
+        lo = np.inf; hi = -np.inf
+        for cr in range(nc):
+            x0 = qhi[0] if cr & 1 else qlo[0]
+            x1 = qhi[1] if cr & 2 else qlo[1]
+            x2 = qhi[2] if cr & 4 else qlo[2]
+            m = a0 * x0 + a1 * x1 + a2 * x2 + b
+            fqm[i, cr] = m; fqr[i, cr] = r
+            w = _wid(m, r)
+            if m - w < lo:
+                lo = m - w
+            if m + w > hi:
+                hi = m + w
+        fql[i] = lo; fqh[i] = hi
+    return nc
 
 
 @njit(cache=True)
@@ -258,11 +288,12 @@ def _pair_flags(c, nc, nv, i, j, fqm, fqr, fvm, fvr, cflat, FC, FI, FJ, FX, FS, 
 
 @njit(cache=True)
 def comp_status(c, Kc, eff, fRlo, fRhi, Tlo, Thi, nc, fqm, fqr, fql, fqh, Rlo, Rhi, qlo, qhi, alo, ahi, nv, fvm, fvr,
-                cflat, FC, FI, FJ, FX, FS, nfa, FVm, FVr):
+                cflat, FC, FI, FJ, FX, FS, nfa, FVm, FVr, deep, ADJ):
     """Status of component c for (true region, receiver box): COVER / NOCOVER / UNDEC, plus a hint to expand the
     block. eff[i]: sign of face i on the true region (+1 front, -1 back, 0 unknown), from intervals on the outer
     polytope or from a symbolic face-split fact. Pair conditions are decided by the fast quotient ranges, and when
-    those are inconclusive by the bilinear vertex/corner form with the path's symbolic pencil facts."""
+    those are inconclusive (only when deep: leaf proofs; internal-node pruning uses the fast form only) by the bilinear
+    vertex/corner form with the path's symbolic pencil facts."""
     srcform = True
     for i in range(Kc):
         if eff[i] == 0:
@@ -284,7 +315,7 @@ def comp_status(c, Kc, eff, fRlo, fRhi, Tlo, Thi, nc, fqm, fqr, fql, fqh, Rlo, R
             if eff[i] != 1:
                 continue
             for j in range(Kc):
-                if eff[j] != -1:
+                if eff[j] != -1 or not ADJ[c, i, j]:
                     continue
                 if gated:
                     ql, qh = _box_tau(nc, i, j, fqm, fqr)
@@ -295,6 +326,9 @@ def comp_status(c, Kc, eff, fRlo, fRhi, Tlo, Thi, nc, fqm, fqr, fql, fqh, Rlo, R
                             continue
                         if nc > 1 and (qh - ql) >= 2.0 * (Thi[i, j] - Tlo[i, j]):
                             amb = True
+                if not deep:
+                    allcov = False
+                    continue
                 # B_ij(s, x) = -B_ij(x, s): condition B_ij(s, x) <= 0  <=>  B_ij(x, s) >= 0
                 ge, gt, le, lt = _pair_flags(c, nc, nv, i, j, fqm, fqr, fvm, fvr, cflat, FC, FI, FJ, FX, FS, nfa, eff, FVm, FVr)
                 if lt:
@@ -331,7 +365,7 @@ def comp_status(c, Kc, eff, fRlo, fRhi, Tlo, Thi, nc, fqm, fqr, fql, fqh, Rlo, R
             if not (fql[i] > 0.0):
                 continue
             for j in range(Kc):
-                if not (fqh[j] < 0.0):
+                if not (fqh[j] < 0.0) or not ADJ[c, i, j]:
                     continue
                 if sgated:
                     ql, qh = _box_tau(nc, i, j, fqm, fqr)
@@ -343,6 +377,9 @@ def comp_status(c, Kc, eff, fRlo, fRhi, Tlo, Thi, nc, fqm, fqr, fql, fqh, Rlo, R
                             continue
                         if nc > 1 and (qh - ql) >= 2.0 * (Thi[i, j] - Tlo[i, j]):
                             amb = True
+                if not deep:
+                    allcov = False
+                    continue
                 ge, gt, le, lt = _pair_flags(c, nc, nv, i, j, fqm, fqr, fvm, fvr, cflat, FC, FI, FJ, FX, FS, nfa, eff, FVm, FVr)
                 if gt:
                     return NOCOVER, False

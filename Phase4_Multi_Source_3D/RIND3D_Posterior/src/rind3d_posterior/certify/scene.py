@@ -140,6 +140,11 @@ class ExactScene:
                 self.E_A[t, k], ra = _enclose(A[k]); self.E_B[t, k], rb = _enclose(B[k]); r = max(r, ra, rb)
             self.E_r[t] = r
         self.nE = nE
+        # exact facet adjacency (facet pairs sharing an edge of the component): with it, the shadow cone of a convex
+        # polytope from an external point is bounded exactly by its silhouette-edge planes (check.py)
+        self.ADJ = np.zeros((C, kmax, kmax), np.bool_)
+        for (c, i, j, A, B) in self.edges:
+            self.ADJ[c, i, j] = True; self.ADJ[c, j, i] = True
         if P_engine is not None:
             self.check_engine_rows(P_engine, K_engine)
 

@@ -22,7 +22,7 @@ from numba import njit
 from .ar import U, INFL, TINY, G2, dn, up
 from .poly import (set_box, copy_slot, clip, volume, sos_sign, OK, EMPTY, OVERFLOW, NOOP, MV)
 from .check import (COVER, NOCOVER, UNDEC, DARK, LIT, region_face_values, region_tau_table, box_face_values,
-                    comp_status, item_box, poly_bbox, face_at_point)
+                    box_face_values_fast, comp_status, item_box, poly_bbox, face_at_point)
 
 EV_ROOT, EV_RCLIP, EV_ROOT_RESET, EV_SPLIT_AXIS, EV_SPLIT_FACE, EV_SPLIT_PENCIL, EV_CLIP, EV_OUT, EV_IN, EV_UNDET, \
     EV_EMPTY = range(1, 12)
@@ -126,7 +126,7 @@ def eval_node(slot, full, AC, AK, AM, ioff, ilen, ooff, WC, WK, WM, geo, win, fa
     Returns (status, nout): status 0 = survivors written at AC[ooff:ooff+nout], 1 = region refuted (wit[0:2] =
     (code, component or -1)), 2 = undecided receiver in full mode, 3 = queue/arena overflow, 4 = region inside a
     component (outside the legal domain)."""
-    C, K, RM, RR, FB, RL, RR2, alo, ahi = geo
+    C, K, RM, RR, FB, RL, RR2, alo, ahi, ADJ = geo
     Wlo, Whi, o, N, L, cls_flat = win
     FC, FI, FJ, FX, FS, FVm, FVr, nfa = fa
     AOc, AOi, AOs, nao = ao
@@ -193,9 +193,13 @@ def eval_node(slot, full, AC, AK, AM, ioff, ilen, ooff, WC, WK, WM, geo, win, fa
             for c in range(C):
                 if not (mask >> c) & 1:
                     continue
-                nc = box_face_values(qlo, qhi, ispt, c, K[c], RM, RL, RR2, fqm, fqr, fql, fqh)
+                nc = box_face_values_fast(qlo, qhi, ispt, c, K[c], RM, FB, fqm, fqr, fql, fqh)
                 st, h = comp_status(c, K[c], asp[c], fRlo[c], fRhi[c], Tlo[c], Thi[c], nc, fqm, fqr, fql, fqh, Rlo, Rhi,
-                                    qlo, qhi, alo, ahi, nv, fvm[c], fvr[c], cflat, FC, FI, FJ, FX, FS, nfa, FVm, FVr)
+                                    qlo, qhi, alo, ahi, nv, fvm[c], fvr[c], cflat, FC, FI, FJ, FX, FS, nfa, FVm, FVr, full != 0, ADJ)
+                if st == UNDEC:
+                    nc = box_face_values(qlo, qhi, ispt, c, K[c], RM, RL, RR2, fqm, fqr, fql, fqh)
+                    st, h = comp_status(c, K[c], asp[c], fRlo[c], fRhi[c], Tlo[c], Thi[c], nc, fqm, fqr, fql, fqh, Rlo,
+                                        Rhi, qlo, qhi, alo, ahi, nv, fvm[c], fvr[c], cflat, FC, FI, FJ, FX, FS, nfa, FVm, FVr, full != 0, ADJ)
                 if st == COVER:
                     cover = True
                     break
@@ -211,9 +215,13 @@ def eval_node(slot, full, AC, AK, AM, ioff, ilen, ooff, WC, WK, WM, geo, win, fa
             for c in range(C):
                 if not (mask >> c) & 1:
                     continue
-                nc = box_face_values(qlo, qhi, ispt, c, K[c], RM, RL, RR2, fqm, fqr, fql, fqh)
+                nc = box_face_values_fast(qlo, qhi, ispt, c, K[c], RM, FB, fqm, fqr, fql, fqh)
                 st, h = comp_status(c, K[c], asp[c], fRlo[c], fRhi[c], Tlo[c], Thi[c], nc, fqm, fqr, fql, fqh, Rlo, Rhi,
-                                    qlo, qhi, alo, ahi, nv, fvm[c], fvr[c], cflat, FC, FI, FJ, FX, FS, nfa, FVm, FVr)
+                                    qlo, qhi, alo, ahi, nv, fvm[c], fvr[c], cflat, FC, FI, FJ, FX, FS, nfa, FVm, FVr, full != 0, ADJ)
+                if st == UNDEC:
+                    nc = box_face_values(qlo, qhi, ispt, c, K[c], RM, RL, RR2, fqm, fqr, fql, fqh)
+                    st, h = comp_status(c, K[c], asp[c], fRlo[c], fRhi[c], Tlo[c], Thi[c], nc, fqm, fqr, fql, fqh, Rlo,
+                                        Rhi, qlo, qhi, alo, ahi, nv, fvm[c], fvr[c], cflat, FC, FI, FJ, FX, FS, nfa, FVm, FVr, full != 0, ADJ)
                 if st == COVER:
                     wit[0] = code; wit[1] = c
                     return 1, 0
@@ -272,6 +280,68 @@ def _emit(PL, npl, slot, kind, scr0, nscr, gid, Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, 
     IN: [vol_lo - shell_hi, vol_hi], UNDET: [0, vol_hi]. Returns (nrec, ok); ok False on scratch exhaustion (the
     caller then records the whole region in the pool)."""
     RC = rec_cell.shape[0]
+    # exact shortcut: a polytope whose faces all lie on axis planes is the box of its (exact) face offsets; its
+    # intersection with every 128^3 cell is a box with exactly representable dyadic sides (no clipping needed)
+    axis = True
+    for f in range(nF[slot]):
+        a = PL[Fp[slot, f] >> 1]
+        if (a[0] != 0.0) + (a[1] != 0.0) + (a[2] != 0.0) != 1 or abs(a[0] + a[1] + a[2]) != 1.0:
+            axis = False                # unit axis planes only: their offsets are the exact coordinates
+            break
+    if axis and nF[slot] == 6:
+        blo = np.empty(3); bhi = np.empty(3)
+        for k in range(3):
+            blo[k] = np.inf; bhi[k] = -np.inf
+        for f in range(6):
+            a = PL[Fp[slot, f] >> 1]
+            k = 0 if a[0] != 0.0 else (1 if a[1] != 0.0 else 2)
+            v = -a[3] / a[k]
+            if v < blo[k]:
+                blo[k] = v
+            if v > bhi[k]:
+                bhi[k] = v
+        okb = True
+        for k in range(3):
+            if not (blo[k] < bhi[k]):
+                okb = False
+        if okb:
+            near = False
+            for c in range(C):
+                sep = False
+                for k in range(3):
+                    if bhi[k] < alo[c, k] - 2.0 * shell_eps or blo[k] > ahi[c, k] + 2.0 * shell_eps:
+                        sep = True
+                if not sep:
+                    near = True
+            if not ((kind == REC_LO or kind == REC_IN) and near):
+                i0 = np.empty(3, np.int64); i1 = np.empty(3, np.int64)
+                for k in range(3):
+                    i0[k] = min(max(int(np.floor(blo[k] * G)), 0), G - 1)
+                    i1[k] = min(max(int(np.ceil(bhi[k] * G)) - 1, 0), G - 1)
+                for ix in range(i0[0], i1[0] + 1):
+                    dx = min(bhi[0], (ix + 1) / G) - max(blo[0], ix / G)
+                    if dx <= 0.0:
+                        continue
+                    exl = max(dn(dx), 0.0); exh = up(dx)       # the difference of two binary64 numbers, rounded outward
+                    for iy in range(i0[1], i1[1] + 1):
+                        dy = min(bhi[1], (iy + 1) / G) - max(blo[1], iy / G)
+                        if dy <= 0.0:
+                            continue
+                        eyl = max(dn(dy), 0.0); eyh = up(dy)
+                        for iz in range(i0[2], i1[2] + 1):
+                            dz = min(bhi[2], (iz + 1) / G) - max(blo[2], iz / G)
+                            if dz <= 0.0:
+                                continue
+                            ezl = max(dn(dz), 0.0); ezh = up(dz)
+                            vlo = dn(dn(exl * eyl) * ezl); vhi = up(up(exh * eyh) * ezh)
+                            if nrec < RC:
+                                rec_cell[nrec] = (ix * G + iy) * G + iz
+                                rec_lo[nrec] = vlo if (kind == REC_LO or kind == REC_IN) else 0.0
+                                rec_hi[nrec] = vhi if kind != REC_LO else 0.0
+                                rec_kind[nrec] = kind
+                            nrec += 1
+                            stats[ST_PIECES] += 1
+                return nrec, True
     copy_slot(slot, scr0, Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, nF)
     top = 1
     lo = np.empty(3); hi = np.empty(3)
@@ -420,7 +490,11 @@ def _in_volumes(PL, npl, q, CUR, SPL, nsp, EM0, NEM, gid, P, rec_cell, rec_lo, r
                 pool, dbgINV, dbgIN):
     """IN region q: upper bounds from the outer polytope, lower bounds from outer n (inner planes of the path)."""
     Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, nF = P
-    C, K, RM, RR, FB, RL, RR2, alo, ahi = geo
+    C, K, RM, RR, FB, RL, RR2, alo, ahi, ADJ = geo
+    if nsp == 0:
+        # no inner planes on the path: the region is its own inner part (one pass gives both bounds)
+        return _undet(PL, npl, q, EM0, NEM, gid, Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, nF, rec_cell, rec_lo, rec_hi, rec_kind,
+                      nrec, C, K, RM, RR, FB, alo, ahi, shell_eps, stats, pool, REC_IN)
     nrec = _undet(PL, npl, q, EM0, NEM, gid, Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, nF, rec_cell, rec_lo, rec_hi, rec_kind, nrec,
                   C, K, RM, RR, FB, alo, ahi, shell_eps, stats, pool, REC_UNDET)
     copy_slot(q, CUR, Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, nF)
@@ -471,7 +545,7 @@ def _edge_cut_pieces(PL, npl, s, P0, NP, edges, geo, eps, P, stats):
     within eps of the solid (_within_shell); the parts {f_i <= -eta} and {f_i >= -eta, f_j <= -eta} remain. Returns
     the number of pieces in slots P0.., or -1 (nothing cut / overflow)."""
     Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, nF = P
-    C, K, RM, RR, FB, RL, RR2, alo, ahi = geo
+    C, K, RM, RR, FB, RL, RR2, alo, ahi, ADJ = geo
     EC, EI, EJ, EA, EB, ER, nE = edges
     copy_slot(s, P0, Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, nF)
     npc = 1
@@ -638,7 +712,7 @@ def _refine_claim(PL, npl, q0, P0, NP, budget, dmax, claim_in, wkind, wcode, wcl
     piece re-proved (IN: lower bound credited from its inner part; OUT: nothing); pieces still failing at the depth or
     budget limit are UNDET. Sound for any split: the pieces tile q0. Returns (nrec, code) with code 3 on overflow."""
     Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, nF = P
-    C, K, RM, RR, FB, RL, RR2, alo, ahi = geo
+    C, K, RM, RR, FB, RL, RR2, alo, ahi, ADJ = geo
     polyv = (Vm, Vr, nV)
     dep = np.zeros(NP, np.int64)
     copy_slot(q0, P0, Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, nF)
@@ -713,7 +787,7 @@ def verify_root(PL, npl, gid, wid, ev, pos, rclip_ref, root_d, root_ix, root_iy,
     proved for the true leaf (interval facts on the outer polytope + symbolic facts); IN leaves credit the volume of
     outer n (inner planes of the path) as lower bound and of the outer polytope as upper bound; UNDET leaves credit
     the outer volume as upper bound. True leaves tile the root, so these are rigorous per-cell enclosures."""
-    C, K, RM, RR, FB, RL, RR2, alo, ahi = geo
+    C, K, RM, RR, FB, RL, RR2, alo, ahi, ADJ = geo
     Wlo, Whi, o, N, L, cls_flat = win
     Fp, Fn, Fv, Fe, Vp, Vm, Vr, nV, nF = P
     polyv = (Vm, Vr, nV)

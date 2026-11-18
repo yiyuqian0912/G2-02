@@ -180,7 +180,7 @@ def _verify_once(scene, cls, origin, N, cert, shell_eps, arena, plane_cap, max_r
     stats = np.zeros(NSTATS, np.int64)
     wit = np.zeros(2, np.int64)
     cflat = np.zeros(8, np.int64)
-    geo = (C, K, RM, RR, FB, RL, RR2, alo, ahi)
+    geo = (C, K, RM, RR, FB, RL, RR2, alo, ahi, scene.ADJ)
     win = (Wlo, Whi, o, float(N), L, cls_flat)
     scr = (fvm, fvr, fRlo, fRhi, asp, Tlo, Thi, fqm, fqr, fql, fqh, cflat)
     NF_ = 1 << 14
@@ -232,7 +232,10 @@ def _verify_once(scene, cls, origin, N, cert, shell_eps, arena, plane_cap, max_r
     root_status = []
     s1roots = {tuple(int(v) for v in r[:4]) for r in s1 if r[4] == 2}
     report["local_first"] = lf_stats
+    import os, sys
+    trace = os.environ.get("RIND3D_CERTIFY_TRACE")
     for r in roots:
+        tr0 = time.perf_counter()
         if tuple(int(v) for v in r) not in s1roots:
             raise ValueError("root not in the stage-1 partition")
         pos, nrec, code = tree.verify_root(PLn.PL, PLn.npl, gid, wid, ev, pos, rclip_ref, int(r[0]), int(r[1]), int(r[2]),
@@ -240,6 +243,8 @@ def _verify_once(scene, cls, origin, N, cert, shell_eps, arena, plane_cap, max_r
                                            sl.a, scr, rec_cell, rec_lo, rec_hi, rec_kind, nrec, pool, stats, SPL, FST, AOST,
                                            (dbgV, dbgI, dbgF, dbgA, dbgINV, dbgIN), (scene.E_c, scene.E_i, scene.E_j, scene.E_A, scene.E_B, scene.E_r, int(scene.nE)))
         root_status.append(code)
+        if trace:
+            print(f"root {r.tolist()} pos {pos} {time.perf_counter() - tr0:.3f}s evals {int(stats[tree.ST_EVALS])}", file=sys.stderr, flush=True)
         if code == 3:
             raise _Overflow("arena")
         if code != 0:

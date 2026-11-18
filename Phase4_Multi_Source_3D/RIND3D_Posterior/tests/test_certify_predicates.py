@@ -91,7 +91,7 @@ def test_comp_status_sound(seed):
     Rlo = np.array(lo); Rhi = np.array(hi)
     z = np.zeros(1, np.int64); zf = np.zeros((1, 2))
     st, _ = check.comp_status(0, Kc, eff, fRlo, fRhi, Tlo, Thi, nc, fqm, fqr, fql, fqh, Rlo, Rhi, qlo, qhi, sc.aabb_lo,
-                              sc.aabb_hi, int(nV[0]), fvm, fvr, np.zeros(8, np.int64), z, z, z, z, z, 0, zf, zf)
+                              sc.aabb_hi, int(nV[0]), fvm, fvr, np.zeros(8, np.int64), z, z, z, z, z, 0, zf, zf, True, sc.ADJ)
     if st == check.UNDEC:
         return
     # exact samples: source box corners + random interior points; receiver block corners + random interior receivers
