@@ -1,7 +1,7 @@
 # Observable thin slabs (contract v3 geometry rule)
 
 **Goal.** Make thin occluders physically observable and spatially coherent: no physically present slab that is
-invisible in the voxel-centre SOLID mask. The goal is not to remove difficult shadow geometry. This is a change of
+invisible in the voxel-centre SOLID mask. The goal is not to remove difficult occlusion geometry. This is a change of
 the physical dataset distribution, versioned in contract v3 (`geometry`).
 * Contract v2 and its generator are unchanged.
 * The frozen 1K release is untouched.
