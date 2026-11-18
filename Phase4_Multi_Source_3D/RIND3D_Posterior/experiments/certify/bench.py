@@ -1,8 +1,8 @@
 """Certified deterministic labelling benchmark: untrusted tau-pencil labeller (engine_cert) + independent verifier.
 
 usage:
-  bench.py run --tasks tasks.json --out OUT [--workers 3] [--timeout 3600] [--oracle 2] [--keep-certs]
-  bench.py one --task JSON [--oracle K] [--cert-out FILE]
+  bench.py run --tasks tasks.json --out OUT [--workers 3] [--timeout 3600] [--local-first] [--reverify] [--oracle K]
+  bench.py one --task JSON --out-dir DIR [--local-first] [--reverify] [--oracle K]
 
 Per task (fresh process, nothing read from the generated source):
 * labeller: stage1_cert (sentinel octree, depth 4) + stage2_cert (proof tree);
@@ -21,49 +21,42 @@ HERE = Path(__file__).resolve()
 
 
 def cmd_one(a):
+    """Produce a certified label (labeller + verifier), save label and certificate, optionally re-verify from disk
+    in this process (independent path: decode, verify, recompute the TV of the stored q) and run the oracle audit."""
     t = json.loads(a.task)
-    from rind3d_posterior.certify import scene as SC, verify as V, tvb, VERIFIER_VERSION
-    from rind3d_posterior.tpl.geom import Geom
-    from rind3d_posterior.tpl.window import Window
-    from rind3d_posterior.tpl import run_cert
-    out = dict(key=t["key"], family=t.get("family"), L=t.get("L"), verifier=VERIFIER_VERSION)
-    cls, o, N = SC.window_from_container(t["container"], t["w"], t["s"])
-    scene = SC.scene_from_container(t["container"])
-    with np.load(t["container"], allow_pickle=False) as z:
-        P = z["P"].astype(float); K = z["K"]
-    geom = Geom(P, K); win = Window(cls, o, N)
+    from rind3d_posterior.certify import label as LB, VERIFIER_VERSION
+    outd = Path(a.out_dir); outd.mkdir(parents=True, exist_ok=True)
+    tag = "lf" if a.local_first else "tp"
+    pl, pc = outd / f"{t['key']}_{tag}_label.npz", outd / f"{t['key']}_{tag}_cert.npz"
+    out = dict(key=t["key"], family=t.get("family"), L=t.get("L"), mode=tag, verifier=VERIFIER_VERSION)
     t0 = time.perf_counter()
-    roots, s1, sec1 = run_cert.stage1_cert(geom, win, d1=4)
-    lab = run_cert.stage2_cert(geom, win, roots)
-    out["label_s"] = time.perf_counter() - t0
-    out["engine"] = dict(L_total=lab["res"]["L_total"], tv_bound=lab["res"]["tv_bound"], records=int(len(lab["res"]["cell"])),
-                         nodes=lab["res"]["stats"]["nodes"], seconds_stage2=lab["seconds"] if "seconds" in lab else lab["res"]["seconds"])
-    cert = dict(s1=s1, ev=lab["ev"], evf=lab["evf"], root_order=roots)
-    blob = zlib.compress(np.ascontiguousarray(lab["ev"]).tobytes() + np.ascontiguousarray(lab["evf"]).tobytes() + s1.tobytes(), 6)
-    out["certificate"] = dict(events=int(len(lab["ev"])), stage1_boxes=int(len(s1)), raw_bytes=int(lab["ev"].nbytes + lab["evf"].nbytes + s1.nbytes),
-                              zlib_bytes=len(blob))
-    if a.cert_out:
-        np.savez_compressed(a.cert_out, **cert)
-    t1 = time.perf_counter()
-    rep = V.verify_certificate(scene, cls, o, N, cert)
-    out["verify_s"] = time.perf_counter() - t1
-    cells, lo, hi = V.cell_enclosures(rep)
-    pool = rep["pool"]
-    b, Lt = tvb.tv_bound_exact(cells, lo, hi, pool)
-    out["certified"] = dict(tv=None if b is None else float(b), Lt=float(Lt), Ht=float(np.sum(hi)) + pool, cells=int(np.sum(lo > 0)),
-                            cells_possible=int(len(cells)), pool=pool)
-    out["stats"] = rep["stats"]; out["stage1"] = rep["stage1"]
+    label, cert, rep = LB.produce(t["container"], t["w"], t["s"], local_first=a.local_first)
+    out["produce_s"] = time.perf_counter() - t0
+    LB.save(pl, pc, label, cert)
+    m = label["meta"]
+    out.update(status=m["status"], tv_bound=float(label["tv_bound"]), label_s=m["label_seconds"], verify_s=m["verify_seconds"],
+               lf_plan_s=m.get("lf_plan_seconds"), local_first_verified=m.get("local_first_verified"),
+               engine_tv_untrusted=m.get("engine_tv_bound_untrusted"), cells=int(np.sum(label["lo"] > 0)),
+               cells_possible=int(len(label["cells"])), Lt=float(np.sum(label["lo"])), Ht=float(np.sum(label["hi"])) + float(label["pool"]),
+               pool=float(label["pool"]), stats=rep["stats"], stage1=rep["stage1"],
+               label_bytes=pl.stat().st_size, cert_bytes=pc.stat().st_size, events=int(len(cert["ev"])))
     out["peak_rss_mb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    if a.reverify:
+        t1 = time.perf_counter()
+        r = LB.verify_label(t["container"], t["w"], t["s"], pl, pc)
+        out["reverify"] = dict(ok=r["ok"], reasons=r["reasons"], tv=r["tv_recomputed"], seconds=time.perf_counter() - t1)
     if a.oracle > 0:
+        from rind3d_posterior.certify import scene as SC
         from rind3d.geometry import load_geometry
         from rind3d.rendering.backends import BackendFactory
         from rind3d_1k.physical import POLICY
+        cls, o, N = SC.window_from_container(t["container"], t["w"], t["s"])
         with np.load(t["container"], allow_pickle=False) as z:
             bundle = load_geometry(io.BytesIO(z["geometry"].tobytes()))
         fac = BackendFactory(cuda_allowed=False); L = cls.shape[0]; free = cls != 2
         rng = np.random.default_rng(zlib.crc32(t["key"].encode()))
         tested = bad = 0
-        for Vp in rep.get("debug_in_pieces", []):
+        for Vp in rep.get("debug_in_pieces", [])[:a.oracle_pieces]:
             ctr = Vp.mean(0)
             for _ in range(a.oracle):
                 p = 0.9 * (rng.dirichlet(np.ones(len(Vp))) @ Vp) + 0.1 * ctr
@@ -76,7 +69,7 @@ def cmd_one(a):
 
 def cmd_run(a):
     tasks = json.loads(Path(a.tasks).read_text()); outd = Path(a.out); outd.mkdir(parents=True, exist_ok=True)
-    fp = outd / "bench.jsonl"
+    fp = outd / ("bench_lf.jsonl" if a.local_first else "bench_tp.jsonl")
     done = {json.loads(l)["key"] for l in fp.read_text().splitlines() if l.strip()} if fp.exists() else set()
     todo = [t for t in tasks if t["key"] not in done]
     if a.only:
@@ -84,9 +77,12 @@ def cmd_run(a):
 
     def one(t):
         t0 = time.perf_counter()
-        args = [sys.executable, str(HERE), "one", "--task", json.dumps(t), "--oracle", str(a.oracle)]
-        if a.keep_certs:
-            args += ["--cert-out", str(outd / f"{t['key']}_cert.npz")]
+        args = [sys.executable, str(HERE), "one", "--task", json.dumps(t), "--oracle", str(a.oracle), "--out-dir", str(outd / "labels"),
+                "--oracle-pieces", str(a.oracle_pieces)]
+        if a.local_first:
+            args.append("--local-first")
+        if a.reverify:
+            args.append("--reverify")
         try:
             p = subprocess.run(args, capture_output=True, text=True, timeout=a.timeout)
             line = [l for l in p.stdout.splitlines() if l.startswith("{")]
@@ -96,7 +92,7 @@ def cmd_run(a):
         rec["wall"] = time.perf_counter() - t0
         with fp.open("a") as f:
             f.write(json.dumps(rec, default=float) + "\n")
-        print(t["key"], rec.get("status", "ok"), round(rec["wall"], 1), rec.get("certified", {}).get("tv"), flush=True)
+        print(t["key"], rec.get("status", "ok"), round(rec["wall"], 1), rec.get("tv_bound"), flush=True)
 
     with ThreadPoolExecutor(a.workers) as ex:
         list(ex.map(one, todo))
@@ -105,10 +101,13 @@ def cmd_run(a):
 def main():
     ap = argparse.ArgumentParser(); sp = ap.add_subparsers(dest="cmd", required=True)
     o = sp.add_parser("one"); o.add_argument("--task", required=True); o.add_argument("--oracle", type=int, default=0)
-    o.add_argument("--cert-out", default=None)
+    o.add_argument("--out-dir", required=True); o.add_argument("--local-first", action="store_true")
+    o.add_argument("--reverify", action="store_true"); o.add_argument("--oracle-pieces", type=int, default=32)
     r = sp.add_parser("run"); r.add_argument("--tasks", required=True); r.add_argument("--out", required=True)
     r.add_argument("--workers", type=int, default=3); r.add_argument("--timeout", type=int, default=3600)
-    r.add_argument("--oracle", type=int, default=0); r.add_argument("--only", default=None); r.add_argument("--keep-certs", action="store_true")
+    r.add_argument("--oracle", type=int, default=0); r.add_argument("--only", default=None)
+    r.add_argument("--local-first", action="store_true"); r.add_argument("--reverify", action="store_true")
+    r.add_argument("--oracle-pieces", type=int, default=32)
     a = ap.parse_args()
     (cmd_one if a.cmd == "one" else cmd_run)(a)
 

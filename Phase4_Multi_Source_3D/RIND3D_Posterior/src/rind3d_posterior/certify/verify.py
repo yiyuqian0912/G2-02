@@ -95,9 +95,32 @@ def _octree_partition_ok(recs):
 
 def verify_certificate(scene: ExactScene, cls, origin, N, cert, shell_eps=2.0 ** -26, arena=1 << 23, plane_cap=1 << 22,
                        max_records=1 << 22, max_depth=420):
+    """Verify one certificate (see _verify_once); buffers that overflow are enlarged and the whole verification is
+    repeated (it is deterministic, so the result is the one an unbounded buffer would give)."""
+    while True:
+        try:
+            return _verify_once(scene, cls, origin, N, cert, shell_eps, arena, plane_cap, max_records, max_depth)
+        except _Overflow as ex:
+            if ex.what == "arena":
+                arena *= 4
+            elif ex.what == "records":
+                max_records *= 4
+            else:
+                plane_cap *= 4
+            if arena > 1 << 28 or max_records > 1 << 28 or plane_cap > 1 << 27:
+                raise RuntimeError(f"verifier buffers exhausted ({ex.what})")
+
+
+class _Overflow(Exception):
+    def __init__(self, what):
+        super().__init__(what); self.what = what
+
+
+def _verify_once(scene, cls, origin, N, cert, shell_eps, arena, plane_cap, max_records, max_depth):
     """Verify one certificate. cert keys: s1 (m, 6) stage-1 terminal boxes (depth, ix, iy, iz, kind, witness flat
-    voxel), ev (n, 8) int64, evf (n,) float64, root_order (r, 4) roots in stream order, rclip (t, ...) optional root
-    clip recipes (verified by certify.propa; rows that fail are not applied). Returns a dict report."""
+    voxel), ev (n, 8) int64, evf (n,) float64, root_order (r, 4) roots in stream order; optional Local-first tables
+    lf_clip (t, 6) = (body, facet i, facet j, l, k, endpoint) with per-root offsets lf_clip_off, and lf_drop (m, 6) =
+    (depth, ix, iy, iz, l, k), all re-proved by certify.propa. Returns a dict report."""
     global _SELF_TESTED
     if not _SELF_TESTED:
         ar.self_test(); _SELF_TESTED = True
@@ -121,11 +144,29 @@ def verify_certificate(scene: ExactScene, cls, origin, N, cert, shell_eps=2.0 **
     m = ev[:, 0] == tree.EV_SPLIT_AXIS
     for e in np.flatnonzero(m):
         ev[e, 2] = PLn.axis_plane(int(ev[e, 1]), float(evf[e]))
-    rclip_ref = np.asarray(cert.get("rclip_ref", np.full(1, -1, np.int64)), np.int64)
-    if "rclip_planes" in cert:              # verified root-clip planes (certify.propa), appended to the table
-        base = int(PLn.npl[0]); RP = np.asarray(cert["rclip_planes"], float).reshape(-1, 4)
-        PLn.PL[base:base + len(RP)] = RP; PLn.npl[0] = base + len(RP)
-        rclip_ref = np.where(rclip_ref >= 0, rclip_ref + 2 * base, -1)
+    # ---- Local-first root restrictions (Proposition A'): every clip row and every dropped root is re-proved here;
+    # rows that fail are not applied (sound: the root stays larger), dropped roots that fail are pooled as UNDET
+    from . import propa
+    roots_all = np.asarray(cert["root_order"], np.int64)
+    lf_clip = np.asarray(cert.get("lf_clip", np.zeros((0, 6), np.int64)), np.int64).reshape(-1, 6)
+    lf_off = np.asarray(cert.get("lf_clip_off", np.zeros(len(roots_all) + 1, np.int64)), np.int64)
+    rclip_ref = np.full(max(len(lf_clip), 1), -1, np.int64)
+    lf_stats = dict(clips=int(len(lf_clip)), clips_ok=0, drops=0, drops_ok=0)
+    for r in range(len(roots_all)):
+        a_, b_ = int(lf_off[r]), int(lf_off[r + 1])
+        if b_ > a_:
+            _, refs = propa.verify_root_plan(scene, cls, o, N, roots_all[r], dict(clips=[tuple(x) for x in lf_clip[a_:b_]]), PLn)
+            rclip_ref[a_:b_] = refs
+            lf_stats["clips_ok"] += int(sum(1 for x in refs if x >= 0))
+    lf_drop = np.asarray(cert.get("lf_drop", np.zeros((0, 6), np.int64)), np.int64).reshape(-1, 6)
+    dropped_ok = set(); dropped_fail = []
+    for row in lf_drop:
+        lf_stats["drops"] += 1
+        ok_, _ = propa.verify_root_plan(scene, cls, o, N, row[:4], dict(drop=(int(row[4]), int(row[5]))), PLn)
+        if ok_:
+            dropped_ok.add(tuple(int(v) for v in row[:4])); lf_stats["drops_ok"] += 1
+        else:
+            dropped_fail.append(tuple(int(v) for v in row[:4]))
     # ---- geometry arrays
     C = scene.C; K = scene.K; RM = scene.RM; RR = scene.RR; FB = scene.FB; alo = scene.aabb_lo; ahi = scene.aabb_hi
     RL = scene.RL; RR2 = scene.RR2
@@ -190,6 +231,7 @@ def verify_certificate(scene: ExactScene, cls, origin, N, cert, shell_eps=2.0 **
     roots = np.asarray(cert["root_order"], np.int64)
     root_status = []
     s1roots = {tuple(int(v) for v in r[:4]) for r in s1 if r[4] == 2}
+    report["local_first"] = lf_stats
     for r in roots:
         if tuple(int(v) for v in r) not in s1roots:
             raise ValueError("root not in the stage-1 partition")
@@ -198,16 +240,23 @@ def verify_certificate(scene: ExactScene, cls, origin, N, cert, shell_eps=2.0 **
                                            sl.a, scr, rec_cell, rec_lo, rec_hi, rec_kind, nrec, pool, stats, SPL, FST, AOST,
                                            (dbgV, dbgI, dbgF, dbgA, dbgINV, dbgIN), (scene.E_c, scene.E_i, scene.E_j, scene.E_A, scene.E_B, scene.E_r, int(scene.nE)))
         root_status.append(code)
+        if code == 3:
+            raise _Overflow("arena")
         if code != 0:
-            raise RuntimeError(f"verifier: root {r.tolist()} returned code {code} (1 malformed stream, 3 buffers)")
+            raise RuntimeError(f"verifier: root {r.tolist()} returned code {code} (malformed stream)")
+        if int(PLn.npl[0]) >= PLn.PL.shape[0] - 64:
+            raise _Overflow("planes")
     if pos != len(ev):
         raise ValueError(f"event stream not fully consumed ({pos} of {len(ev)})")
-    if len(set(map(tuple, roots.tolist()))) != len(s1roots) or len(roots) != len(s1roots):
-        # every stage-1 root must have been verified (dropped roots need a Local-first proof: certify.propa)
-        missing = s1roots - set(map(tuple, roots.tolist()))
-        report["roots_without_tree"] = sorted(missing)
+    covered = set(map(tuple, roots.tolist())) | dropped_ok | set(dropped_fail)
+    if covered != s1roots or len(roots) + len(lf_drop) != len(s1roots):
+        report["roots_without_tree"] = sorted(s1roots - covered)
+    for b_ in undet_boxes:           # an unproved stage-1 refutation: the whole box is undetermined mass
+        pool[0] = float(np.nextafter(pool[0] + 2.0 ** (-3 * int(b_[0])), np.inf))
+    for b_ in dropped_fail:          # an unproved drop: the whole root box is undetermined mass
+        pool[0] = float(np.nextafter(pool[0] + 2.0 ** (-3 * b_[0]), np.inf))
     if nrec > max_records:
-        raise RuntimeError("record buffer too small")
+        raise _Overflow("records")
     stats[tree.ST_NPL] = int(PLn.npl[0])
     report["stats"] = dict(zip(STAT_NAMES, stats.tolist()))
     report["records"] = dict(cell=rec_cell[:nrec].copy(), lo=rec_lo[:nrec].copy(), hi=rec_hi[:nrec].copy(),
