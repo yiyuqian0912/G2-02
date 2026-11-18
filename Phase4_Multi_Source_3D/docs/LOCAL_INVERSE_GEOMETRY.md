@@ -23,12 +23,12 @@ region?
      conclusion holds on an open set of generator parameters, so it has positive probability.
    - **What would make H1 certifiable (Proposition 11).** H1 is locally certifiable away from SOLID receivers and the
      window boundary, given a declared *local-thickness radius*. v3 does not declare one, and the always-valid bound
-     is hundreds of voxels. H2 (one shadow plane per component) stays undecidable from the observation.
+     is hundreds of voxels. H2 (one interface plane per component) stays undecidable from the observation.
    - **New structure (Lemma 10).** The interface extends away from the source along rulings, through free space. Its
      creases and the ends of its pieces lie on lines through the source.
 4. *Restricted results that hold in both distributions.*
    - *Propositions 4–5.* The local constraint "the source lies on the stabbing set of a component" is safe under two
-     hypotheses: H1, every interface edge is free; H2, the component is crossed by a single shadow plane. Its
+     hypotheses: H1, every interface edge is free; H2, the component is crossed by a single interface plane. Its
      region's size is governed by the singular values of the stacked plane normals and a boundedness threshold.
    - *Proposition 6.* H1 becomes locally checkable only under an inner-rolling-ball condition that polytopes violate.
    - *Estimate 7.* Curved interfaces carry apex information that is second order in the angular extent of the patch.
@@ -60,10 +60,10 @@ Status labels used below: **Theorem/Proposition/Lemma** (proved here), **Estimat
 * Feasible set: F(G, X) = {s ∈ D(G) \ B_W : R_s(x) = r(x) for every FREE x ∈ W}.
 * The label is the uniform law on F, as cell masses on the 128³ grid.
 
-**Shadows.**
-* Shadow of a point: Sh(s) = {y : [s, y] ∩ S ≠ ∅}.
-* For a convex body C and a point x ∉ C: SV(x, C) = {s : [s, x] ∩ C ≠ ∅}.
-* A receiver x is inactive for s iff s ∈ ∪ᵢ SV(x, Cᵢ).
+**Response-inactive sets.**
+* Inactive set of a driver source: In(s) = {y : [s, y] ∩ S ≠ ∅} (the "shadow" of classical graphics).
+* For a convex body C and a point x ∉ C: Occ(x, C) = {s : [s, x] ∩ C ≠ ∅} (the occlusion set; a shadow volume in graphics terms).
+* A receiver x is inactive for s iff s ∈ ∪ᵢ Occ(x, Cᵢ).
 
 **Interfaces.**
 * A *direct interface edge* is a pair of 6-adjacent FREE receivers (u, v), |u − v| = h, with r(u) ≠ r(v). This is the
@@ -82,7 +82,7 @@ The intuition: one plane gives a plane, two give a line, three give a point. §3
 ## 3. Proven statements
 
 **Lemma 1 (convexity).**
-* For a compact convex C and x ∉ C, SV(x, C) = {x + t(c − x) : c ∈ C, t ≥ 1} is closed and convex.
+* For a compact convex C and x ∉ C, Occ(x, C) = {x + t(c − x) : c ∈ C, t ≥ 1} is closed and convex.
 * By symmetry, for fixed s, the set {x : [s, x] ∩ C ≠ ∅} is convex in x.
 
 *Proof.* Take a = x + t₁(c₁ − x) and b = x + t₂(c₂ − x) with t₁, t₂ ≥ 1 and λ ∈ [0, 1]. Then
@@ -96,20 +96,20 @@ compactness. ∎
 * **Active constraint.** The union of the segments between two convex sets is their convex hull. Hence a block Q is
   active for every s ∈ R iff conv(R ∪ Q) ∩ S = ∅.
 
-**Theorem 1 (cone law).** Let S be closed and s ∉ S. Let p ∈ ∂Sh(s) \ S, and let c be the point of [s, p] ∩ S
-farthest from s. Then the half-open segment (c, p] lies in ∂Sh(s). In other words, the interface is ruled by rays
-from s. At every point where ∂Sh(s) has a tangent plane, that plane contains s.
+**Theorem 1 (cone law).** Let S be closed and s ∉ S. Let p ∈ ∂In(s) \ S, and let c be the point of [s, p] ∩ S
+farthest from s. Then the half-open segment (c, p] lies in ∂In(s). In other words, the interface is ruled by rays
+from s. At every point where ∂In(s) has a tangent plane, that plane contains s.
 
 *Proof.*
-* Sh(s) is closed, so [s, p] meets S and c exists.
-* Take y ∈ (c, p] and suppose y were interior to Sh(s), with a neighbourhood U ⊂ Sh(s).
-* For every y′ ∈ U, the ray from s through y′ beyond y′ lies in Sh(s), because [s, z] ⊇ [s, y′] meets S. The union of
+* In(s) is closed, so [s, p] meets S and c exists.
+* Take y ∈ (c, p] and suppose y were interior to In(s), with a neighbourhood U ⊂ In(s).
+* For every y′ ∈ U, the ray from s through y′ beyond y′ lies in In(s), because [s, z] ⊇ [s, y′] meets S. The union of
   these rays contains a neighbourhood of p, since p lies beyond y on the ray from s through y. So p would be interior,
   a contradiction.
 * The boundary therefore contains a nondegenerate segment through p in direction p − s. A tangent plane at p
   contains that direction, and so contains s. ∎
 
-**Corollary 1a (polyhedra; Crow 1977).** If every Cᵢ is a polytope, ∂Sh(s) \ S is contained in a finite union of:
+**Corollary 1a (polyhedra; Crow 1977).** If every Cᵢ is a polytope, ∂In(s) \ S is contained in a finite union of:
 * planar pieces of the planes aff(s ∪ e), for edges e of the Cᵢ (silhouette edges);
 * planes of faces that contain s;
 * rays from s through vertices.
@@ -120,15 +120,15 @@ or a vertex (a ray through it). Each case gives finitely many pieces. ∎
 
 This is the facet law measured in the Student lab: large facets lie a median 0.04–0.09 voxel from the source.
 
-**Corollary 1b (ball).** For C = B(z, ρ_C) with |s − z| > ρ_C, ∂SV(s, C) \ C is the part, beyond the contact circle,
+**Corollary 1b (ball).** For C = B(z, ρ_C) with |s − z| > ρ_C, ∂Occ(s, C) \ C is the part, beyond the contact circle,
 of the right circular cone with apex s, axis s → z and half-angle α = arcsin(ρ_C / |s − z|).
 
 **Proposition 2 (free interface edges cross a ruled sheet).** Let (u, v) be a direct interface edge for s that is
-free. Then [u, v] contains a point p ∈ ∂Sh(s) \ S. In particular (Corollary 1a), for polyhedra p lies on a plane
+free. Then [u, v] contains a point p ∈ ∂In(s) \ S. In particular (Corollary 1a), for polyhedra p lies on a plane
 through s spanned by an occluder edge or face, or on a ray from s through a vertex.
 
-*Proof.* [u, v] ∩ Sh(s) is closed, nonempty and not all of [u, v], so it has a relative boundary point p. Then
-p ∈ ∂Sh(s), and p ∉ S because the edge is free. ∎
+*Proof.* [u, v] ∩ In(s) is closed, nonempty and not all of [u, v], so it has a relative boundary point p. Then
+p ∈ ∂In(s), and p ∉ S because the edge is free. ∎
 
 *Without H1 (a free edge) nothing follows.* Counterexample C1 in §4 is a thin slab crossing [u, v]: u lies in front
 of it and is active, v lies behind it and is inactive, and the interface is the slab's face, which need not contain s.
@@ -169,7 +169,7 @@ invisible slabs. Theorem 3 therefore applies to the declared population, not onl
 **Proposition 4 (the restricted local constraint).** Let C be a set of direct interface edges (lᵢ, kᵢ), with lᵢ
 active and kᵢ inactive. Assume:
 * *H1:* every edge of C is free;
-* *H2:* one plane Π_s ∋ s crosses all of them, i.e. the edges cross the same shadow plane.
+* *H2:* one plane Π_s ∋ s crosses all of them, i.e. the edges cross the same interface plane.
 
 Then s ∈ U(C) = ∪{Π : Π ∈ Stab(C)}, where
 Stab(C) = {(n, d) : n · lᵢ − d ≥ 0 ≥ n · kᵢ − d for all i}, with the orientation fixed by the active side.
@@ -218,7 +218,7 @@ Balls of radius ≥ 0.87 voxel satisfy the assumption. Polytopes, with their sha
 do not. So H1 is locally checkable for sphere-only worlds with a minimum radius, but not for the v3 population.
 
 **Estimate 7 (curved interfaces carry second-order apex information).**
-* *Setting.* A window at distance D from s sees an arc of a ball's shadow cone (Corollary 1b). The arc spans an
+* *Setting.* A window at distance D from s sees an arc of a ball's interface cone (Corollary 1b). The arc spans an
   azimuth Δφ ≈ ℓ / (D sin α).
 * *Normals.* The unit normals n(φ) = cos α (cos φ e₁ + sin φ e₂) − sin α a lie on a cone around the axis a.
 * *Conditioning.* For the stacked normals, σ₂ = O(Δφ) and σ₃ = O(Δφ²): a circular arc departs from a straight line
@@ -290,11 +290,11 @@ rarer than in v2 (Observation below), but not absent.
 **Observation (v3 canary).** See §3c for the measured share of direct interface edges that are not free, v2 thin
 slabs versus v3.
 
-**Lemma 10 (ruling extension).** Let p ∈ ∂Sh(s) \ S and p′ = s + t(p − s) with t > 1. If the closed segment [p, p′]
-misses S, then [p, p′] ⊂ ∂Sh(s).
+**Lemma 10 (ruling extension).** Let p ∈ ∂In(s) \ S and p′ = s + t(p − s) with t > 1. If the closed segment [p, p′]
+misses S, then [p, p′] ⊂ ∂In(s).
 
 *Proof.*
-* Every y on [p, p′] is shadowed, because [s, y] ⊇ [s, p] meets S.
+* Every y on [p, p′] is inactive, because [s, y] ⊇ [s, p] meets S.
 * Take active points qₙ → p, i.e. [s, qₙ] ∩ S = ∅. For y = s + τ(p − s) with τ ∈ [1, t], set yₙ = s + τ(qₙ − s).
 * [p, y] has positive distance from the closed S, and [qₙ, yₙ] → [p, y]. So [qₙ, yₙ] misses S for large n.
 * Hence [s, yₙ] misses S, yₙ is active, and yₙ → y. ∎
@@ -325,8 +325,8 @@ ruling is certified (the observability problem below), and with the digitization
   (knife edges near 7° give R ≈ 14 voxels).
 
 **What remains undecidable locally (H2).** Even when every edge is free, a component may merge pieces of different
-shadow planes. Their crease is a line through s, but the merge can make the stabbing set miss s (counterexample C2).
-A component may also contain a free shadow-plane piece next to a non-free occluder-face piece (Theorem 3′).
+interface planes. Their crease is a line through s, but the merge can make the stabbing set miss s (counterexample C2).
+A component may also contain a free interface-plane piece next to a non-free occluder-face piece (Theorem 3′).
 Segmentation is a heuristic, and no local test certifies it.
 
 **Answer to the question for v3.** Improving physical observability removed the *sub-voxel body* obstruction, but
@@ -344,10 +344,10 @@ prototype uses them for: a guide for which receivers to evaluate. They are not p
 | | construction | what fails |
 |---|---|---|
 | C1 occluder face | a slab of thickness < h between u and v: u in front (active), v behind (inactive) | H1. The interface is the slab face; s need not lie on it. 3.8% of large facets (Student lab) |
-| C2 bent component | two shadow planes through s meeting at a ray through the window (an occluder vertex) | H2 for the merged component. Stab(C) can exclude s: a single fitted plane over both pieces is offset from s by O(D · angle) |
+| C2 bent component | two interface planes through s meeting at a ray through the window (an occluder vertex) | H2 for the merged component. Stab(C) can exclude s: a single fitted plane over both pieces is offset from s by O(D · angle) |
 | C3 sub-voxel construction | Theorem 3 | every local-only bound |
 | C4 near-pencil | three planes whose normals have σ₃ < √K b | boundedness (Prop. 5): the candidate region is a long tube, and the localization is unstable |
-| C5 small curved patch | a ball shadow with ℓ² < 4 h D tan α | curvature information (Est. 7): the patch acts as a plane |
+| C5 small curved patch | a ball's interface cone with ℓ² < 4 h D tan α | curvature information (Est. 7): the patch acts as a plane |
 
 ## 5. Discretization
 
@@ -383,8 +383,8 @@ removes only infeasible sources. ∎
 
 **What the local geometry contributes.** Lemma 1 explains why a few direct-interface receivers carry most of the
 constraint. The set of sources that make v inactive and its neighbour u active is a thin shell. It lies within the
-penumbra wedges {s : ∃ p ∈ [u, v], [s, p] ∩ e ≠ ∅} of occluder edges e, treating the segment [u, v] as a linear
-light (Teller 1992; Drettakis–Fiume 1994). Its angular thickness is about h / dist(e, W).
+wedges {s : ∃ p ∈ [u, v], [s, p] ∩ e ≠ ∅} of occluder edges e. These are the "penumbra" regions of graphics, with the
+segment [u, v] in the role of a linear emitter (Teller 1992; Drettakis–Fiume 1994). Its angular thickness is about h / dist(e, W).
 
 **Heuristic.** Choosing those receivers spread over each planar component (farthest-point sampling), across
 components with independent normals (Prop. 5), is a cost choice. It is not a correctness choice.

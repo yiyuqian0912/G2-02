@@ -12,13 +12,13 @@ This package is the maintained form of the tau-pencil engine (TPE), Phases 1–2
 ## What a label is
 
 **Input.** A local window W of the N³ receiver grid, with these parts:
-* the receiver classes `cls[x, y, z]`: 0 = dark FREE, 1 = lit FREE, 2 = SOLID;
+* the receiver classes `cls[x, y, z]`: 0 = response-inactive FREE (legacy "dark"), 1 = response-active FREE ("lit"), 2 = SOLID;
 * the window origin;
 * the scene's convex bodies as halfspace rows `P[c, i] = (a, b, c, d)`, with body = {a·x + d ≤ 0}.
 
 **Target.** The source-excluded single-source posterior Uniform(F_W):
 
-    F_W = {s ∈ D(G) \ B̄(W) : the segment s→x is unobstructed exactly for the lit FREE receivers x of W}
+    F_W = {s ∈ D(G) \ B̄(W) : the segment s→x is unobstructed exactly for the response-active FREE receivers x of W}
 
 * Visibility is closed-solid, closed-segment.
 * D(G) = (0,1)³ minus the solid, with clearance > 2⁻²⁶.

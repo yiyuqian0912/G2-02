@@ -14,7 +14,7 @@
 | component | state |
 |---|---|
 | target scale in code and contract | 100,000 scenes, 1024³, 12 windows (4 × L = 64/128/256), K = 1..4, source-separated responses, 128³ posteriors (`contract/RIND3D_100K_CONTRACT_v1.json`, status "frozen-draft") |
-| physical stage | **Local-only** (`rind3d_100k/local_eval.py`): exact probes, exact hull certificates for all-lit channels, lazy acceptance, progressive certified 64³ tiles with early stop, full crops of accepted windows only. **No full-world response field.** 3.7 s per scene on the laptop |
+| physical stage | **Local-only** (`rind3d_100k/local_eval.py`): exact probes, exact hull certificates for all-active channels, lazy acceptance, progressive certified 64³ tiles with early stop, full crops of accepted windows only. **No full-world response field.** 3.7 s per scene on the laptop |
 | equivalence with the 1K full-field selection | documented on 12 scenes: identical windows and Λ̂, 0 mismatches in 2.9·10⁹ bits. The comparison harness is not committed; `scripts/smoke_test.py` checks determinism against fixtures |
 | selection law | same as the 1K: m-balanced c-tables from an epoch-frozen controller (1000-slot epochs, lag 1), adaptive k with a 15% floor. Rate stream R = 256/128/64, exact m only for the first 8 rate proposals |
 | storage | one npz container per scene (0.36 MB), R3LJ label journal (47 KB per label), ≈ 0.2 TB projected. Gaps: manifest without fsync (a torn line blocks resume); no sha256 for consolidated label files; no directory fsync after renames. A tested minimal fix: `patches/100k_durability_5560a20.patch` (`100K_FASTLABEL_INTEGRATION.md` §4) |
@@ -52,7 +52,7 @@
 | complexity coverage | pure natural 4+0; **3+1 at L64 only**: one coverage window in K = 4 scenes, c(m) = (1/8, 1/4, 1/2, 1); 3+1 K ≥ 3 with c = ρ^(K−m), ρ = 0.25; 2+2 | 3+1 at L64 as insurance; required if κ has < 50% K = 4. Cost: +1% labels, +14% proposals, max weight 1.26× natural. L128 and L256 need none. **2+2 is not recommended** (ESS ≈ 0.6, weights up to 2×) | E18, E19 |
 | coverage-target thresholds | the declared absolute targets, per (L, m): test ≥ 300 independent scenes and ≥ 1,000 windows; train ≥ 3,000 scenes, ≥ 20,000 channels, T* ESS ≥ 5,000; per family m = 4 ≥ 30 test / 300 train scenes | adopt, or revise after the canary | judgement calibrated on the 1K pilot |
 | labeller | TPE (implemented) vs FastLabel (validated at 1K scale, not integrated) | FastLabel, if the port passes Gate A and the accuracy and throughput checks on H20 | 1K: 10.2 labels/s vs TPE ≈ 0.35 labels/s on the same laptop |
-| all-dark S6 | research prototype | only for an optional supplementary labelled set, after production review | `G_GENERALIZATION_AND_EXTREMES.md` §3 |
+| all-inactive (legacy: all-dark) S6 | research prototype | only for an optional supplementary labelled set, after production review | `G_GENERALIZATION_AND_EXTREMES.md` §3 |
 
 **Coverage streams must stay logically distinct.** Per window, store the stream id, proposal index, U and c-row. Per scene-side, store the rate m-histogram and the proposal counts. Combine streams only through the balance-heuristic weights 1/(n_nat/P_A + n_cov c(m)/Λ_c).
 

@@ -56,9 +56,9 @@ For slot t, every random stream is keyed by (seed = 20261215, t, stream, attempt
 
 **Facts used:**
 * **Probes** are exact evaluations of single receivers by the certified CPU predicate. Each probe is a true fact about
-  R_j at that receiver. A lit FREE probe plus a dark FREE probe imply I_j = 1; a FREE probe implies FREE ≠ ∅.
+  R_j at that receiver. A response-active FREE probe plus a response-inactive FREE probe imply I_j = 1 (v1/v2 rule); a FREE probe implies FREE ≠ ∅.
 * **The hull certificate** is an exact rational witness that conv({s_j} ∪ receivers) lies outside every closed body. It
-  implies every receiver is lit and FREE, so I_j = 0.
+  implies every receiver is response-active and FREE, so I_j = 0.
 * **Lazy rule.** Write m_lo for the number of channels proven informative and u for the number still unresolved.
   - It *accepts* only if m_lo ≥ 1, FREE ≠ ∅, and U < c(m) for **every** m ∈ [m_lo, m_lo + u].
   - It *rejects* only if, for every m in that range, m = 0 or U ≥ c(m).
@@ -79,7 +79,7 @@ fine receivers. Measured on 18 scenes [M], coarse rejection would miss these fra
 * 13.6% at L = 64;
 * 5.0% at L = 128;
 * 2.3% at L = 256.
-These are mostly thin shadows and small features. Such a filter would bias the selection against fine structure, which
+These are mostly thin response-inactive regions and small features. Such a filter would bias the selection against fine structure, which
 is a source- and geometry-dependent selection that ω does not correct. It is therefore **not used**.
 
 ## 3. The per-channel posterior and the training weight [P]

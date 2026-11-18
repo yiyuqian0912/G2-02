@@ -1,12 +1,31 @@
 # Phase4: multi-source 3D source localization (RIND3D-100K)
 
 **The question.** Phase4 studies global source localization from limited local observations in three-dimensional multi-source worlds.
-* **The worlds:** 1024³ worlds of closed convex polyhedra with 1–4 point sources and exact closed-segment visibility.
+* **The worlds:** 1024³ worlds of closed convex polyhedra with 1–4 point driver sources and exact closed-segment
+  source-to-receiver visibility.
 * **What a Student sees:** one local window of one source channel: the SOLID crop, the binary response, the side and the origin.
 * **What it predicts:** that source's posterior on a global 128³ grid.
 * **Supervision:** certified posterior labels computed from the full geometry, which the Student never sees.
 
 **Status.** `yushu/3d` is the canonical RIND3D-100K pre-production branch. The pipeline is validated on a laptop. The 16 × H20 production gate has not been run.
+* **Contract v2** is unchanged and reproducible (`RIND3D_Dataset100K/contract/RIND3D_100K_CONTRACT_v2.json`).
+* **Contract v3** is provisional and has not been run at scale. It has two changes: only windows with a *direct
+  FREE–FREE response interface* are eligible, and thin slabs are observable (≥ 2 voxels thick, 6-connected sampling).
+  See `RIND3D_Dataset100K/docs/SAMPLING_IMPACT_V3.md` and `RIND3D_Dataset100K/docs/THIN_SLABS_V3.md`.
+* **Research:**
+  - local inverse geometry and a local-first certified labelling pathway (`docs/LOCAL_INVERSE_GEOMETRY.md`,
+    `RIND3D_Posterior/docs/LOCALFIRST_COMPARISON.md`);
+  - curved occluders, closed balls, physical stage only, no labels (`RIND3D_Generator/curved/`,
+    `docs/CURVED_OCCLUDERS.md`);
+  - per-family generator benchmark (`RIND3D_Dataset100K/docs/GENERATOR_BENCHMARK_V3.md`).
+
+**Terminology.**
+* RIND3D is presented as a general driver-source / binary-response inference framework. A receiver is
+  *response-active* or *response-inactive*, and the two meet at a *response interface*.
+* The implemented physics is still a visibility-based binary response: active iff the closed segment from the driver
+  source misses the closed solid. The general vocabulary does not mean other response mechanisms are supported.
+* Serialized keys and APIs keep their legacy names (`lit`, `dark`, `lit_frac`, `cls` 0/1/2) for compatibility with 1K
+  and v2.
 
 ## Where things are
 

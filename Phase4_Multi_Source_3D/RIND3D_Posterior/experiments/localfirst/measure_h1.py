@@ -15,47 +15,52 @@ HERE = Path(__file__).resolve()
 sys.path.insert(0, str(HERE.parents[3] / "RIND3D_Dataset100K"))
 
 
-def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--root", action="append", required=True); ap.add_argument("--out", required=True)
-    ap.add_argument("--max-scenes", type=int, default=200)
-    a = ap.parse_args()
+def scene_stats(p):
+    """Per-channel H1 statistics of one stored scene (one task of the process pool)."""
     from rind3d.rendering.backends import BackendFactory
     from rind3d_1k.physical import POLICY
     from rind3d_100k.storage import SceneFile
     from rind3d_posterior.localfirst.local import interface_edges, edge_free_mask, plane_components
-    fac = BackendFactory(cuda_allowed=False)
+    S = SceneFile(p); fam = S.meta["family"]
+    ctx = BackendFactory(cuda_allowed=False).context(S.geometry(), POLICY); rows = [c.rows for c in ctx.components]
+    out = []
+    for w, r in enumerate(S.W):
+        o = np.array([r["x"], r["y"], r["z"]]); sol = S.crop(w, -1)
+        for j in range(S.k):
+            if not (int(r["mask"]) >> j) & 1:
+                continue
+            lit = S.crop(w, j)
+            cls = np.where(sol, 2, np.where(lit, 1, 0)).transpose(2, 1, 0)
+            li, da = interface_edges(cls)
+            free = edge_free_mask(rows, o, int(S.meta["resolution"]), li, da)
+            nf = np.flatnonzero(~free)
+            comp = bool(len(nf) >= 24 and any(c["n"] >= 24 for c in plane_components(li[nf], da[nf], max_planes=2, iters=64)))
+            out.append(dict(family=fam, L=int(r["Lp"]), edges=int(len(li)), nonfree=int(len(nf)), comp=comp))
+    return str(p), out
+
+
+def main():
+    ap = argparse.ArgumentParser(); ap.add_argument("--root", action="append", required=True); ap.add_argument("--out", required=True)
+    ap.add_argument("--max-scenes", type=int, default=200); ap.add_argument("--workers", type=int, default=8)
+    a = ap.parse_args()
+    from concurrent.futures import ProcessPoolExecutor
+    from multiprocessing import get_context
     out = {}
     for root in a.root:
-        agg = defaultdict(lambda: dict(channels=0, edges=0, nonfree=0, ch_nonfree=0, ch_nonfree_comp=0, by_L=defaultdict(lambda: [0, 0])))
-        for p in sorted(Path(root).glob("scenes/*/*.npz"))[:a.max_scenes]:
-            S = SceneFile(p); fam = S.meta["family"]
-            ctx = fac.context(S.geometry(), POLICY); rows = [c.rows for c in ctx.components]
-            for w, r in enumerate(S.W):
-                o = np.array([r["x"], r["y"], r["z"]]); sol = S.crop(w, -1)
-                for j in range(S.k):
-                    if not (int(r["mask"]) >> j) & 1:
-                        continue
-                    lit = S.crop(w, j)                                  # [Z, Y, X]
-                    cls = np.where(sol, 2, np.where(lit, 1, 0)).transpose(2, 1, 0)   # -> [x, y, z]
-                    li, da = interface_edges(cls)
-                    free = edge_free_mask(rows, o, int(S.meta["resolution"]), li, da)
-                    g = agg[fam]; g["channels"] += 1; g["edges"] += len(li); g["nonfree"] += int((~free).sum())
-                    g["by_L"][int(r["Lp"])][0] += 1
-                    if (~free).any():
-                        g["ch_nonfree"] += 1; g["by_L"][int(r["Lp"])][1] += 1
-                        nf = np.flatnonzero(~free)
-                        if len(nf) >= 24 and any(c["n"] >= 24 for c in plane_components(li[nf], da[nf], max_planes=2)):
-                            g["ch_nonfree_comp"] += 1
+        paths = sorted(Path(root).glob("scenes/*/*.npz"))[:a.max_scenes]
+        per = []
+        with ProcessPoolExecutor(a.workers, mp_context=get_context("spawn")) as ex:
+            for _, rows in ex.map(scene_stats, paths):
+                per += rows
         res = {}
-        for fam, g in sorted(agg.items()):
-            res[fam] = dict(channels=g["channels"], edge_nonfree_share=g["nonfree"] / max(g["edges"], 1),
-                            channel_nonfree_share=g["ch_nonfree"] / max(g["channels"], 1),
-                            channel_nonfree_component_share=g["ch_nonfree_comp"] / max(g["channels"], 1),
-                            by_L={str(L): dict(channels=v[0], nonfree_share=v[1] / max(v[0], 1)) for L, v in sorted(g["by_L"].items())})
-        tot = {k: sum(g[k] for g in agg.values()) for k in ("channels", "edges", "nonfree", "ch_nonfree", "ch_nonfree_comp")}
-        res["ALL"] = dict(channels=tot["channels"], edge_nonfree_share=tot["nonfree"] / max(tot["edges"], 1),
-                          channel_nonfree_share=tot["ch_nonfree"] / max(tot["channels"], 1),
-                          channel_nonfree_component_share=tot["ch_nonfree_comp"] / max(tot["channels"], 1))
+        fams = sorted({x["family"] for x in per})
+        for fam in fams + ["ALL"]:
+            g = [x for x in per if fam == "ALL" or x["family"] == fam]
+            E = sum(x["edges"] for x in g); NF = sum(x["nonfree"] for x in g)
+            res[fam] = dict(channels=len(g), edge_nonfree_share=NF / max(E, 1),
+                            channel_nonfree_share=sum(x["nonfree"] > 0 for x in g) / max(len(g), 1),
+                            channel_nonfree_component_share=sum(x["comp"] for x in g) / max(len(g), 1),
+                            by_L={str(L): sum(x["nonfree"] > 0 for x in g if x["L"] == L) / max(sum(x["L"] == L for x in g), 1) for L in (64, 128, 256)})
         out[root] = res
         print(json.dumps({root: res["ALL"]}), flush=True)
     Path(a.out).write_text(json.dumps(out, indent=1))

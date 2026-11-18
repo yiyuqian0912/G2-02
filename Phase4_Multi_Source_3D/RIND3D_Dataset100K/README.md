@@ -35,7 +35,7 @@
 | module | role |
 |---|---|
 | `sampling.py` | contract v2 law: κ draw, side streams (natural, coverage), outcome-independent plans, balance-heuristic T* weights |
-| `local_eval.py` | exact local-only window decisions: exact probes, rational all-lit hull certificate, lazy decisions, progressive certified CUDA tiles |
+| `local_eval.py` | exact local-only window decisions: exact probes, rational all-active (legacy: all-lit) hull certificate, lazy decisions, progressive certified CUDA tiles |
 | `physical.py` | one scene: geometry, sources, natural / coverage streams (v2) or thinned selection (v1), exact-m rate streams, one atomic container |
 | `controller.py` | `plan_epoch`: declared plans (v2) or the epoch-frozen balancing controller (v1) |
 | `pool.py`, `coordinator.py`, `worker.py` | supervised multi-GPU node: per-worker GPU binding, per-GPU FastLabel semaphores, timeouts, RSS limits, retries, quarantine, journals, stop / resume, contract digest check |

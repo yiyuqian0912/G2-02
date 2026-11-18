@@ -114,9 +114,9 @@ The rind3d CUDA runtime creates its own non-primary context (`cuCtxCreate`) and 
 ## Solid-separated windows: cost tail and low-risk optimisations (documented, not implemented)
 
 **Mechanism** (measured at 1K scale; `RIND3D_HANDOFF/RIND3D_IMPLEMENTATION_FACTS.md` §1):
-* A solid-separated mixed channel has no 6-adjacent lit/dark FREE pair, so `boundary_mask` is empty.
+* A solid-separated mixed channel has no 6-adjacent active/inactive FREE pair (no direct response interface), so `boundary_mask` is empty.
 * Phase 1 then starts from the 128 interior receivers alone; `point_items` draws `nbd = 256` boundary and `nin = 128` interior receivers.
-* Stage 1's sentinels are only the `n_class` lit and dark interior picks.
+* Stage 1's sentinels are only the `n_class` active and inactive interior picks.
 * The single-cell exit never applies.
 * B stays broad (6–8·10⁵ pieces, 3–6·10⁵ cells), and 72–78% of the 13.4 s mean goes to stage-2 BSP and cell emission, not to certification rounds.
 

@@ -40,12 +40,12 @@
 | windows | **exactly 12 per scene: 4 × side 64, 4 × side 128, 4 × side 256** (sides in 1024³ voxels) |
 | sources | k ∈ {1..4}, chosen by the controller before the sources are drawn; i.i.d. uniform on D(G) (FREE, certified clearance > 2⁻²⁶); anti-duplicate 2⁻²⁰ (L∞) |
 | source exclusion | every source outside every accepted **closed** window box [o/N, (o + L)/N]³, including sources with uninformative channels |
-| informative channel | lit FREE and dark FREE receivers both present for that source; m(W) = number of informative channels; every accepted window has m ≥ 1 |
+| informative channel | v1/v2: response-active and response-inactive FREE receivers both present for that source (v3: a direct FREE–FREE response interface, docs/SAMPLING_IMPACT_V3.md); m(W) = number of informative channels; every accepted window has m ≥ 1 |
 | balancing | global target 25% per m = 1..4 over 1.2M windows; epoch-frozen controller (1000-slot epochs, lag 1, k floor 15%, c_min 0.01); raw and ω-weighted histograms reported |
 | proposals | i.i.d. uniform origins per side; one independent U per proposal; accept iff A ∧ U < c(m, L, k); cap 6000 per side; repeats skipped |
 | rate stream | R = 256 / 128 / 64 per side; Λ̂_L = accepts / R; training weight ω (contract default) |
 | scene acceptance | all quotas within caps, otherwise attempt + 1 (≤ 3 attempts, all recorded); failures retry the same attempt |
-| responses | exact LOCAL renderings only; **no global response field is computed or stored**; per window: SOLID once plus one lit channel per physical source; packed bits (Z, Y, X), zstd |
+| responses | exact LOCAL renderings only; **no global response field is computed or stored**; per window: SOLID once plus one binary response channel (legacy name `lit`) per physical source; packed bits (Z, Y, X), zstd |
 | posterior target | Uniform(F_W^j) over D(G) minus the closed window box, with GLOBAL geometry; cell masses on the 128³ grid; TPE v3.1 (`rind3d_posterior`) |
 | certification | rigorous `tv_bound` per label; certified ≤ 0.05; certified_loose ≤ 0.10; uncertified > 0.10 (stored, never presented as qualified) |
 | label coverage | every informative slot: a certified label, or an explicit status `uncertified` / `engine_failure` / `timeout` / `memory_limit` / `unavailable`; uninformative slots: `not_computed` |

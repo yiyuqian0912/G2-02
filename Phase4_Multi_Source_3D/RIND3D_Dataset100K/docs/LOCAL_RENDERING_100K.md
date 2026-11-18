@@ -14,7 +14,7 @@ All numbers are **laptop measurements** unless marked otherwise.
 | certified CUDA 64³ tile, batch 1 / 8 / 32 | 0.76 / 0.26 / 0.15 ms per tile | exact (certified intervals plus exact fallback) |
 | full 1024³ field per source (render_stream, 4 CPU packers) | ≈ 2.0 s | exact |
 | exact CPU receiver probe (`native.points`) | 0.5–0.7 µs per receiver (one thread) | exact |
-| exact rational all-lit hull certificate | ≈ 0.1 ms per channel | proof (sufficient condition) |
+| exact rational all-active hull certificate | ≈ 0.1 ms per channel | proof (sufficient condition) |
 | coarse 128³ field (N = 128, 8 tiles) | ≈ 20 ms per source | exact for the coarse world, **not** for 1024³ receivers |
 | NVRTC compile of the renderer | 1.2 s per process (once) | |
 
@@ -50,7 +50,7 @@ side):
 | 256 | 1354 | 31 (2.3%) | 1 (0.15%) |
 
 **Reading of C:**
-* A coarse rejection step would remove 13.6% of the informative L = 64 channels: thin shadows, slits, grazing
+* A coarse rejection step would remove 13.6% of the informative L = 64 channels: thin response-inactive regions, slits, grazing
   boundaries.
 * That is a geometry- and source-dependent selection that changes the per-channel posterior and cannot be repaired by
   the scene-level ω.
@@ -71,7 +71,7 @@ side):
 |---|---|---|---|
 | naive local (unpack every tile, render all unresolved channels) | 30.0 s | 38,881 | Python unpacking dominates |
 | popcount on packed tiles + progressive early stop | 8.5 s | 36,140 | |
-| + exact all-lit hull certificate + incremental channel resolution | 6.6 s | 24,453 | 846 of 2,484 channel checks certified without rendering |
+| + exact all-active hull certificate + incremental channel resolution | 6.6 s | 24,453 | 846 of 2,484 channel checks certified without rendering |
 | more probes (4×) | 9.2 s | 22,903 | probes are not the bottleneck |
 | R = 128 instead of 256 | 5.2 s | 13,422 | the rate stream dominates the remaining cost |
 | full-field pipeline A, same scene | 11.4 s | | |
@@ -87,7 +87,7 @@ side):
 | accepted / attempts | 96 / 96 |
 | wall per scene: mean / p50 / p95 / max | **3.7 / 3.9 / 6.1 / 6.7 s** (selection ≈ 2.5 s, serialisation ≈ 1.3 s CPU) |
 | tiles per scene: mean / p95 | 3,988 / 6,661 (≈ 0.6 s GPU) |
-| channel checks certified all-lit without rendering | 41% (median 37%) |
+| channel checks certified all-active without rendering | 41% (median 37%) |
 | scene container | 0.36 MB mean (p95 0.64 MB) |
 | GPU memory | ≈ 0.6 GB per physical worker |
 
