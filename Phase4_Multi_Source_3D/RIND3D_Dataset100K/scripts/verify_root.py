@@ -62,7 +62,9 @@ def main():
     out = dict(root=str(root), accepted=len(acc), duplicate_accepted=dup, scenes_failed_validation=len(bad), failures=bad[:20],
                physics_checked=sum(1 for r in res if r.get("physics")),
                physics_mismatches=sum(r["physics"]["mismatches"] + r["physics"]["independent_mismatches"] for r in res if r.get("physics")),
-               journals=jstat, label_scenes_failed=len(lab_bad), ok=not bad and not dup and not lab_bad)
+               journals=jstat, label_scenes_failed=len(lab_bad),
+               label_failures=[dict(slot=r.get("slot"), errors=(r.get("labels") or {}).get("errors")) for r in lab_bad[:20]],
+               ok=not bad and not dup and not lab_bad)
     s = json.dumps(out, indent=1, default=str)
     Path(a.out or root / "VERIFY.json").write_text(s); print(s)
     sys.exit(0 if out["ok"] else 1)

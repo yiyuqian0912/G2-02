@@ -47,7 +47,10 @@ def main():
                            max_over_median=float(v.max() / np.median(v)) if len(v) else None,
                            coverage_weight_share=float(mass[L][1] / max(mass[L][0] + mass[L][1], 1e-300)))
     labels = Counter()
+    last = {}                                  # consolidated.jsonl: one record per consolidation, the last one wins
     for r in read_jsonl(root / "labels" / "consolidated.jsonl"):
+        last[int(r["slot"])] = r
+    for r in last.values():
         labels.update(r.get("statuses", {}))
     kap = (cfg.get("source_count") or {}).get("kappa")
     out = dict(root=str(root), contract=cfg["contract"], scenes=n,

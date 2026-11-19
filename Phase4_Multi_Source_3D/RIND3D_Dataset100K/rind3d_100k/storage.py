@@ -74,11 +74,36 @@ def atomic_write(path, data):
     return hashlib.sha256(data).hexdigest()
 
 
+def _drop_torn_tail(path):
+    """If the file does not end with a newline, its last record is torn (a crash during an append): truncate it back to
+    the last newline, so the next append cannot merge the fragment into a corrupt middle line. A torn record was never
+    complete and readers already ignore it, so nothing valid is lost."""
+    with open(path, "rb+") as f:
+        f.seek(0, os.SEEK_END); end = f.tell()
+        if end == 0:
+            return
+        f.seek(end - 1)
+        if f.read(1) == b"\n":
+            return
+        pos = end; keep = 0
+        while pos > 0:
+            step = min(1 << 16, pos); pos -= step
+            f.seek(pos); chunk = f.read(step)
+            i = chunk.rfind(b"\n")
+            if i >= 0:
+                keep = pos + i + 1
+                break
+        f.truncate(keep); f.flush(); os.fsync(f.fileno())
+
+
 def append_line(path, line):
-    """Durable append of one newline-terminated text record (single writer)."""
+    """Durable append of one newline-terminated text record (single writer). A torn final line left by a crash is
+    dropped first (_drop_torn_tail)."""
     path = Path(path); new = not path.exists()
     if new:
         path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        _drop_torn_tail(path)
     with open(path, "a") as f:
         f.write(line.rstrip("\n") + "\n"); f.flush(); os.fsync(f.fileno())
     if new:
