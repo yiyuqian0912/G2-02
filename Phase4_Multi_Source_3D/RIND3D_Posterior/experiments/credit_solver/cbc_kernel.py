@@ -170,6 +170,15 @@ def encoded_subset(obs, p, bodies):
     for j in bodies:
         b = obs.bodies[j]
         e = Envelope(b, p.vertices)
+        # Guaranteed shadow from the vertices outside the closed body only: for a vertex v in
+        # K every segment [v, r] meets K, so S_K(v) is all of space and v imposes no row
+        # (Envelope's rows at such a vertex over-constrain). Lemma (design doc, section 4):
+        # r in the intersection of S_K(v) over the vertices outside K puts every vertex in
+        # C_K(r), hence P = conv(vertices) inside C_K(r). All vertices in K: P is inside K
+        # (illegal a.e.), the guaranteed shadow is everything.
+        outside = [v for v in p.vertices if any(form(r, v) > 0 for r in b)]
+        if len(outside) < len(p.vertices):
+            e.inner = Envelope(b, outside).inner if outside else ()
         if getattr(obs, "use_support", False):
             e.outer = e.outer + directions(obs.obstacles[j], p)
             if mixed:

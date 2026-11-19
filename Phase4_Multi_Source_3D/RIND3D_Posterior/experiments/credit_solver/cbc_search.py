@@ -87,6 +87,24 @@ def propose_split(kernel, h, bodies):
     return None if c is None else axis_plane(k, c)
 
 
+def hull_receivers(kernel, h, obs, r, minimum):
+    """Convex-hull extreme receivers of the single-blocker dark ambiguous sets (proposal)."""
+    from cbc_kernel import encoded_subset
+    from hull_proposals import from_list, from_scan, scan_extremes
+    L = obs.side
+    if r["ids"] is not None and r.get("masks") is not None:
+        dark = obs.scancls.ravel()[r["ids"]] == 0
+        per_body = from_list(L, r["ids"], r["masks"], dark, minimum)
+    else:
+        rows, offs = encoded_subset(obs, kernel.poly(h), range(len(obs.bodies)))
+        lo, hi, count = scan_extremes(obs.scancls, np.asarray(obs.origin, np.int64), obs.denom, rows, offs,
+                                      np.zeros(0, np.int64))
+        per_body = from_scan(L, lo, hi, count, minimum)
+    if not per_body:
+        return []
+    return [int(i) for i in np.unique(np.concatenate(list(per_body.values())))]
+
+
 def elongation(poly):
     _, lo, hi = extents(poly)
     ext = sorted(float(hi[i] - lo[i]) for i in range(3))
@@ -102,13 +120,15 @@ def solve(obs, key, tolerance, seconds, cap=4096, **policy):
 
 def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
            batch=96, split_above=1500, elongated=1e4, max_splits=4000, always_split=True, negligible=Fraction(1, 2000),
-           shrink=0.8, prefer_single_dark=True, centroid_anchor=True, park_share=0.25):
+           shrink=0.8, prefer_single_dark=True, centroid_anchor=True, park_share=0.25, hull=True, hull_min=512):
     """Untrusted policy. Returns diagnostics only; the status comes from kernel.release()."""
     if pairs < 0:
         raise ValueError("invalid pair count")
     obs.centroid_anchor = centroid_anchor  # anchor hint for the screens' `wrong` flags
     timings = {}
     parked = set()
+    hull_spent = set()  # handles where the hull step found nothing or changed nothing
+    hull_from = {}  # child handle -> ambiguous count of the parent's hull step
     reason = "unresolved_frontier"
     trace = []
 
@@ -164,6 +184,23 @@ def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
                         break
                 continue
             h, n = r["handle"], r["ambiguous"]
+            if hull and h in hull_from and n > shrink * hull_from[h]:
+                hull_spent.add(h)  # the last hull step did not shrink the obligations enough
+            if hull and h not in hull_spent and n > hull_min:
+                # receiver convexity: the extreme points of each single-blocker dark set settle
+                # the whole set by exact (non-fragmenting) intersections
+                chosen = hull_receivers(kernel, h, obs, r, hull_min)
+                if chosen:
+                    kids, same = kernel.enforce(h, chosen)
+                    timings["hull_enforcements"] = timings.get("hull_enforcements", 0) + 1
+                    timings["hull_receivers"] = timings.get("hull_receivers", 0) + len(chosen)
+                    if same:
+                        hull_spent.update(kids)
+                    for x in kids:
+                        hull_from[x] = n
+                    push(kids)
+                    continue
+                hull_spent.add(h)
             if r["ids"] is None:
                 # obligation list too large to store: split geometrically
                 plane = propose_split(kernel, h, obs.bodies)

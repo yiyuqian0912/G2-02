@@ -22,6 +22,8 @@ def warm_jit():
     o = np.zeros(3, np.int64)
     scan_collect(cls, o, 2048, rows, off, np.zeros(0, np.int64), 1)
     scan_ids(cls, np.zeros(0, np.int64), o, 2048, rows, off)
+    from hull_proposals import scan_extremes
+    scan_extremes(cls, o, 2048, np.zeros((3, 4), np.int64), np.array([0, 1, 2, 3], np.int32), np.zeros(0, np.int64))
     return perf_counter() - t
 
 
@@ -39,6 +41,7 @@ def main():
     ap.add_argument("--split-above", type=int, default=1500)
     ap.add_argument("--no-single-dark", dest="prefer_single_dark", action="store_false")
     ap.add_argument("--vertex-sum-anchor", dest="centroid_anchor", action="store_false")
+    ap.add_argument("--no-hull", dest="hull", action="store_false")
     args = ap.parse_args()
     t, c = perf_counter(), process_time()
     warm = warm_jit()  # one-time per process; a long-lived worker pays it once
@@ -46,7 +49,8 @@ def main():
     key = f"{identity['slot']:06d}_w{args.window:02d}_s{args.channel}"
     payload, details = solve(obs, key, args.tolerance, args.seconds, cap=args.cap, pairs=args.pairs,
                              batch=args.batch, split_above=args.split_above,
-                             prefer_single_dark=args.prefer_single_dark, centroid_anchor=args.centroid_anchor)
+                             prefer_single_dark=args.prefer_single_dark, centroid_anchor=args.centroid_anchor,
+                             hull=args.hull)
     details["solver"] = "claude-cbc-v2"
     details["jit_warm_seconds"] = warm
     write_result(args.output, identity, args.tolerance, payload, details)
