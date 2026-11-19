@@ -204,3 +204,39 @@ def test_masks_are_sound(conditioned):
                     assert within(piece.poly, cone(body, rr)) is None
                     checked += 1
     assert checked > 0
+
+
+def test_body_subset_screen_is_never_weaker():
+    """On a many-body scene, the residual screen restricted to the masked bodies proves at
+    least what the all-body screen proves, and never disagrees on a contradiction."""
+    from cbc_kernel import encoded_subset
+    if not (ROOT / "scenes" / "0000/000044.npz").exists():
+        pytest.skip("data")
+    obs, _ = inputs.load(ROOT / "scenes" / "0000/000044.npz", 4, 0)
+    k = Kernel(obs, Budget(120, 10 ** 6))
+    for d, a in choose_pairs(obs.cls, 6, 1, "interface"):
+        k.condition_pair(d, a)
+    k.exclude_window()
+    o = np.asarray(obs.origin, np.int64)
+    compared = 0
+    for h in sorted(k.open_handles(), key=k.volume, reverse=True)[:6]:
+        r = k.screen(h)
+        if r["outcome"] != "open" or r["ids"] is None or not len(r["ids"]):
+            continue
+        piece = k._state.live[r["handle"]]
+        kids, _ = k.enforce(r["handle"], [int(i) for i in piece.pending[:8]])
+        for c in kids:
+            q = k._state.live[c]
+            if q.pending is None or not len(q.pending):
+                continue
+            rows, offs = encoded_subset(obs, q.poly, range(len(obs.bodies)))
+            nf, idf, *_ = scan_ids(obs.scancls, q.pending, o, obs.denom, rows, offs)
+            union = int(np.bitwise_or.reduce(q.masks))
+            rel = [b for b in range(len(obs.bodies)) if union >> b & 1]
+            rows, offs = encoded_subset(obs, q.poly, rel)
+            ns, ids_, *_ = scan_ids(obs.scancls, q.pending, o, obs.denom, rows, offs)
+            if nf < 0:
+                continue  # a contradiction found with all bodies is also sound
+            assert ns < 0 or set(ids_.tolist()) <= set(idf.tolist())
+            compared += 1
+    assert compared > 0

@@ -57,6 +57,35 @@ def cell_box_rows(i, j, k, n=128):
     return rows
 
 
+def remap_masks(masks, rel):
+    """Local bit c (position in rel) -> global body bit rel[c]."""
+    out = np.zeros(len(masks), np.uint64)
+    for c, g in enumerate(rel):
+        out |= ((masks >> np.uint64(c)) & np.uint64(1)) << np.uint64(g)
+    return out
+
+
+def encoded_subset(obs, p, bodies):
+    """raster.encoded restricted to the listed bodies (same rows, same directed rounding)."""
+    from raster import fixed
+    from envelopes import Envelope
+    from penumbra import directions
+    anchor = primitive(tuple(map(sum, zip(*p.vertices))))
+    rows, offsets = [], [0]
+    if getattr(obs, "use_support", False) and not hasattr(obs, "obstacles"):
+        obs.obstacles = [within(Poly.cube(), b) for b in obs.bodies]
+    for j in bodies:
+        b = obs.bodies[j]
+        e = Envelope(b, p.vertices)
+        if getattr(obs, "use_support", False):
+            e.outer = e.outer + directions(obs.obstacles[j], p)
+        hint = cone(b, anchor) if any(form(r, anchor) > 0 for r in b) else []
+        for planes, up in ((e.inner, True), (e.outer, False), (hint, False)):
+            rows.extend(fixed(planes, up))
+            offsets.append(len(rows))
+    return np.array(rows, np.int64).reshape(-1, 4), np.array(offsets, np.int32)
+
+
 def facet_rows(p):
     """Outward facet rows (p on the <= 0 side) from the face cycles, validated exactly.
 
@@ -225,6 +254,8 @@ class Kernel:
         neg, pos = piece.poly.split(tuple(row))
         if neg is None or pos is None:
             return [h]  # the plane misses the interior: no transition
+        if neg.volume + pos.volume != piece.poly.volume:
+            raise ArithmeticError("split failed exact volume conservation")  # face-structure guard
         self.stats["splits"] += 1
         return self._commit((h,), [Piece(neg, piece.pending, piece.done, piece.deferred, piece.masks),
                                     Piece(pos, piece.pending, piece.done, piece.deferred, piece.masks)])
@@ -238,7 +269,15 @@ class Kernel:
             raise ValueError("deferred clearance shell")
         p = piece.poly
         t0 = perf_counter()
-        rows, offs = encoded(self.obs, p)
+        nb = len(self.obs.bodies)
+        rel = None
+        if piece.pending is not None and piece.masks is not None and nb <= 64 and len(piece.pending):
+            # Only bodies in some residual receiver's mask can affect a residual decision:
+            # an excluded body's possible shadow over an ancestor (hence over this subset)
+            # misses the receiver, so it can neither block nor guarantee a block there.
+            union = int(np.bitwise_or.reduce(piece.masks))
+            rel = [c for c in range(nb) if union >> c & 1]
+        rows, offs = encoded_subset(self.obs, p, range(nb) if rel is None else rel)
         check_ranges(rows, self.obs.origin, self.obs.side, self.obs.denom)
         if piece.pending is None:
             skipped = np.array(sorted(piece.done), np.int64)
@@ -261,6 +300,8 @@ class Kernel:
             return self._settle(h, piece)
         if n > len(ids):  # overflow: keep the full-window obligation
             return dict(outcome="open", handle=h, ambiguous=n, ids=None, wrong=None, boundary=None)
+        if rel is not None:
+            masks = remap_masks(masks, rel)
         new = self._commit((h,), [Piece(p, np.ascontiguousarray(ids), frozenset(), False,
                                         np.ascontiguousarray(masks))])[0]
         return dict(outcome="open", handle=new, ambiguous=n, ids=ids, wrong=wrong, boundary=bnd)
@@ -297,6 +338,8 @@ class Kernel:
             if not parts:
                 break
         same = len(parts) == 1 and parts[0] is piece.poly
+        if not same and sum((q.volume for q in parts), Fraction(0)) > piece.poly.volume:
+            raise ArithmeticError("exact cut created volume")  # disjoint subsets cannot exceed the parent
         if piece.pending is None:
             children = [Piece(q, None, piece.done.union(sel), False) for q in parts]
         else:
