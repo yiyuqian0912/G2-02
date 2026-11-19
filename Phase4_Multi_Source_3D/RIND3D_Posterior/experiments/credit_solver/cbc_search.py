@@ -45,9 +45,32 @@ def extents(poly):
     return vs, lo, hi
 
 
+def facet_contact_plane(poly, bodies):
+    """If the piece lies outside one obstacle facet and touches its plane, a parallel plane at
+    half the piece's height above it (dyadic offset). Proposal only."""
+    best = None
+    for b in bodies:
+        for r in b:
+            vals = [Fraction(r[0] * v[0] + r[1] * v[1] + r[2] * v[2] + r[3] * v[3], v[3]) for v in poly.vertices]
+            lo_v, hi_v = min(vals), max(vals)
+            if lo_v == 0 and hi_v > 0 and (best is None or hi_v > best[1]):
+                best = (r, hi_v)
+    if best is None:
+        return None
+    r, hmax = best
+    tau = dyadic_between(Fraction(0), hmax, hmax / 2)
+    if tau is None:
+        return None
+    return (r[0] * tau.denominator, r[1] * tau.denominator, r[2] * tau.denominator,
+            r[3] * tau.denominator - tau.numerator)
+
+
 def propose_split(kernel, h, bodies):
-    """Apex isolation if a vertex lies in a closed obstacle, else long-axis bisection."""
+    """Facet-parallel split for face contact, apex isolation for vertex contact, else long-axis bisection."""
     poly = kernel.poly(h)
+    plane = facet_contact_plane(poly, bodies)
+    if plane is not None:
+        return plane
     vs, lo, hi = extents(poly)
     contact = [v for v, hv in zip(vs, poly.vertices)
                if any(all(r[0] * hv[0] + r[1] * hv[1] + r[2] * hv[2] + r[3] * hv[3] <= 0 for r in b) for b in bodies)]
