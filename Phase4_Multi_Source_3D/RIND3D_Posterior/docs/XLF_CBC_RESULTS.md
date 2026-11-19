@@ -81,7 +81,12 @@ Every snapshot is compared with an exact-certified reference.
 | campaign | runs (tasks) | snapshot checks | violations | misuse attempts rejected (state unchanged) |
 |---|---|---|---|---|
 | v2.9a, 48 referenced tasks × 3 seeds | 127 (43) | 9,600 | **0** | 2,904 |
-| v2.9e certified mode | [pending] | | | |
+| v2.9e certified mode (every split certified), 48 tasks × 3 seeds | 144 (48) | 1,421 | **0** | 498 (+1 oversize split row) |
+
+In the certified-mode campaign no kernel was tainted. Every split, including the deliberately degenerate chaos
+planes through vertices, passed its run-time certificate, so the checker raised no false alarm. 123 of 137 final
+releases reached bound ≤ 0.05; the check covers bounds of every size. Fewer snapshots fit the budget than in the
+v2.9a campaign because each split is certified.
 
 The v2.9a campaign also exposed the native decimal-key defect (IMPLEMENTATION §2, defect 4): a crash, not a wrong
 certificate.
@@ -96,8 +101,8 @@ among points discarded by each transition kind (they must be infeasible). An ind
 |---|---|---|---|---|
 | v2.8, all 60 L64/L128 | 60 | 604 | 958 | **0** |
 | v2.8, L = 256 spot check `000007_w08_s2` | 1 | 48 | 29 | **0** |
-| v2.9e, all 60 L64/L128 | [pending] | | | |
-| v2.9e, 11 hard canary channels newly certified by v2.9 (mixed facets, hull step) | [pending] | | | |
+| v2.9e certified mode, all 60 L64/L128 (8 s; 51 certified under audit load) | 60 | 414 | 1,215 (pairs 615, cuts 512, screens 87, exclusion 1) | **0** |
+| v2.9e, 11 hard canary channels newly certified by v2.9 (5 × L64 mixed-facet cases, 6 × L256 hull-step cases; reduced sampling) | 11 (9 certified under audit load; `000007_w09_s2`, `000007_w10_s1` incomplete there, so only their discarded points were sampled) | 70 | 127 (pairs 65, cuts 62) | **0** |
 
 This is sampled evidence and proves nothing over continuous regions; the per-run certificates are §3.4.
 
@@ -172,8 +177,13 @@ certificate. Classes:
 
 Notes on the comparison:
 * FastLabel's per-channel cost is measured inside a warm scene worker. CBC's in-process wall still includes
-  decoding the channel; at L = 256 that is a large share of easy channels (the single-cell posteriors are
-  dominated by it).
+  decoding the channel (`inputs.load`), measured on a lightly loaded machine at median 0.01 / 0.03 / 1.66 s for
+  L = 64 / 128 / 256.
+  * The L = 256 cost is the shared input path: it re-reads the scene's whole observation blob per channel.
+  * Over the canary this is about 590 s (349 × 1.7 s).
+  * Net of decoding, CBC's total is ≈ 970 s in certified mode (≈ 1.3× FastLabel) and ≈ 680 s in speed mode
+    (≈ 0.9×), an approximation from medians.
+  * A per-scene worker that decodes once would realize this.
 * CBC uses one CPU core per channel and FastLabel the laptop GPU.
 
 **Latency of certified labels (certified mode):** in-process median 1.76 s, p90 3.08 s, p99 6.90 s, max 9.36 s.
@@ -182,7 +192,7 @@ Notes on the comparison:
 
 | output | channels | median / p90 |
 |---|---|---|
-| single cell | 295 | 2.31 / 2.74 s (225 are L = 256; decoding dominates) |
+| single cell | 295 | 2.31 / 2.74 s (225 are L = 256, where decoding takes ≈ 1.7 s of it) |
 | 2–100 cells | 129 | 0.96 / 2.78 s |
 | 101–10⁴ cells | 326 | 1.16 / 3.56 s |
 | > 10⁴ cells (max 29,247) | 36 | 2.95 / 5.46 s |
