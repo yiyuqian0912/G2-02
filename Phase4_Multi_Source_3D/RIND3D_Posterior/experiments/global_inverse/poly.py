@@ -124,13 +124,18 @@ class Poly:
         if min(signs.values()) >= 0:
             return None,self
         neg,pos,cap = [],[],set()
+        cut = {}  # each crossing edge is shared by two faces; its point is symmetric in the endpoints
         for face in self.faces:
             a,b = [],[]
             last = face[-1]
             for p in face:
                 u,v = signs[last],signs[p]
                 if u < 0 < v or v < 0 < u:
-                    h = primitive(tuple(abs(v)*x + abs(u)*y for x,y in zip(last,p)))
+                    key = (last, p) if last < p else (p, last)
+                    h = cut.get(key)
+                    if h is None:
+                        h = primitive(tuple(abs(v)*x + abs(u)*y for x,y in zip(last,p)))
+                        cut[key] = h
                     a.append(h)
                     b.append(h)
                     cap.add(h)

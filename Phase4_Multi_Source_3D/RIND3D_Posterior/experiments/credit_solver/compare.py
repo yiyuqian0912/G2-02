@@ -103,6 +103,21 @@ def main():
                 q = None
             else:
                 q, name = reference(key)
+                flf = CMP / "labels" / f"{key}_fl.npz"
+                if flf.exists():
+                    # FastLabel v3.4 (statistical TV <= 0.05) is preferred over legacy Tau-pencil
+                    # labels, which were shown wrong by up to 0.07-0.09 on two tasks.
+                    z = np.load(flf)
+                    qf = dict(zip(z["cell"].tolist(), (z["lo"] / z["lo"].sum()).tolist()))
+                    row.update(ref=flf.name, ref_status="fastlabel_stat", ref_bound=0.05, ref_cells=len(qf),
+                               tv_to_ref=tv(p, qf))
+                    row["consistent"] = row["tv_to_ref"] <= row["tv"] + 0.05 + 1e-9
+                    if q is not None:
+                        row["tv_to_legacy"] = tv(p, q)
+                    q = None
+                elif q is not None:
+                    row.update(ref=name, ref_status="legacy_unreliable", ref_cells=len(q), tv_to_ref=tv(p, q))
+                    q = None  # informational only: no consistency verdict against a legacy label
             if q is not None:
                 st, b = bounds.get(key, (None, None))
                 row.update(ref=name, ref_status=st, ref_bound=b, ref_cells=len(q), tv_to_ref=tv(p, q))
@@ -130,6 +145,11 @@ def main():
         print("  INCONSISTENT", r)
     ex = [r for r in cert if r.get("ref_status") == "exact_certified"]
     print(f"  against exact-certified references: {len(ex)} compared, {sum(r['consistent'] is False for r in ex)} inconsistent")
+    fl = [r for r in cert if r.get("ref_status") == "fastlabel_stat"]
+    print(f"  against FastLabel (no exact reference): {len(fl)} compared, {sum(r['consistent'] is False for r in fl)} inconsistent")
+    lg = [r for r in cert if r.get("ref_status") == "legacy_unreliable"]
+    if lg:
+        print(f"  legacy-only references (informational): {[(r['key'], round(r['tv_to_ref'], 4)) for r in lg]}")
 
 
 if __name__ == "__main__":
