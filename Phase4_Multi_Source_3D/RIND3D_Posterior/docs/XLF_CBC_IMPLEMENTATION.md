@@ -19,6 +19,7 @@ python -m pytest -q test_cbc.py test_wire.py ../global_inverse/test_global.py
 | `inputs.py` (Astra) | decode one v3 container channel: canonical geometry rows, [x,y,z] class array, origin, problem identity | **yes** (input) |
 | `cbc_kernel.py` | state, transitions, exact enforcement (mask-restricted), body-subset screens, settlement, octree cell credits, integer encoder, snapshot | **yes** |
 | `screen2.py` | Numba integer screens (full window / residual list), candidate-body masks, range guard | **yes** |
+| `native/cells.cpp` (optional, GMP + pybind11; `native/build.sh`) | exact octree cell credits of IN pieces: the same algorithm as `_grid_credit_python`, mpz/mpq only. Per-cell credits equal the Python path (differential test). The kernel re-checks conservation against the Python rational volume on every call. `CBC_NATIVE=0` disables it; the build is reproducible (identical `.so` sha256 in two worktrees) | **yes** (when enabled) |
 | `global_inverse/poly.py` (Astra, + float sign filter) | exact homogeneous-integer polytopes: split, volume, `side` | **yes** |
 | `global_inverse/solver.py` (Astra): `cone`, `apply_pair`, `subtract_many` | exact inverse cones, pair conditioning | **yes** |
 | `global_inverse/envelopes.py` (Astra): `Envelope`, `clearance_partition` | guaranteed and possible receiver shadows; exact clearance partition | **yes** |
@@ -26,6 +27,7 @@ python -m pytest -q test_cbc.py test_wire.py ../global_inverse/test_global.py
 | `global_inverse/penumbra.py` (Astra, + axis fallbacks) | support-plane **proposals** (binary64 hull); exact validation inside | validation only |
 | `xlf_assurance/ledger.py` (Astra): `encode`, `decode` | exact quota encoding to binary64 probabilities, strict decoding | **yes** |
 | `kernel.py` (Astra): `wire_bound`, `ceil_mass` | integer TV bound on the decoded payload | **yes** |
+| `global_inverse/solver.py` `choose_pairs` (Astra, + cache-friendly scan) | interface pair proposals; identical choices, about 5× faster at L=256 | no (proposals; the cones are exact) |
 | `cbc_search.py`, `run.py` writer, `cbc_run.py` | search policy; atomic envelope writer that re-reads the bytes | no (the writer re-checks) |
 | `exactcheck.py`, `audit_exact.py`, `compare.py`, `diag.py`, `hunt.py` | independent research instruments | no (not in the certificate path) |
 
@@ -77,8 +79,8 @@ support-plane proposals (validated exactly).
    * cell-credit conservation.
 
    They are not proved.
-3. **Numba build identity.** `cache=True` keys on the source only. A production build would pin the compiler, flags
-   and cache.
+3. **Build identity.** Numba `cache=True` keys on the source only, and the native helper depends on the system g++
+   and GMP. A production build would pin compilers, flags and caches.
 4. **Isolation.** Python cannot prevent a hostile search from mutating kernel state. The model assumes the search
    is merely untrusted, not adversarial at the interpreter level.
 5. **Input trust.** The container decoder and the canonical geometry reader are trusted inputs. Agreement with the

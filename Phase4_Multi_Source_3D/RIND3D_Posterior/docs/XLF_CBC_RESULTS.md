@@ -30,10 +30,15 @@ TV 0.019 on `000038_w06_s2` (exact-verified) while claiming 0, and they are 0.07
 | v2 (`611e3a5`) | split, inherited obligations, obstacle exclusion, support planes | 54/90 (cold JIT) | | 0/25 |
 | v2.2 (`3123f0e`) | candidate-body masks, float sign filter | 65/90 | | 0/62 |
 | v2.4 (`67e1eea`) | exact octree cell credit, support-plane axes | 69/90 | 79/90 | 0/77 |
-| **v2.7 (`7621fcc`)** | body-subset screens, facet contact splits, integer encoder, heap scheduling, budgeted parking | **79/90** | **87/90** | **0/85 exact + 0/1 FastLabel** |
+| v2.7 (`7621fcc`) | body-subset screens, facet contact splits, integer encoder, heap scheduling, budgeted parking | 79/90 | 87/90 | 0/85 exact + 0/1 FastLabel |
+| **v2.8 (`70522ab`)** | exact GMP cell credit (native, differential-tested), cache-friendly pair proposals | **84/90** | **88/90** | **0/86 exact + 0/1 FastLabel** |
 
-v2.7 by window size at 20 s: L64 30/30, L128 30/30, L256 27/30. By split: holdout 27/27, fresh 9/9,
-archive 51/54.
+v2.8 at 20 s:
+
+* by window size: L64 30/30, L128 30/30, L256 28/30;
+* by split: holdout 27/27, fresh 9/9, archive 52/54.
+
+At 8 s: L64 29/30, L128 29/30, L256 26/30.
 
 * **Consistency.** For every certified output, TV(p, q_ref) ≤ tv_bound + ref_bound. The largest observed distance
   is 0.0413, against a bound of 0.0494.
@@ -65,32 +70,43 @@ none may be feasible.
   * 12 from screens and clearance settlement.
 * 0 violations. The full run was paused for clean timing.
 
-## 4. Cost
+## 4. Cost (v2.8)
 
-| comparison | CBC v2.7, 20 s | other |
+| comparison | CBC v2.8 | other |
 |---|---|---|
-| deterministic: exact Tau-pencil labeller + independent verifier (85 tasks both certify) | median 2.7 s, total 268 s | median 36.4 s, total 10,760 s (**40× in total**) |
-| statistical: FastLabel v3.4 (archive; FastLabel certifies 54/54, CBC 51/54) | median 2.7 s | median 1.6 s (**1.7×**) |
+| deterministic: exact Tau-pencil labeller + independent verifier (83 tasks both certify, 8 s budget) | median 1.60 s, total 164 s | median 36.4 s, total 10,520 s (**30× median, 64× total**) |
+| statistical: FastLabel v3.4 (archive; FastLabel certifies 54/54, CBC 49/54 at 8 s, 52/54 at 20 s) | median 1.55 s | median 1.59 s (**on par for the channels CBC certifies**) |
 
-* **Latency of certified runs at 20 s:** median 2.7 s, p90 8.3 s, maximum 16.5 s.
-* **At 8 s:** median 2.5 s, p90 4.8 s.
-* **Memory:** peak RSS median 472 MiB, maximum 1.2 GiB.
-* **Where the time goes (kernel counters):**
-  * exact Python polytope clipping (homogeneous vertices of about 500-bit integers) in exact cuts;
-  * cell integration of large IN pieces;
-  * screen envelopes;
-  * Numba screens are minor.
-* **Measurement note.** cProfile overstated pair conditioning by about 20× (10.8 s against 0.5 s measured). All
-  numbers here come from wall-clock counters.
+* **Latency of certified runs:**
+  * 8 s budget: median 1.6 s, p90 4.7 s, maximum 7.9 s;
+  * 20 s budget: median 1.6 s, p90 5.1 s, maximum 22.1 s.
+* **Memory:** peak RSS median 480 MiB, maximum 1.2 GiB.
+* **One-time JIT load:** about 1.6 s per process, outside the budget. A long-lived worker pays it once.
+* **Where the time goes** (share of total wall, 8 s run, kernel wall-clock counters):
 
-## 5. Remaining failures (v2.7, 20 s)
+  | component | share |
+  |---|---|
+  | Numba screens | 34% |
+  | Python envelopes | 10% |
+  | exact cuts | 9% |
+  | cell integration (native) | 8% |
+  | pair proposals | 7% |
+  | pair conditioning | 4% |
+  | bound snapshots | 4% |
 
-* **`000007_w08_s2`.** It certifies at 20 s, but its exact reference timed out. It agrees with FastLabel (TV 0.024);
-  exact re-certification (4 h budget) and a targeted exact audit are running.
-* **The three uncertified tasks** are L = 256 barriers / occluder-cluster windows. The exact reference also failed
-  (1800 s timeout) on two of them.
+  Before the native credit, integration was 28% and pair proposals 13%.
+* **Measurement note.** cProfile overstated pair conditioning by about 20×. All numbers here come from wall-clock
+  counters.
+
+## 5. Remaining failures (v2.8, 20 s)
+
+* **`000007_w08_s2` (L = 256 barriers).** It certifies at 20 s, but its exact reference timed out at 1800 s. It agrees
+  with FastLabel (TV 0.024 ≤ 0.049 + 0.05). FastLabel is 0.070 from the legacy label, which is the outlier.
+  Exact re-certification (4 h) and a targeted exact audit are running.
+* **Two uncertified L = 256 tasks** (barriers / occluder clusters). The exact reference failed on them too (1800 s
+  timeouts).
   * Pattern: a broad fragmented frontier with obstacle contact.
-  * They remain INCOMPLETE, with no misleading certificate.
+  * They stay INCOMPLETE, with no misleading certificate.
 
 ## 6. Representative workload: release canary (production contract v3)
 
