@@ -19,8 +19,17 @@ Tau-pencil labeller + exact verifier).
 * Label + verify cost: median 36 s, maximum 650 s.
 
 **Fallbacks.** Where no exact reference exists, FastLabel v3.4 (statistical TV ≤ 0.05) is the comparison. Legacy
-Tau-pencil labels (`cmp_v3/labels/*_tp`, Astra's `records/reference*`) are informational only. They were wrong by
-TV 0.019 on `000038_w06_s2` (exact-verified) while claiming 0, and they are 0.070 from FastLabel on `000007_w08_s2`.
+Tau-pencil labels (`cmp_v3/labels/*_tp`, Astra's `records/reference*`) are informational only. Two defects are
+**exactly confirmed**, in both cases while the legacy engine claimed bound 0:
+
+| task | legacy TV to exact | CBC TV to exact (bound) | FastLabel TV to exact |
+|---|---|---|---|
+| `000038_w06_s2` | 0.019 | 0.0097 (bound 0.0189) | 1.7e-7 |
+| `000007_w08_s2` (exact reference after 1,984 s, bound 1.7e-5) | 0.069 | 0.024 (bound 0.049) | 3e-4 |
+
+The CBC solver flagged both while being itself within its certified bound. FastLabel is unaffected.
+
+**Exact reference set after re-certification:** 88/90.
 
 ## 2. Certification rate and correctness
 
@@ -31,7 +40,7 @@ TV 0.019 on `000038_w06_s2` (exact-verified) while claiming 0, and they are 0.07
 | v2.2 (`3123f0e`) | candidate-body masks, float sign filter | 65/90 | | 0/62 |
 | v2.4 (`67e1eea`) | exact octree cell credit, support-plane axes | 69/90 | 79/90 | 0/77 |
 | v2.7 (`7621fcc`) | body-subset screens, facet contact splits, integer encoder, heap scheduling, budgeted parking | 79/90 | 87/90 | 0/85 exact + 0/1 FastLabel |
-| **v2.8 (`70522ab`)** | exact GMP cell credit (native, differential-tested), cache-friendly pair proposals | **84/90** | **88/90** | **0/86 exact + 0/1 FastLabel** |
+| **v2.8 (`70522ab`)** | exact GMP cell credit (native, differential-tested), cache-friendly pair proposals | **84/90** | **88/90** | **0/87 exact** |
 
 v2.8 at 20 s:
 
@@ -114,9 +123,8 @@ This is sampled differential evidence, independent of the kernel's code. It does
 
 ## 5. Remaining failures (v2.8, 20 s)
 
-* **`000007_w08_s2` (L = 256 barriers).** It certifies at 20 s, but its exact reference timed out at 1800 s. It agrees
-  with FastLabel (TV 0.024 ≤ 0.049 + 0.05). FastLabel is 0.070 from the legacy label, which is the outlier.
-  Exact re-certification (4 h) and a targeted exact audit are running.
+* **`000007_w08_s2` (L = 256 barriers)** certifies at 20 s (bound 0.049). Its exact reference was finally obtained
+  after 1,984 s, and the certified output is 0.024 from it, which is consistent.
 * **Two uncertified L = 256 tasks** (barriers / occluder clusters). The exact reference failed on them too (1800 s
   timeouts).
   * Pattern: a broad fragmented frontier with obstacle contact.
