@@ -15,7 +15,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument("checkout",type=Path)
 parser.add_argument("work",type=Path,help="v3 work directory containing sampling_impact/v3 and xlf_cbc")
 parser.add_argument("output",type=Path)
-parser.add_argument("--arms", choices=("baseline","patch","factorial"), required=True)
+parser.add_argument("--arms", choices=("baseline","patch","factorial","tail"), required=True)
 args=parser.parse_args()
 config=json.loads(Path(__file__).with_name("tasks.json").read_bytes())
 phase=args.checkout.resolve()/"Phase4_Multi_Source_3D"
@@ -56,7 +56,7 @@ def summary_ref(key,p,d,ident):
     return out
 
 def parameters(key):
-    if args.arms=="baseline":
+    if args.arms in ("baseline","tail"):
         return [{}]
     if args.arms=="patch":
         return [dict(patch_depth=v) for v in (None,1,2)]
@@ -71,7 +71,8 @@ warm=perf_counter()-start
 tolerance=Q(config["tolerance"])
 archive=args.work/"xlf_cbc/v301_canary_10s"
 fl={r["key"]:r for r in json.loads((archive/"compare_canary.json").read_bytes())}
-keys=config["factorial" if args.arms=="factorial" else "cases"]
+keys=config[args.arms if args.arms in ("factorial","tail") else "cases"]
+seconds = 45 if args.arms=="tail" else config["seconds"]
 with args.output.open("x") as sink,tempfile.TemporaryDirectory() as tmp:
     for i,key in enumerate(keys):
         arms=parameters(key)
@@ -79,13 +80,13 @@ with args.output.open("x") as sink,tempfile.TemporaryDirectory() as tmp:
             start,cpu=perf_counter(),process_time()
             obs,identity=load(key)
             loaded=perf_counter()
-            raw,d=solve(obs,key,tolerance,config["seconds"],config["cap"],**arm)
+            raw,d=solve(obs,key,tolerance,seconds,config["cap"],**arm)
             computed=perf_counter()
             dst=Path(tmp)/"label.json"
             write_result(dst,identity,tolerance,raw,d)
             actual=json.loads(dst.read_bytes())
             wall=perf_counter()-start
-            record=dict(key=key,arm=arm,side=obs.side,family=identity["family"],bodies=len(obs.bodies),
+            record=dict(key=key,arm=arm,soft_seconds=seconds,side=obs.side,family=identity["family"],bodies=len(obs.bodies),
                         geometry=identity["geometry_sha256"],crop=identity["observation_xyz_sha256"],
                         warmup_once=warm,decode_s=loaded-start,solver_s=computed-loaded,total_s=wall,
                         cpu_s=process_time()-cpu,peak_process_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,

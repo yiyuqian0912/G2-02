@@ -7,6 +7,7 @@
     "000007_w09_s2", "000000_w00_s0", "000001_w02_s0", "000002_w04_s2",
     "000003_w09_s0", "000005_w04_s1", "000006_w04_s0", "000008_w00_s1"
   ],
+  "tail": ["000001_w02_s0","000003_w09_s0"],
   "factorial": ["000004_w00_s0", "000060_w11_s2"],
   "selection": "Purposive frozen panel: prior audit controls, both known legacy errors, a hull-sensitive task, two previous timeout cases, and coverage of all nine families. No population throughput inference."
 }

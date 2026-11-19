@@ -1,14 +1,12 @@
-"""Blind, one-process research labeler. Multiple cases can share a warmed JIT."""
-import argparse
+"""Historical search for diagnostic callers; both CLI aliases invoke the maintained CBC solver."""
 import base64
 from fractions import Fraction
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
-import resource
 import tempfile
-from time import perf_counter, process_time
+from time import perf_counter
 
 import inputs
 from kernel import Kernel
@@ -65,16 +63,16 @@ def search(obs, key, tolerance, seconds, cap, pairs, strategy, order):
 
 
 def write_result(path, identity, tolerance, payload, details):
-    result = dict(format="astra-cbc-research-1",problem=identity,tolerance=str(tolerance),**details)
+    import evidence
+    if details.get("solver") != evidence.VERSION or details.get("status") not in ("CERTIFIED","INCOMPLETE"):
+        raise ValueError("expected a current solver result")
+    result = dict(format="astra-xlf-certified-interface/1", problem=identity, tolerance=str(tolerance), **details)
     if payload is not None:
         result.update(cells=len(decode(payload)), wire=base64.b64encode(payload).decode("ascii"),
                       wire_sha256=sha256(payload).hexdigest())
-    import evidence
-    if details.get("solver") == evidence.VERSION:
-        result["format"] = "astra-xlf-certified-interface/1"
-        if result["status"] == "CERTIFIED":
-            evidence.check_seal(result["certificate"], payload, result["tv"], tolerance, identity)
-            result["artifact_sha256"] = evidence.artifact_digest(identity, result["certificate"])
+    if result["status"] == "CERTIFIED":
+        evidence.check_seal(result["certificate"], payload, result["tv"], tolerance, identity)
+        result["artifact_sha256"] = evidence.artifact_digest(identity, result["certificate"])
     raw = json.dumps(result,sort_keys=True,allow_nan=False,separators=(",",":")).encode()
     path = Path(path)
     path.parent.mkdir(parents=True,exist_ok=True)
@@ -93,15 +91,9 @@ def write_result(path, identity, tolerance, payload, details):
             raise ArithmeticError("serialized envelope changed")
         if rec["status"]=="CERTIFIED":
             restored = base64.b64decode(rec["wire"],validate=True)
-            if rec["format"] == "astra-xlf-certified-interface/1":
-                evidence.check_artifact(rec, identity)
-            if rec.get("certificate") is not None:
-                from evidence import check_seal
-                check_seal(rec["certificate"], restored, rec["tv"], tolerance, rec["problem"])
-            if restored!=payload or sha256(restored).hexdigest()!=rec["wire_sha256"]:
+            evidence.check_artifact(rec, identity)
+            if restored != payload:
                 raise ArithmeticError("wire mismatch")
-            if not 0<=Fraction(rec["tv"])<=tolerance or len(decode(restored))!=rec["cells"]:
-                raise ArithmeticError("invalid release")
         elif "wire" in rec:
             raise ArithmeticError("incomplete label cannot carry a distribution")
         os.replace(tmp,path)
@@ -109,27 +101,7 @@ def write_result(path, identity, tolerance, payload, details):
         tmp.unlink(missing_ok=True)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("container",type=Path)
-    parser.add_argument("window",type=int)
-    parser.add_argument("channel",type=int)
-    parser.add_argument("output",type=Path)
-    parser.add_argument("--tolerance",type=Fraction,default=Fraction(1,20))
-    parser.add_argument("--seconds",type=float,default=8)
-    parser.add_argument("--cap",type=int,default=192)
-    parser.add_argument("--pairs",type=int,default=24)
-    parser.add_argument("--strategy",choices=("interface","random_classes"),default="interface")
-    parser.add_argument("--order",choices=("largest","fifo"),default="largest")
-    args=parser.parse_args()
-    t,c=perf_counter(),process_time()
-    obs,identity=inputs.load(args.container,args.window,args.channel)
-    key=f"{identity['slot']:06d}_w{args.window:02d}_s{args.channel}"
-    payload,details=search(obs,key,args.tolerance,args.seconds,args.cap,args.pairs,args.strategy,args.order)
-    write_result(args.output,identity,args.tolerance,payload,details)
-    print(json.dumps(dict(key=key,wall=perf_counter()-t,cpu=process_time()-c,
-                          peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,**details)))
 
-
-if __name__=="__main__":
+if __name__ == "__main__":
+    from cbc_run import main
     main()

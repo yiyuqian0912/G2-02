@@ -248,3 +248,21 @@ def test_verify_split_accepts_exact_and_rejects_wrong_halves():
             with pytest.raises(ArithmeticError):
                 polycheck.verify_split(P, r, n2, p2)  # halves of a different plane
         P = neg if neg.volume >= pos.volume else pos
+
+
+def test_rational_fan_volume_after_many_splits():
+    from study.volume_reference import cartesian_volume
+    rng = random.Random(29389)
+    ps = [Poly.cube()]
+    for i in range(140):
+        poly = rng.choice(ps)
+        den = 1 if i%4==0 else 2**53
+        normal = tuple(rng.randrange(-den,den+1) for _ in range(3))
+        if not any(normal):
+            continue
+        vals = [Fraction(sum(a*x for a,x in zip(normal,v)),v[3]) for v in poly.vertices]
+        a,b=poly.split((*normal,-round(sum(vals)/len(vals))))
+        if a is not None and b is not None:
+            ps.extend([a,b])
+    assert len(ps)>200
+    assert all(p.volume == cartesian_volume(p) for p in ps)

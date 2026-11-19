@@ -113,18 +113,25 @@ class Poly:
 
     @cached_property
     def volume(self):
-        def xyz(p):
-            return tuple(Fraction(x,p[3]) for x in p[:3])
-        o = xyz(self.vertices[0])
-        v = {p:tuple(x-y for x,y in zip(xyz(p),o)) for p in self.vertices}
-        total = 0
+        """Unsigned tetrahedral fan about a vertex, with exact integer determinants."""
+        origin = self.vertices[0]
+        ox, oy, oz, ow = origin
+        offsets = {}
+        for point in self.vertices:
+            x, y, z, w = point
+            offsets[point] = (ow*x-ox*w, ow*y-oy*w, ow*z-oz*w)
+        total = Fraction()
         for face in self.faces:
-            a,b,c = v[face[0]]
-            for p,q in zip(face[1:-1],face[2:]):
-                x,y,z = v[p]
-                h,i,j = v[q]
-                total += abs(a*(y*j-z*i) + b*(z*h-x*j) + c*(x*i-y*h))
-        return total/6
+            if origin in face:
+                continue  # every tetrahedron on this face has zero height
+            start = face[0]
+            a, b, c = offsets[start]
+            for p, q in zip(face[1:-1], face[2:]):
+                x, y, z = offsets[p]
+                h, i, j = offsets[q]
+                determinant = a*(y*j-z*i) + b*(z*h-x*j) + c*(x*i-y*h)
+                total += Fraction(abs(determinant), start[3]*p[3]*q[3])
+        return total / (6*ow**3)
 
     def grid_bounds(self, n):
         # Positive-volume range; closed facets have zero grid mass.
