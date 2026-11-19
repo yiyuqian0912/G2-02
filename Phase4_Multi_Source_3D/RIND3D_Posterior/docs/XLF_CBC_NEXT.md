@@ -3,7 +3,7 @@
 Production stays FastLabel v3.4 on `yushu/3d`. Nothing here is a production change; any production use needs a
 separate readiness decision.
 
-Numbers refer to `XLF_CBC_RESULTS.md` (unified build v3.0, `a648358`; reference build v2.9e, `067d746`). v3.0 has
+Numbers refer to `XLF_CBC_RESULTS.md` (unified build v3.0.1, `2b05802`; reference build v2.9e, `067d746`). v3.0 has
 one certification path. The items below strengthen that single path; none of them introduces a mode.
 
 ## 1. Correctness obligations still open (ordered by risk × cost to close)
@@ -27,7 +27,7 @@ one certification path. The items below strengthen that single path; none of the
    * An independent decoder cross-check in CI.
    * Decoding once per scene rather than per channel; this also saves ≈ 1.7 s per L = 256 channel.
 
-## 2. Performance: the remaining tail (v2.9e, 10 s budget)
+## 2. Performance: the remaining tail (v3.0.1, 10 s budget; the same failure classes as v2.9e)
 
 Remaining failure classes, with the measured cause:
 
@@ -39,7 +39,7 @@ Remaining failure classes, with the measured cause:
 
 Current numbers to beat:
 * benchmark 8 s: 87/90 with verification off, 84/90 with it on;
-* canary 10 s: 786/807 certified mode, 796/807 speed mode (`XLF_CBC_RESULTS.md` §5).
+* canary 10 s: 795/807 unified (v2.9e: 786 certified mode, 796 speed mode; `XLF_CBC_RESULTS.md` §6).
 
 Ideas measured and **not** adopted (evidence):
 * Grid-aligned refinement of live pieces: the per-cell exact decomposition gives exactly the frontier bound on

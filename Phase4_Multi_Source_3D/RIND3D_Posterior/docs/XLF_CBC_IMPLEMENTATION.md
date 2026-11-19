@@ -39,7 +39,7 @@ neither changes the trust model.)
 | 5. correct by construction instead? | Yes: the split primitive is proven (Theorem P) from an FS precondition that holds inductively from the cube, since every polytope the kernel holds comes from `Poly.cube()` or `split` |
 | 6. redundancy under the actual representation | Exact Python integers everywhere in `split`. The binary64 filter decides only the early exits, with a proved margin and exact fallback. Theorem P therefore applies to the executed code, and the check is redundant |
 | 7. cheap intrinsic replacement | Not needed for splits. The one place where volumes enter the bound keeps a cheap guard (§3) |
-| 8. performance of the unified implementation | Equals speed mode: certified mode cost +23% wall time over the canary and 10 certifications at 10 s (XLF_CBC_RESULTS §5–6) |
+| 8. performance of the unified implementation | Measured (v3.0.1): 795/807 canary channels at 10 s and 1,284 s in total, against 796 and 1,271 s for speed mode and 786 and 1,563 s for certified mode. Outputs are byte-identical to both modes where both certify (XLF_CBC_RESULTS §6) |
 
 **Behavioural evidence** (EMPIRICALLY TESTED, consistent with the proof): on all 786 canary channels that both
 v2.9e modes certified, the payload bytes and bounds are identical. The check never changed a decision; it never

@@ -1,4 +1,4 @@
-# XLF CBC labeller: results (v2.9)
+# XLF CBC labeller: results (v2.9 → v3.0.1 unified)
 
 **Machine and method.**
 * Ryzen 7 5800H (8 cores, 16 threads); single-threaded solver processes, 4–6 in parallel; laptop only.
@@ -82,6 +82,7 @@ Every snapshot is compared with an exact-certified reference.
 |---|---|---|---|---|
 | v2.9a, 48 referenced tasks × 3 seeds | 127 (43) | 9,600 | **0** | 2,904 |
 | v2.9e certified mode (every split certified), 48 tasks × 3 seeds | 144 (48) | 1,421 | **0** | 498 (+1 oversize split row) |
+| **v3.0.1 unified**, external split oracle on (`instrument_splits`), 48 tasks × 3 seeds | 144 (48) | 4,087 | **0** (no taint; 179,918 splits certified by the oracle, 0 failures) | 749 |
 
 In the certified-mode campaign no kernel was tainted. Every split, including the deliberately degenerate chaos
 planes through vertices, passed its run-time certificate, so the checker raised no false alarm. 123 of 137 final
@@ -242,3 +243,56 @@ structure checks 0.5%. Per-split certification sits inside the pair-conditioning
 **Relation to FastLabel.** XLF-CBC does not fall back to FastLabel; INCOMPLETE is its only non-certified
 outcome. A pipeline that labels INCOMPLETE channels with FastLabel would be a separate decision, with the two
 assurance models kept distinct in the envelope.
+
+## 6. Unified solver v3.0.1 (`2b05802`) against both v2.9e modes and FastLabel
+
+One frozen build (worktree `G2-02-xlf-cbc-v301`) on the same machine, budgets and parallelism as §5. There is no
+mode switch.
+
+| | **v3.0.1 unified** | v2.9e certified mode | v2.9e speed mode | FastLabel v3.4 |
+|---|---|---|---|---|
+| canary certified at 10 s | **795/807 (98.5%)** | 786/807 | 796/807 | 807/807 (512 statistical) |
+| inconsistent with production labels | **0** | 0 | 0 | — |
+| identical to the 295 deterministic FastLabel labels | **295/295** | 295/295 | 295/295 | — |
+| total in-process wall | **1,284 s** | 1,563 s | 1,271 s | 772 s |
+| ratio to FastLabel | **1.66×** (≈ 0.9× net of ≈ 590 s decoding) | 2.0× | 1.65× | 1 |
+| total process wall | 2,201 s | 2,435 s | 2,151 s | — |
+| certified latency median / p90 / p99 / max (in-process) | **1.41 / 2.60 / 6.90 / 11.3 s** | 1.76 / 3.08 / 6.90 / 9.4 s | 1.39 / 2.58 / 7.26 / 11.3 s | 0.68 / 1.76 / — / 6.1 s (per channel) |
+| peak RSS median / max | 446 / 788 MiB | 444 / 771 MiB | 443 / 794 MiB | (GPU worker) |
+| failures | 0 crashes, 0 ERROR, 12 INCOMPLETE | 0, 0, 21 | 0, 0, 11 | — |
+| benchmark at 8 s / 20 s | **87/90 / 87/90** | 84/90 / 87/90 | 87/90 / — | — |
+| inconsistent vs exact references | **0/86** | 0/83, 0/86 | 0 | — |
+
+**Byte identity.** The v3.0.1 payload bytes and bounds are identical to v2.9e on every channel both certified:
+795/795 against speed mode and 786/786 against certified mode. Unification changed no decision; it removed the
+duplicated verification and one aliasing channel.
+* The single channel speed mode certified and v3.0.1 did not (`000003_w09_s0`, bound 0.094 at the deadline) is a
+  10 s budget borderline.
+* Against certified mode, v3.0.1 certifies 9 more channels and costs 18% less in total.
+* The first v3.0 run was slower (in-process median 2.01 s). The cause was a value check (`np.isin`) in the new
+  private problem copy, which took 0.71 s per L = 256 channel; v3.0.1 replaced it with an O(n) maximum.
+
+**Primitive costs.** Measured on an idle machine, on 1,500 splits recorded from a cut-heavy L64 task (≈ 8 vertices,
+≈ 360-bit coordinates):
+
+| primitive | cost |
+|---|---|
+| `Poly.split` (exact; filtered early exit) | 88 µs |
+| `Poly.side` (exact predicate, filtered) | 10.6 µs (exact `form` over all vertices without filter: 3.8 µs) |
+| `polycheck.check` (structure / topology) | 300 µs per polytope |
+| fan volume (Fraction) | 827 µs per polytope |
+| `verify_split` (the removed per-split check) | **650 µs per split**, about 7× the split itself |
+
+**Where the unified kernel spends its time** (canary, kernel wall-clock counters):
+
+| component | share |
+|---|---|
+| screens | 14.7% |
+| octree credit integration (native) | 11.0% |
+| envelopes | 7.9% |
+| exact cuts | 6.0% |
+| pair conditioning | 4.9% |
+| retained structural guards (29,373 checks) | 0.7% |
+
+The removed per-split verification had cost +23% wall time over the canary.
+
