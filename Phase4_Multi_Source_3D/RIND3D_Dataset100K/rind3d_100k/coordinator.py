@@ -46,6 +46,25 @@ from .labels import decode_cells
 HERE = Path(__file__).resolve().parent.parent
 
 
+FASTLABEL_KEYS = ("n_tasks", "base_seed", "family_delta", "eps", "delta")
+
+
+def fastlabel_config(cfg, o):
+    """FastLabel parameters of the campaign: the contract's labels.fastlabel. An option (run_node --fastlabel-*) may only
+    fill a field the contract does not fix; a different value is refused, because the label streams (base_seed) and the
+    per-label budget (family_delta / n_tasks, eps) are part of the statistical certificate: changing them for a rerun
+    would re-roll labels outside the declared union bound (docs/FASTLABEL_V34_CERTIFICATION.md §6)."""
+    fl = {kk: v for kk, v in ((cfg.get("labels") or {}).get("fastlabel") or {}).items() if kk in FASTLABEL_KEYS}
+    for kk, v in (o.get("fastlabel") or {}).items():
+        if kk not in FASTLABEL_KEYS or v is None:
+            continue
+        if kk in fl and fl[kk] != v:
+            raise SystemExit(f"fastlabel.{kk} = {v!r} differs from the contract ({fl[kk]!r}): label streams and the "
+                             f"certificate budget are fixed by the contract")
+        fl[kk] = v
+    return fl
+
+
 def contract_digest(c):
     """sha256 of the scientific content of a contract (documentation fields and the epoch size excluded)."""
     import copy
@@ -277,8 +296,7 @@ class Coordinator:
             # every FastLabel worker needs CUDA (exact verifier); one semaphore per GPU serialises its submissions.
             # All label workers (GPU and CPU budget) become FastLabel workers, round-robin over the GPUs.
             # FastLabel and the CuPy tau-pencil engine never share a process (rind3d's CUDA runtime owns its context).
-            fl = dict((cfg["labels"].get("fastlabel") or {})); fl.update(o.get("fastlabel") or {})
-            fl = {kk: v for kk, v in fl.items() if kk in ("n_tasks", "base_seed", "family_delta", "eps", "delta")}
+            fl = fastlabel_config(cfg, o)
             if not fl.get("n_tasks") and fl.get("delta") is None:
                 raise ValueError("FastLabel labels need n_tasks (planned label count) in the contract or options")
             lkw["fastlabel"] = fl

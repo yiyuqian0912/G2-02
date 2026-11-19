@@ -179,6 +179,54 @@ def physics_spot_check(S, n_points=512, n_windows=3, independent_points=32, seed
     return out
 
 
+def check_stat_certificate(m, lo, hi, fl):
+    """Problems of one `certified_stat` label (empty list = valid), RIND3D_Posterior/docs/FASTLABEL_V34_CERTIFICATION.md §6.
+    m: label meta; lo, hi: its per-cell arrays; fl: the contract's labels.fastlabel (n_tasks, base_seed, family_delta,
+    eps). Checks that the stored certificate is the one the theorem needs: the contract's eps and per-label delta
+    (family_delta / n_tasks), the contract's base seed and this label's own key (no re-rolled stream), the per-round
+    budget delta * 2^-round, a stage decision consistent with the fixed design (a1, a2) = design2(n1, n_max, eps,
+    delta_round), and q_B arrays (lo == hi, finite, >= 0, positive total)."""
+    c = m.get("certificate") or {}
+    if c.get("kind") != "statistical":
+        return ["kind"]
+    bad = []
+    eps = c.get("eps")
+    if eps is None or not eps <= 0.05 or m.get("tv_bound") != eps or ("eps" in fl and eps != float(fl["eps"])):
+        bad.append("eps/tv_bound")
+    d = c.get("delta_label")
+    if not (isinstance(d, float) and 0 < d < 1):
+        bad.append("delta_label")
+    elif fl.get("n_tasks") and d != float(fl.get("family_delta", 0.01)) / int(fl["n_tasks"]):
+        bad.append("delta_label != family_delta / n_tasks")
+    if fl.get("n_tasks") and c.get("n_tasks") != fl["n_tasks"]:
+        bad.append("n_tasks")
+    seed = list(c.get("seed") or [])
+    if "base_seed" in fl and seed[:1] != [int(fl["base_seed"])]:
+        bad.append("base_seed")
+    own = [int(m["slot"]), int(m["window"]), int(m["source"])] if "slot" in m else None
+    if len(seed) != 4 or (own is not None and seed[1:] != own):
+        bad.append("seed key")
+    r = c.get("round")
+    if not (isinstance(r, int) and r >= 1) or d is None or c.get("delta_round") != d * 0.5 ** r:
+        bad.append("delta_round")
+    n, K, n1, n2, a1, a2 = (c.get(x) for x in ("n", "K", "n1", "n_max", "a1", "a2"))
+    if None in (n, K, n1, n2, a1, a2):
+        bad.append("stage fields")
+    else:
+        if not ((c.get("stage") == 1 and n == n1 < n2 and K <= a1) or (c.get("stage") == 2 and n == n2 and K <= a2)):
+            bad.append("stage decision")
+        if "delta_round" not in bad and "eps/tv_bound" not in bad:
+            from rind3d_posterior.fastlabel.pipeline import design2
+            if n1 < n2 and (a1, a2) != tuple(design2(int(n1), int(n2), float(eps), float(c["delta_round"]))[:2]):
+                bad.append("design (a1, a2)")
+    lo = np.asarray(lo, np.float64); hi = np.asarray(hi, np.float64)
+    if not (len(lo) and np.array_equal(lo, hi) and np.all(np.isfinite(lo)) and np.all(lo >= 0) and lo.sum() > 0):
+        bad.append("q_B arrays")
+    if not str(m.get("engine_version", "fastlabel-v3.4")).startswith("fastlabel-v3.4"):
+        bad.append("engine_version")
+    return bad
+
+
 def validate_labels(root, slot, scene_rec, cons_rec=None):
     """cons_rec: the slot's last labels/consolidated.jsonl record; its sha256 must match the file."""
     p = labels_path(root, slot)
@@ -209,15 +257,14 @@ def validate_labels(root, slot, scene_rec, cons_rec=None):
         j = int(m["source"]); s_ = np.minimum((src[j] * 128).astype(np.int64), 127)
         if (s_[0] * 128 + s_[1]) * 128 + s_[2] not in set(cells_all[a_:b_].astype(np.int64).tolist()):
             errs.append(f"{m['key']} true source outside the label support")
-        if m["status"] == "certified_stat" and fl.get("n_tasks") and (m.get("certificate") or {}).get("n_tasks") != fl["n_tasks"]:
-            errs.append(f"{m['key']} certificate n_tasks differs from the contract")
         if m["status"] == "certified" and m["tv_bound"] > 0.05:
             errs.append(f"{m['key']} certified with tv {m['tv_bound']}")
+        if status.get(m["key"]) != m["status"]:
+            errs.append(f"{m['key']} status map {status.get(m['key'])} differs from the label meta {m['status']}")
         if m["status"] == "certified_stat":
-            c = m.get("certificate") or {}
-            if c.get("kind") != "statistical" or not (c.get("eps", 1) <= 0.05 and m["tv_bound"] == c.get("eps")) or \
-                    not (0 < c.get("delta_label", 1) < 1) or c.get("K", 1) > c.get("a2", -1):
-                errs.append(f"{m['key']} certified_stat without a valid statistical certificate")
+            bad = check_stat_certificate(m, z["lo"][a_:b_], z["hi"][a_:b_], fl)
+            if bad:
+                errs.append(f"{m['key']} certified_stat without a valid statistical certificate: {','.join(bad)}")
         nseg = offs[i + 1] - offs[i]
         if ("n_cells" in m and nseg != m["n_cells"]) or ("n_cells" not in m and not 0 < nseg <= m["n_records"]):
             errs.append(f"{m['key']} cell count")       # legacy piece-format records: at most one cell per piece
