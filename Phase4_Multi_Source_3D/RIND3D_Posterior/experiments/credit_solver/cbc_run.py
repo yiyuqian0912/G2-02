@@ -37,8 +37,8 @@ def main():
     ap.add_argument("--pairs", type=int, default=24)
     ap.add_argument("--batch", type=int, default=96)
     ap.add_argument("--split-above", type=int, default=1500)
-    ap.add_argument("--prefer-single-dark", action="store_true")
-    ap.add_argument("--centroid-anchor", action="store_true")
+    ap.add_argument("--no-single-dark", dest="prefer_single_dark", action="store_false")
+    ap.add_argument("--vertex-sum-anchor", dest="centroid_anchor", action="store_false")
     args = ap.parse_args()
     t, c = perf_counter(), process_time()
     warm = warm_jit()  # one-time per process; a long-lived worker pays it once

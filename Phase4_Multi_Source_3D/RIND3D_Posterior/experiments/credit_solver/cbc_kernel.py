@@ -182,6 +182,10 @@ class Kernel:
     def handles(self):
         return tuple(self._state.live)
 
+    def is_open(self, h):
+        p = self._state.live.get(h)
+        return p is not None and not p.deferred
+
     def open_handles(self):
         return [h for h, p in self._state.live.items() if not p.deferred]
 
@@ -303,7 +307,9 @@ class Kernel:
             # misses the receiver, so it can neither block nor guarantee a block there.
             union = int(np.bitwise_or.reduce(piece.masks))
             rel = [c for c in range(nb) if union >> c & 1]
+        t_enc = perf_counter()
         rows, offs = encoded_subset(self.obs, p, range(nb) if rel is None else rel)
+        self.stats["envelope_seconds"] += perf_counter() - t_enc
         check_ranges(rows, self.obs.origin, self.obs.side, self.obs.denom)
         if piece.pending is None:
             skipped = np.array(sorted(piece.done), np.int64)
@@ -514,8 +520,12 @@ class Kernel:
         return payload, wire_bound(payload, state.lower, state.upper_in, unknown_total, unknown_in)
 
     def unknown_volume(self):
-        """Search hint: total live volume (exact)."""
-        return sum((p.poly.volume for p in self._state.live.values()), Fraction(0))
+        """Search hint: total live volume (binary64; exact Fraction sums over hundreds of
+        pieces with large denominators cost ~1 s)."""
+        return sum(float(p.poly.volume) for p in self._state.live.values())
+
+    def lower_total_float(self):
+        return sum(self._state.lower.values()) / float(SCALE)
 
     def unknown_fraction(self):
         """Search hint: live volume relative to proved IN volume."""

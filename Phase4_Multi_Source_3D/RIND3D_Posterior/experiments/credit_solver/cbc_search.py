@@ -14,6 +14,7 @@ Policy (all choices affect speed or success, never soundness):
 """
 from fractions import Fraction
 from hashlib import sha256
+import heapq
 from time import perf_counter
 
 import numpy as np
@@ -94,7 +95,7 @@ def elongation(poly):
 
 
 def solve(obs, key, tolerance, seconds, cap=4096, pairs=24, strategy="interface",
-          batch=96, split_above=1500, elongated=1e4, max_splits=4000, always_split=True, negligible=Fraction(1, 2000), shrink=0.8, prefer_single_dark=False, centroid_anchor=False):
+          batch=96, split_above=1500, elongated=1e4, max_splits=4000, always_split=True, negligible=Fraction(1, 2000), shrink=0.8, prefer_single_dark=True, centroid_anchor=True, park_share=0.25):
     if seconds <= 0 or cap < 1 or pairs < 0 or not 0 <= tolerance <= 1:
         raise ValueError("invalid budget or tolerance")
     budget = Budget(seconds, cap)
@@ -120,21 +121,36 @@ def solve(obs, key, tolerance, seconds, cap=4096, pairs=24, strategy="interface"
         timings["discovery_seconds"] = perf_counter() - t0
         kernel.exclude_window()
         splits = 0
+        heap = []  # (-volume, handle); stale entries are skipped on pop
+        parked_volume = [0.0]
+
+        def push(handles):
+            for x in handles:
+                if kernel.is_open(x):
+                    heapq.heappush(heap, (-float(kernel.volume(x)), x))
+        push(kernel.open_handles())
         while True:
             budget.check()
-            work = [h for h in kernel.open_handles() if h not in parked]
-            if not work:
+            h = None
+            while heap:
+                _, x = heapq.heappop(heap)
+                if kernel.is_open(x) and x not in parked:
+                    h = x
+                    break
+            if h is None:
                 break
-            h = max(work, key=kernel.volume)
-            if kernel.positive and kernel.volume(h) < negligible * kernel.lower_total():
-                parked.add(h)  # charged as unknown; not worth the work
+            vol_h = float(kernel.volume(h))
+            if kernel.positive and vol_h < float(negligible) * kernel.lower_total_float() and \
+                    parked_volume[0] + vol_h <= park_share * float(tolerance) * kernel.lower_total_float():
+                parked.add(h)  # charged as unknown; small enough, within the parking budget
+                parked_volume[0] += vol_h
                 continue
             inherited = kernel.pending_count(h)
             r = kernel.screen(h)
             if r["outcome"] in ("out", "in", "shell"):
                 if r["outcome"] == "in" and kernel.positive:
-                    lo_v, unk_v = kernel.lower_total(), kernel.unknown_volume()
-                    if unk_v > 2 * tolerance * (lo_v + unk_v):
+                    lo_v, unk_v = kernel.lower_total_float(), kernel.unknown_volume()
+                    if unk_v > 2 * float(tolerance) * (lo_v + unk_v):
                         continue  # hint: the bound cannot be near the target yet; skip the snapshot
                     payload, bound = checkpoint()
                     trace.append([round(perf_counter() - t0, 3), float(bound)])
@@ -146,8 +162,11 @@ def solve(obs, key, tolerance, seconds, cap=4096, pairs=24, strategy="interface"
             if r["ids"] is None:
                 # obligation list too large to store: split geometrically
                 plane = propose_split(kernel, h, obs.bodies)
-                if plane is None or splits >= max_splits or kernel.split(h, plane) == [h]:
+                kids = kernel.split(h, plane) if plane is not None and splits < max_splits else [h]
+                if kids == [h]:
                     parked.add(h)
+                else:
+                    push(kids)
                 splits += 1
                 continue
             poly = kernel.poly(h)
@@ -158,9 +177,12 @@ def solve(obs, key, tolerance, seconds, cap=4096, pairs=24, strategy="interface"
             if n > split_above and splits < max_splits and (contact or (progress and (
                     always_split or elongation(poly) > elongated))):
                 plane = propose_split(kernel, h, obs.bodies)
-                if plane is not None and kernel.split(h, plane) != [h]:
-                    splits += 1
-                    continue
+                if plane is not None:
+                    kids = kernel.split(h, plane)
+                    if kids != [h]:
+                        splits += 1
+                        push(kids)
+                        continue
             ids, wrong, bnd = r["ids"], r["wrong"], r["boundary"]
             score = wrong.astype(np.int64) * 2 + bnd.astype(np.int64)
             if prefer_single_dark and r.get("masks") is not None:
@@ -172,13 +194,14 @@ def solve(obs, key, tolerance, seconds, cap=4096, pairs=24, strategy="interface"
             order = np.argsort(-score, kind="stable")
             k = n if n <= 2 * batch else batch
             chosen = [int(ids[i]) for i in order[:k]]
-            kernel.enforce(h, chosen)
+            kids, _ = kernel.enforce(h, chosen)
+            push(kids)
     except Limit as exc:
         reason = str(exc)
     if reason != "tv_target":
         payload, bound = checkpoint()
     accepted = bound is not None and bound <= tolerance
-    unk, lo = kernel.unknown_fraction()
+    unk, lo = kernel.unknown_volume(), kernel.lower_total_float()
     return (payload if accepted else None), dict(
         status="CERTIFIED" if accepted else "INCOMPLETE", reason=reason,
         tv=None if bound is None else str(bound), live=len(kernel.handles()),
