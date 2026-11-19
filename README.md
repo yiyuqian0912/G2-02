@@ -47,7 +47,8 @@ See the [v6 guide](Phase2_Multi_Source/docs/SEQUENTIAL_COUNT_SHAPE.zh-CN.md), [P
 
 **Phase4: RIND3D-100K, multiple sources.** RIND3D-100K studies global source localization from limited local observations in three-dimensional multi-source worlds.
 * The pipeline includes certified physical rendering, efficient probabilistic labelling with FastLabel, and Student training.
-* See [`Phase4_Multi_Source_3D/README.md`](Phase4_Multi_Source_3D/README.md).
+* See [`Phase4_Multi_Source_3D/README.md`](Phase4_Multi_Source_3D/README.md). Handoff: [`HANDOFF.md`](Phase4_Multi_Source_3D/HANDOFF.md); operator commands: [`PRODUCTION_RUNBOOK.md`](Phase4_Multi_Source_3D/PRODUCTION_RUNBOOK.md); contract: [`RIND3D_100K_V3_CONTRACT.md`](Phase4_Multi_Source_3D/RIND3D_100K_V3_CONTRACT.md).
+* Status: the v3 production pipeline (FastLabel v3.4 statistical labels) is validated on a laptop; the 100K dataset has not been generated yet.
 
 ## Repository
 

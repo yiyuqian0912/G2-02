@@ -9,8 +9,9 @@ machine (a local directory, not in git).
 
 | branch | tip | content | status |
 |---|---|---|---|
-| `yushu/3d` | release merge (see HANDOFF.md) | production branch | authoritative |
-| `yushu/3d-v3-release` | integration branch of this release | v3 tasks 1, 3, 4 + FastLabel v3.4 production path | merged into `yushu/3d` |
+| `yushu/3d` | tag `release/rind3d-100k-v3-2026-11-18` | production branch | authoritative |
+| `yushu/3d-v3-release` | integration branch of this release | v3 tasks 1, 3, 4 + FastLabel v3.4 production path | merged into `yushu/3d` (tag `release/rind3d-100k-v3-2026-11-18`) |
+| `yushu/3d-v3-fastlabel-cert` | 98b1668 | FastLabel v3.4 certification review: certificate rules (contract-pinned streams, strict validation, curved guard), `FASTLABEL_V34_CERTIFICATION.md`, validation scripts and results | integrated (cherry-picked) |
 | `yushu/3d-100k-v3` | b3823ad | v3 work: direct-interface eligibility, thin slabs, contract v3, curved research layer, local-first notes, benchmarks | integrated (fast-forward base of the release) |
 | `yushu/3d-v3-terminology` | 9029e61 | driver-source / binary-response vocabulary, glossary | integrated (cherry-picked) |
 | `yushu/3d-v3-curved-assessment` | b9b7f2b | `docs/CURVED_ASSESSMENT.md`: closed-ball occluders | integrated (cherry-picked); balls stay research-only |
