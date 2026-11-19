@@ -2,7 +2,7 @@
 
 **Paths.** Commands are relative to `Phase4_Multi_Source_3D/` in the G2-02 repository, or to the root of the handoff package; both have the same layout.
 
-**Scope.** This runbook covers everything that must pass on the 16 × H20 target before the 100K campaign under contract v2 (`contract/RIND3D_100K_CONTRACT_v2.json`). It is run in order and stops at the first failure.
+**Scope.** This runbook covers everything that must pass on the 16 × H20 target before the 100K campaign under the production contract v3 (`contract/RIND3D_100K_CONTRACT_v3.json`; v2 is kept for regression). It is run in order and stops at the first failure. The entry point for operators is `../PRODUCTION_RUNBOOK.md`; the laptop release canary (2026-11-19) is recorded there.
 
 **Status.** Every check below is **PENDING**: none has been executed on an H20. Mark a check PASS only after running it on the target machine, and record the command output in the canary report (§9).
 
@@ -111,11 +111,11 @@ Pass iff every task has TV(q_FastLabel, q_exact) ≤ tv_bound(FastLabel) + tv_bo
 | laptop 100K, 26 tasks of 8 v2 scenes | 26 | 0.0067 |
 | laptop 100K, slot 0, all 32 channels | 32 | 0.0147 |
 
-## 6. Canary of ≥ 256 scenes under the provisional contract v2 (PENDING)
+## 6. Canary of ≥ 256 scenes under the production contract v3 (PENDING)
 
 ```bash
 python RIND3D_Dataset100K/scripts/run_node.py --root <canary_root> --slots 0:256 --gpus all \
-       --label-cpu auto --rss-gb 3 --progress-s 60          # contract v2 and FastLabel are the defaults
+       --label-cpu auto --rss-gb 3 --progress-s 60          # contract v3 and FastLabel are the defaults
 python RIND3D_Dataset100K/scripts/verify_root.py <canary_root> --workers 64 --labels --physics-every 8 --deep-every 32
 python RIND3D_Dataset100K/scripts/coverage_report.py <canary_root>
 python RIND3D_Dataset100K/scripts/report.py <canary_root>         # throughput and timing (existing report tool)
@@ -168,7 +168,7 @@ python RIND3D_Dataset100K/scripts/report.py <canary_root>         # throughput a
 * the share of time in solid-separated channels;
 * I/O rate.
 
-**Projection.** Project the 100K wall time from steady state: `python scripts/report.py <canary_root> --costs costs.jsonl`, then `python scripts/estimate.py --report <canary_root>/REPORT.json --cost-samples costs.jsonl --workers <label workers> --gpus 16`. For FastLabel the 1K laptop rate was 10.2 labels/s with 15 workers on one GPU. ≈ 2.7–3.0 M labels are expected under κ = (0.15, 0.15, 0.15, 0.55).
+**Projection.** Project the 100K wall time from steady state: `python scripts/report.py <canary_root> --costs costs.jsonl`, then `python scripts/estimate.py --report <canary_root>/REPORT.json --cost-samples costs.jsonl --workers <label workers> --gpus 16`. For FastLabel the 1K laptop rate was 10.2 labels/s with 15 workers on one GPU. Under contract v2, ≈ 2.7–3.0 M labels were expected under κ = (0.15, 0.15, 0.15, 0.55); under v3 (direct-interface eligibility) use the canary's measured informative-channel rate (laptop estimate in `../PRODUCTION_RUNBOOK.md`).
 
 **Canary report.** Write `<canary_root>/CANARY_REPORT.md` with:
 * every command of §1–§9;

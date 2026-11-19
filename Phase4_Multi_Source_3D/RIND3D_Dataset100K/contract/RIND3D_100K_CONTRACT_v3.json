@@ -1,6 +1,6 @@
 {
   "contract": "rind3d-100k-contract-v3",
-  "status": "provisional pre-production contract (not run at scale). It changes the target population of v2: only windows with a direct FREE-FREE response interface are eligible. kappa, quotas, caps and the coverage design are v2's and are NOT yet re-validated for the v3 population (docs/SAMPLING_IMPACT_V3.md; H20 canary still required)",
+  "status": "production contract (release 2026-11-19; default of scripts/run_node.py). Semantics frozen: physics, direct FREE-FREE response-interface eligibility, thin-slab geometry rule, posterior target, label statuses, storage. Population parameters (kappa, quotas, caps, coverage design; v2's values, impact measured in docs/SAMPLING_IMPACT_V3.md) are as declared pending the H20 canary review (docs/H20_CANARY_RUNBOOK.md section 7). Not yet run at scale.",
   "supersedes": "rind3d-100k-contract-v2 (window rule 'mixed'; kept unchanged for regression and reproducibility)",
   "seed": 20261118,
   "resolution": 1024,

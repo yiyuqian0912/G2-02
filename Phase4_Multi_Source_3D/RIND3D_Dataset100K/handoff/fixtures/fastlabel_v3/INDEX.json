@@ -1,0 +1,239 @@
+{
+ "contract": "rind3d-100k-contract-v3",
+ "config": {
+  "n_tasks": 4800000,
+  "base_seed": 20261118,
+  "family_delta": 0.01,
+  "eps": 0.05
+ },
+ "labels": [
+  {
+   "slot": 0,
+   "window": 0,
+   "source": 0,
+   "digest": "732d25d17870ae00",
+   "status": "certified_stat",
+   "tv_bound": 0.05,
+   "path": "stat_certified",
+   "n_cells": 81,
+   "certificate": {
+    "kind": "statistical",
+    "n": 512,
+    "K": 0,
+    "stage": 1,
+    "round": 2,
+    "a1": 1,
+    "a2": 14
+   }
+  },
+  {
+   "slot": 0,
+   "window": 4,
+   "source": 0,
+   "digest": "b5a1c7c8197cc6e4",
+   "status": "certified_stat",
+   "tv_bound": 0.05,
+   "path": "stat_certified",
+   "n_cells": 997,
+   "certificate": {
+    "kind": "statistical",
+    "n": 512,
+    "K": 0,
+    "stage": 1,
+    "round": 2,
+    "a1": 1,
+    "a2": 14
+   }
+  },
+  {
+   "slot": 0,
+   "window": 8,
+   "source": 0,
+   "digest": "7985622bd65d4853",
+   "status": "certified_stat",
+   "tv_bound": 0.05,
+   "path": "stat_certified",
+   "n_cells": 2572,
+   "certificate": {
+    "kind": "statistical",
+    "n": 512,
+    "K": 0,
+    "stage": 1,
+    "round": 2,
+    "a1": 1,
+    "a2": 14
+   }
+  },
+  {
+   "slot": 1,
+   "window": 0,
+   "source": 0,
+   "digest": "8abd48548b4d3aef",
+   "status": "certified_stat",
+   "tv_bound": 0.05,
+   "path": "stat_certified",
+   "n_cells": 6803,
+   "certificate": {
+    "kind": "statistical",
+    "n": 512,
+    "K": 0,
+    "stage": 1,
+    "round": 2,
+    "a1": 1,
+    "a2": 14
+   }
+  },
+  {
+   "slot": 1,
+   "window": 4,
+   "source": 1,
+   "digest": "c116376fbbb98316",
+   "status": "certified_stat",
+   "tv_bound": 0.05,
+   "path": "stat_certified",
+   "n_cells": 2575,
+   "certificate": {
+    "kind": "statistical",
+    "n": 1024,
+    "K": 10,
+    "stage": 2,
+    "round": 2,
+    "a1": 1,
+    "a2": 14
+   }
+  },
+  {
+   "slot": 1,
+   "window": 8,
+   "source": 0,
+   "digest": "ef008a8c3c244882",
+   "status": "certified",
+   "tv_bound": 0.0,
+   "path": "single_cell_support",
+   "n_cells": 1,
+   "certificate": {
+    "kind": "support",
+    "n": null,
+    "K": null,
+    "stage": null,
+    "round": null,
+    "a1": null,
+    "a2": null
+   }
+  },
+  {
+   "slot": 2,
+   "window": 0,
+   "source": 2,
+   "digest": "b571a317e3fa9a58",
+   "status": "certified_stat",
+   "tv_bound": 0.05,
+   "path": "stat_certified",
+   "n_cells": 103,
+   "certificate": {
+    "kind": "statistical",
+    "n": 512,
+    "K": 0,
+    "stage": 1,
+    "round": 2,
+    "a1": 1,
+    "a2": 14
+   }
+  },
+  {
+   "slot": 2,
+   "window": 4,
+   "source": 2,
+   "digest": "eeb53dfd9234f024",
+   "status": "certified_stat",
+   "tv_bound": 0.05,
+   "path": "stat_certified",
+   "n_cells": 121,
+   "certificate": {
+    "kind": "statistical",
+    "n": 512,
+    "K": 0,
+    "stage": 1,
+    "round": 2,
+    "a1": 1,
+    "a2": 14
+   }
+  },
+  {
+   "slot": 2,
+   "window": 8,
+   "source": 0,
+   "digest": "3ed9a81e4743eb68",
+   "status": "certified",
+   "tv_bound": 0.0,
+   "path": "single_cell_support",
+   "n_cells": 1,
+   "certificate": {
+    "kind": "support",
+    "n": null,
+    "K": null,
+    "stage": null,
+    "round": null,
+    "a1": null,
+    "a2": null
+   }
+  },
+  {
+   "slot": 3,
+   "window": 0,
+   "source": 0,
+   "digest": "9ef5e0248d7794cb",
+   "status": "certified_stat",
+   "tv_bound": 0.05,
+   "path": "stat_certified",
+   "n_cells": 8917,
+   "certificate": {
+    "kind": "statistical",
+    "n": 1024,
+    "K": 7,
+    "stage": 2,
+    "round": 2,
+    "a1": 1,
+    "a2": 14
+   }
+  },
+  {
+   "slot": 3,
+   "window": 4,
+   "source": 0,
+   "digest": "7a71700d361d6a95",
+   "status": "certified_stat",
+   "tv_bound": 0.05,
+   "path": "stat_certified",
+   "n_cells": 76,
+   "certificate": {
+    "kind": "statistical",
+    "n": 512,
+    "K": 0,
+    "stage": 1,
+    "round": 2,
+    "a1": 1,
+    "a2": 14
+   }
+  },
+  {
+   "slot": 3,
+   "window": 8,
+   "source": 0,
+   "digest": "7669daf6681c0568",
+   "status": "certified_stat",
+   "tv_bound": 0.05,
+   "path": "stat_certified",
+   "n_cells": 58,
+   "certificate": {
+    "kind": "statistical",
+    "n": 512,
+    "K": 0,
+    "stage": 1,
+    "round": 3,
+    "a1": 1,
+    "a2": 13
+   }
+  }
+ ]
+}

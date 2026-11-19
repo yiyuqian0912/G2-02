@@ -69,7 +69,7 @@ cat > "${REPO}/r3d_env.sh" <<EOF
 export R3D_REPO="${REPO}"
 export PATH="${REPO}/.venv/bin:\${PATH}"
 export RIND_NVRTC_LIBRARY="${NVRTC_LIB}"
-export PYTHONPATH="${REPO}/RIND3D_Dataset100K:${REPO}/RIND3D_Dataset1K:${REPO}/RIND3D_Posterior/src\${PYTHONPATH:+:\${PYTHONPATH}}"
+export PYTHONPATH="${REPO}/RIND3D_Dataset100K:${REPO}/RIND3D_Dataset1K:${REPO}/RIND3D_Posterior/src:${REPO}/RIND3D_Generator/curved\${PYTHONPATH:+:\${PYTHONPATH}}"
 export OMP_NUM_THREADS=1 NUMBA_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1
 EOF
 source "${REPO}/r3d_env.sh"

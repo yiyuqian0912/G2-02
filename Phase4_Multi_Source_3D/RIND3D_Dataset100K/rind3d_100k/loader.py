@@ -146,8 +146,10 @@ class Scene:
         return rec
 
     def sources(self):
-        """Privileged: source coordinates [k, 3] (targets / evaluation only, never a model input)."""
+        """Privileged: driver-source coordinates [k, 3] (targets / evaluation only, never a model input)."""
         return self.S.sources()
+
+    driver_sources = sources          # generalized vocabulary (docs/RIND3D/GLOSSARY.md); `sources` kept for compatibility
 
 
 class RIND3D100K:
