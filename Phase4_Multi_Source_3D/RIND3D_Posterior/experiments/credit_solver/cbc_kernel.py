@@ -45,13 +45,13 @@ import weakref
 import numpy as np
 
 import inputs  # noqa: F401  (installs pinned research paths)
-from envelopes import clearance_partition
+from envelopes import clearance_covers, clearance_partition
 from ledger import decode, encode
 from poly import Poly, form, grid_pieces, primitive
 from raster import encoded
 from screen2 import check_ranges, scan_collect, scan_ids
 from poly import within
-from solver import Budget, Limit, apply_pair, cone, subtract_many
+from solver import Budget, Limit, Observation, apply_pair, cone, subtract_many
 from kernel import SCALE, ceil_mass, cell_id, single_cell, wire_bound
 import polycheck
 
@@ -68,7 +68,7 @@ except ImportError:
 CELL_UNITS = SCALE // (128 ** 3)  # exact volume of one output cell in units of 2^-160
 SPLIT_COEF_LIMIT = 1 << 4096  # search-proposed split rows (the search's dyadic planes need < 2^450)
 CHECK_LIVE = True
-VERIFY_SPLITS = _os.environ.get("CBC_VERIFY_SPLITS", "1") != "0"  # structural certificate (polycheck) for every live piece charged in a snapshot
+# CHECK_LIVE: structural certificate (polycheck.check) of every live piece charged in a snapshot
 
 
 def _readonly(a, dtype):
@@ -150,7 +150,7 @@ def encoded_subset(obs, p, bodies):
     from raster import fixed
     from envelopes import Envelope
     from penumbra import directions
-    if getattr(obs, "centroid_anchor", False):
+    if obs.centroid_anchor:
         # Hint only (never a decision): the binary64 vertex centroid snapped to 2^-60.
         fv = p.fvertices
         anchor = primitive(tuple(int(round(sum(v[i] for v in fv) / len(fv) * 2.0 ** 60)) for i in range(3))
@@ -158,16 +158,10 @@ def encoded_subset(obs, p, bodies):
     else:
         anchor = primitive(tuple(map(sum, zip(*p.vertices))))
     rows, offsets = [], [0]
-    if getattr(obs, "use_support", False) and not hasattr(obs, "obstacles"):
-        obs.obstacles = [within(Poly.cube(), b) for b in obs.bodies]
-        if any(k is None for k in obs.obstacles):
-            raise ValueError("expected full-dimensional body in world")
-    mixed = getattr(obs, "use_support", False) and getattr(obs, "use_mixed", False)
-    if mixed:
-        from shadow_facets import Geometry, mixed_candidates
-        if not hasattr(obs, "kgeo"):
-            obs.kgeo = [Geometry(k) for k in obs.obstacles]
-        pgeo = Geometry(p)
+    # obs is the kernel's private problem (private_problem): obstacles, facet geometry and
+    # clearance covers are built once at construction, never lazily on a shared object.
+    from shadow_facets import Geometry, mixed_candidates
+    pgeo = Geometry(p)
     for j in bodies:
         b = obs.bodies[j]
         e = Envelope(b, p.vertices)
@@ -180,11 +174,9 @@ def encoded_subset(obs, p, bodies):
         outside = [v for v in p.vertices if any(form(r, v) > 0 for r in b)]
         if len(outside) < len(p.vertices):
             e.inner = Envelope(b, outside).inner if outside else ()
-        if getattr(obs, "use_support", False):
-            e.outer = e.outer + directions(obs.obstacles[j], p)
-            if mixed:
-                e.outer = tuple(dict.fromkeys(e.outer + separators(obs.obstacles[j], p,
-                                                                   mixed_candidates(obs.kgeo[j], pgeo))))
+        # possible shadow: Envelope rows + validated cone facets + validated mixed facets (Lemma O)
+        e.outer = tuple(dict.fromkeys(e.outer + directions(obs.obstacles[j], p)
+                                      + separators(obs.obstacles[j], p, mixed_candidates(obs.kgeo[j], pgeo))))
         hint = cone(b, anchor) if any(form(r, anchor) > 0 for r in b) else []
         for planes, up in ((e.inner, True), (e.outer, False), (hint, False)):
             rows.extend(fixed(planes, up))
@@ -266,29 +258,48 @@ class State:
     outside_window: bool
 
 
+def private_problem(observation, centroid_anchor=True):
+    """The kernel's own copy of one problem: nothing the search holds can alias it.
+
+    Obstacle rows are deep-copied into tuples of Python ints, the class array is copied and
+    made read-only, and every derived cache the trusted code reads (obstacles clipped to the
+    cube, their facet geometry, the clearance covers) is computed here, once.
+    """
+    side = int(observation.side)
+    if int(observation.denom) != 2048 or side not in (64, 128, 256):
+        raise ValueError("kernel verified for N=1024 and v3 window sizes only")
+    origin = tuple(int(o) for o in observation.origin)
+    if len(origin) != 3 or any(o < 0 or o + side > 1024 for o in origin):
+        raise ValueError("window outside the world")
+    bodies = tuple(tuple(tuple(int(x) for x in r) for r in b) for b in observation.bodies)
+    if any(len(r) != 4 for b in bodies for r in b):
+        raise ValueError("obstacle rows must be homogeneous 4-vectors")
+    cls = np.array(observation.cls, dtype=np.uint8, copy=True)
+    if cls.shape != (side,) * 3 or not np.isin(cls, (0, 1, 2)).all():
+        raise ValueError("class array must be (L, L, L) with values 0, 1, 2")
+    cls.flags.writeable = False
+    obs = Observation(bodies, cls, origin, 1024)
+    scancls = np.ascontiguousarray(cls.T).copy()
+    scancls.flags.writeable = False
+    obs.scancls = scancls
+    obs.centroid_anchor = bool(centroid_anchor)
+    obs.obstacles = [within(Poly.cube(), b) for b in bodies]
+    if any(k is None for k in obs.obstacles):
+        raise ValueError("expected full-dimensional body in world")
+    from shadow_facets import Geometry
+    obs.kgeo = [Geometry(k) for k in obs.obstacles]
+    obs.clearance_covers = clearance_covers(obs)
+    return obs
+
+
 class Kernel:
-    def __init__(self, observation, budget):
-        self.obs = observation
+    def __init__(self, observation, budget, centroid_anchor=True):
+        self._obs = private_problem(observation, centroid_anchor)
         self.budget = budget
-        if observation.denom != 2048 or observation.side not in (64, 128, 256):
-            raise ValueError("kernel verified for N=1024 and v3 window sizes only")
-        if any(o < 0 or o + observation.side > 1024 for o in observation.origin):
-            raise ValueError("window outside the world")
         self._state = State({0: Piece(Poly.cube())}, Counter(), Counter(), 1, False)
         self.stats = Counter()
         self._cones = {}
-        self.obs.scancls = np.ascontiguousarray(self.obs.cls.T)
-        # Exactly validated separating support planes tighten every possible shadow
-        # (penumbra.directions: float proposals, exact integer validation; see design doc).
-        self.obs.use_support = True
-        # Mixed facets of K + cone(K - P) (shadow_facets: proposals; separators: exact check).
-        self.obs.use_mixed = _os.environ.get("CBC_MIXED") != "0"
-        self._origin = np.asarray(self.obs.origin, np.int64)
-        # Per-split certificate (polycheck.verify_split): every polytope split inside every
-        # transition is checked for structure, side, provenance and exact volume conservation.
-        import poly as _poly
-        _poly.SPLIT_HOOK = polycheck.verify_split if VERIFY_SPLITS else None
-        self._verified0 = polycheck.VERIFIED
+        self._origin = np.asarray(self._obs.origin, np.int64)
         self._tainted = None
         self._best = None  # (bound, payload) with the smallest bound computed so far
         self._checked = weakref.WeakSet()  # polytopes that passed polycheck.check
@@ -311,6 +322,15 @@ class Kernel:
         p = self._state.live[h]
         return None if p.pending is None else len(p.pending)
 
+    def receiver_classes(self):
+        """Read-only [z, y, x] class view (hint for the search)."""
+        return _view(self._obs.scancls)
+
+    def envelope_rows(self, h):
+        """Copies of the piece's screen rows over all bodies (hint for the search's proposals)."""
+        rows, offs = encoded_subset(self._obs, self._state.live[h].poly, range(len(self._obs.bodies)))
+        return rows.copy(), offs.copy()
+
     def poly(self, h):
         """A copy of the polytope, for proposal heuristics only (the kernel keeps its own)."""
         return copy.copy(self._state.live[h].poly)
@@ -318,7 +338,7 @@ class Kernel:
     def contact(self, h):
         """Hint: does a vertex of the piece lie in a closed obstacle? (search hint, untrusted use)"""
         p = self._state.live[h].poly
-        return any(all(form(r, v) <= 0 for r in body) for body in self.obs.bodies for v in p.vertices)
+        return any(all(form(r, v) <= 0 for r in body) for body in self._obs.bodies for v in p.vertices)
 
     @property
     def positive(self):
@@ -344,15 +364,15 @@ class Kernel:
         return new_ids
 
     def _receiver(self, pos, label=None):
-        if len(pos) != 3 or any(type(i) is not int or not 0 <= i < self.obs.side for i in pos):
+        if len(pos) != 3 or any(type(i) is not int or not 0 <= i < self._obs.side for i in pos):
             raise ValueError("invalid receiver coordinate")
-        c = int(self.obs.cls[pos])
+        c = int(self._obs.cls[pos])
         if c not in (0, 1) or (label is not None and c != label):
             raise ValueError("receiver evidence contradicts observation")
-        return self.obs.world(pos)
+        return self._obs.world(pos)
 
     def _idx_pos(self, idx):
-        L = self.obs.side
+        L = self._obs.side
         if type(idx) is not int or not 0 <= idx < L ** 3:
             raise ValueError("invalid receiver id")
         z, yx = divmod(idx, L * L)
@@ -370,9 +390,9 @@ class Kernel:
         if self._state.outside_window:
             return
         children = []
-        solids = [tuple(b) for b in self.obs.bodies]
+        solids = [tuple(b) for b in self._obs.bodies]
         for piece in self._state.live.values():
-            parts = self.obs.exclude_window([piece.poly], self.budget)
+            parts = self._obs.exclude_window([piece.poly], self.budget)
             parts = subtract_many(parts, solids, self.budget)
             children.extend(Piece(q, piece.pending, piece.done, piece.deferred, piece.masks) for q in parts)
             self.budget.check(len(children))
@@ -382,8 +402,8 @@ class Kernel:
     def condition_pair(self, dark, lit):
         t_pair = perf_counter()
         d, a = self._receiver(dark, 0), self._receiver(lit, 1)
-        cones_d = [cone(b, d) for b in self.obs.bodies]
-        cones_a = [cone(b, a) for b in self.obs.bodies]
+        cones_d = [cone(b, d) for b in self._obs.bodies]
+        cones_a = [cone(b, a) for b in self._obs.bodies]
         children = []
         for piece in self._state.live.values():
             children.extend(Piece(q, piece.pending, piece.done, piece.deferred, piece.masks)
@@ -422,7 +442,7 @@ class Kernel:
             raise ValueError("deferred clearance shell")
         p = piece.poly
         t0 = perf_counter()
-        nb = len(self.obs.bodies)
+        nb = len(self._obs.bodies)
         rel = None
         if piece.pending is not None and piece.masks is not None and nb <= 64 and len(piece.pending):
             # Only bodies in some residual receiver's mask can affect a residual decision:
@@ -431,16 +451,16 @@ class Kernel:
             union = int(np.bitwise_or.reduce(piece.masks))
             rel = [c for c in range(nb) if union >> c & 1]
         t_enc = perf_counter()
-        rows, offs = encoded_subset(self.obs, p, range(nb) if rel is None else rel)
+        rows, offs = encoded_subset(self._obs, p, range(nb) if rel is None else rel)
         self.stats["envelope_seconds"] += perf_counter() - t_enc
-        check_ranges(rows, self.obs.origin, self.obs.side, self.obs.denom)
+        check_ranges(rows, self._obs.origin, self._obs.side, self._obs.denom)
         if piece.pending is None:
             skipped = np.array(sorted(piece.done), np.int64)
-            n, ids, wrong, bnd, masks = scan_collect(self.obs.scancls, self._origin, self.obs.denom, rows, offs,
+            n, ids, wrong, bnd, masks = scan_collect(self._obs.scancls, self._origin, self._obs.denom, rows, offs,
                                                      skipped, COLLECT_CAP)
             self.stats["full_scans"] += 1
         else:
-            n, ids, wrong, bnd, masks = scan_ids(self.obs.scancls, piece.pending, self._origin, self.obs.denom,
+            n, ids, wrong, bnd, masks = scan_ids(self._obs.scancls, piece.pending, self._origin, self._obs.denom,
                                                  rows, offs)
             self.stats["list_scans"] += 1
             self.stats["list_receivers"] += len(piece.pending)
@@ -464,10 +484,10 @@ class Kernel:
 
     def _settle(self, h, piece):
         p = piece.poly
-        if self.obs.cleared(p):
+        if self._obs.cleared(p):
             legal, shell = [p], []
         else:
-            legal, shell = clearance_partition(self.obs, p, self.budget)
+            legal, shell = clearance_partition(self._obs, p, self.budget)
         empty = _readonly(np.zeros(0), np.int64)
         if not legal and len(shell) == 1 and shell[0] is p:
             new = self._commit((h,), [Piece(p, empty, frozenset(), True)])
@@ -485,6 +505,9 @@ class Kernel:
         piece = self._state.live[h]
         if piece.deferred:
             raise ValueError("deferred clearance shell")
+        receiver_ids = list(receiver_ids)
+        if not all(isinstance(i, (int, np.integer)) and not isinstance(i, (bool, np.bool_)) for i in receiver_ids):
+            raise ValueError("receiver ids must be integers")  # no silent coercion of proposals
         sel = list(dict.fromkeys(int(i) for i in receiver_ids))
         if not sel:
             raise ValueError("no receivers")
@@ -523,7 +546,7 @@ class Kernel:
         subset) that misses the receiver, so its inverse cone misses the piece a.e.
         Receivers without a stored mask use every body.
         """
-        nb = len(self.obs.bodies)
+        nb = len(self._obs.bodies)
         every = tuple(range(nb))
         if piece.masks is None or piece.pending is None or nb > 64:
             return [every] * len(sel)
@@ -541,7 +564,7 @@ class Kernel:
         key = (c, idx)
         hit = self._cones.get(key)
         if hit is None:
-            hit = cone(self.obs.bodies[c], self.obs.world(self._idx_pos(idx)))
+            hit = cone(self._obs.bodies[c], self._obs.world(self._idx_pos(idx)))
             if len(self._cones) > 200000:
                 self._cones.clear()
             self._cones[key] = hit
@@ -551,7 +574,7 @@ class Kernel:
         """Exact inverse-cone enforcement of one receiver over the candidate bodies."""
         x, y, z = self._idx_pos(idx)
         cones = [self._cone(c, idx) for c in bodies]
-        if int(self.obs.cls[x, y, z]) == 1:
+        if int(self._obs.cls[x, y, z]) == 1:
             return subtract_many(parts, cones, self.budget)
         out = []
         for p in parts:
@@ -723,7 +746,7 @@ class Kernel:
         return unk, lo
 
 
-def certify(obs, tolerance, seconds, cap, search):
+def certify(obs, tolerance, seconds, cap, search, centroid_anchor=True):
     """Trusted driver: owns the budget and the kernel, runs the untrusted search, releases.
 
     search(kernel, budget) may return a diagnostics dict, run out of time (Limit) or fail
@@ -733,7 +756,7 @@ def certify(obs, tolerance, seconds, cap, search):
     if type(tolerance) is not Fraction or not 0 <= tolerance <= 1 or seconds <= 0 or cap < 1:
         raise ValueError("invalid budget or tolerance")
     budget = Budget(seconds, cap)
-    kernel = Kernel(obs, budget)
+    kernel = Kernel(obs, budget, centroid_anchor)
     try:
         details = dict(search(kernel, budget) or {})
     except Limit as exc:
@@ -741,7 +764,6 @@ def certify(obs, tolerance, seconds, cap, search):
     except Exception as exc:  # noqa: BLE001  (a failed search abstains; the kernel state stays valid)
         details = dict(search_reason="search_error", search_error=f"{type(exc).__name__}: {exc}")
     rel = kernel.release(tolerance)
-    kernel.stats["splits_verified"] = polycheck.VERIFIED - kernel._verified0
     details.update(status=rel.status, tv=None if rel.bound is None else str(rel.bound), reason=rel.reason,
                    live=len(kernel.handles()), positive=kernel.positive, stats=dict(kernel.stats))
     return rel.payload, details

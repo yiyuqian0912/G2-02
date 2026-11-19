@@ -73,7 +73,7 @@ def _sign_matrix(rows, p):
     return out
 
 
-VERIFIED = 0  # number of splits certified by verify_split in this process
+VERIFIED = 0  # splits certified by verify_split in this process (test and audit instrument)
 
 
 def _diff(b, a):
@@ -369,3 +369,28 @@ def verify_split(parent, row, neg, pos):
     check(neg)
     check(pos)
     VERIFIED += 1
+
+
+class instrument_splits:
+    """Test/audit oracle: certify every Poly.split in the block (not used in production).
+
+    with polycheck.instrument_splits(): ...   # each split must pass verify_split
+    """
+
+    def __enter__(self):
+        import poly
+        self._poly = poly
+        self._orig = poly.Poly.split
+
+        def split(p, row, _orig=self._orig):
+            a, b = _orig(p, row)
+            if a is not None and b is not None:
+                verify_split(p, row, a, b)
+            return a, b
+        poly.Poly.split = split
+        return self
+
+    def __exit__(self, *exc):
+        self._poly.Poly.split = self._orig
+        return False
+

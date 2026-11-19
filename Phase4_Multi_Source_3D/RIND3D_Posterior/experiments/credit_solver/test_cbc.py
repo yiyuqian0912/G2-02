@@ -16,7 +16,8 @@ from cbc_kernel import Kernel, Piece
 from cbc_search import solve
 from ledger import decode
 from poly import Poly, form
-from raster import encoded
+from raster import encoded  # noqa: F401
+from cbc_kernel import encoded_subset
 from screen2 import scan_collect, scan_ids, check_ranges
 from solver import Budget, choose_pairs
 from exactcheck import Oracle, _exact_hit
@@ -36,10 +37,11 @@ def load():
 def conditioned():
     obs, _ = load()
     k = Kernel(obs, Budget(60, 10 ** 6))
+    obs = k._obs
     for d, a in choose_pairs(obs.cls, 8, 1, "interface"):
         k.condition_pair(d, a)
     k.exclude_window()
-    return obs, k
+    return k._obs, k  # the kernel's private problem (its own caches and class arrays)
 
 
 def test_scan_ids_matches_full_scan(conditioned):
@@ -48,7 +50,7 @@ def test_scan_ids_matches_full_scan(conditioned):
     free = np.flatnonzero(obs.scancls.ravel() != 2)
     for h in list(k.handles())[:6]:
         p = k.poly(h)
-        rows, offs = encoded(obs, p)
+        rows, offs = encoded_subset(obs, p, range(len(obs.bodies)))
         check_ranges(rows, obs.origin, obs.side, obs.denom)
         n, ids, w, b, mk = scan_collect(obs.scancls, np.asarray(obs.origin, np.int64), obs.denom, rows, offs,
                                     np.zeros(0, np.int64), 1 << 22)
@@ -65,7 +67,7 @@ def test_scan_ids_matches_full_scan(conditioned):
 def test_scan_ids_rejects_corrupt_lists(conditioned):
     obs, k = conditioned
     p = k.poly(k.handles()[0])
-    rows, offs = encoded(obs, p)
+    rows, offs = encoded_subset(obs, p, range(len(obs.bodies)))
     o = np.asarray(obs.origin, np.int64)
     bad = np.array([5, 3], np.int64)
     assert scan_ids(obs.scancls, bad, o, obs.denom, rows, offs)[0] == -3
@@ -160,6 +162,7 @@ def test_unvisited_mass_is_charged():
     """Pieces the search never visits stay in the bound: omitting them can only lower it."""
     obs, _ = load()
     k = Kernel(obs, Budget(60, 10 ** 6))
+    obs = k._obs
     for d, a in choose_pairs(obs.cls, 24, 1, "interface"):
         k.condition_pair(d, a)
     k.exclude_window()
@@ -214,6 +217,7 @@ def test_body_subset_screen_is_never_weaker():
         pytest.skip("data")
     obs, _ = inputs.load(ROOT / "scenes" / "0000/000044.npz", 4, 0)
     k = Kernel(obs, Budget(120, 10 ** 6))
+    obs = k._obs
     for d, a in choose_pairs(obs.cls, 6, 1, "interface"):
         k.condition_pair(d, a)
     k.exclude_window()
@@ -271,6 +275,7 @@ def _pointwise_reference(obs, rows, offs):
 def test_full_screen_matches_pointwise_reference():
     obs, _ = load()
     k = Kernel(obs, Budget(120, 10 ** 6))
+    obs = k._obs
     for d, a in choose_pairs(obs.cls, 8, 1, "interface"):
         k.condition_pair(d, a)
     k.exclude_window()
@@ -283,7 +288,7 @@ def test_full_screen_matches_pointwise_reference():
             polys.extend(k.poly(c) for c in kids)
     checked = compared = 0
     for p in polys[:16]:
-        rows, offs = encoded(obs, p)
+        rows, offs = encoded_subset(obs, p, range(len(obs.bodies)))
         n, ids, w, b, mk = scan_collect(obs.scancls, np.asarray(obs.origin, np.int64), obs.denom, rows, offs,
                                         np.zeros(0, np.int64), 1 << 22)
         contra, amb, masks = _pointwise_reference(obs, rows, offs)

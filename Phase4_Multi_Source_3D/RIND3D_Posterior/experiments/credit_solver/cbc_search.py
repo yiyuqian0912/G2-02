@@ -89,15 +89,15 @@ def propose_split(kernel, h, bodies):
 
 def hull_receivers(kernel, h, obs, r, minimum):
     """Convex-hull extreme receivers of the single-blocker dark ambiguous sets (proposal)."""
-    from cbc_kernel import encoded_subset
     from hull_proposals import from_list, from_scan, scan_extremes
     L = obs.side
+    scancls = kernel.receiver_classes()
     if r["ids"] is not None and r.get("masks") is not None:
-        dark = obs.scancls.ravel()[r["ids"]] == 0
+        dark = scancls.ravel()[r["ids"]] == 0
         per_body = from_list(L, r["ids"], r["masks"], dark, minimum)
     else:
-        rows, offs = encoded_subset(obs, kernel.poly(h), range(len(obs.bodies)))
-        lo, hi, count = scan_extremes(obs.scancls, np.asarray(obs.origin, np.int64), obs.denom, rows, offs,
+        rows, offs = kernel.envelope_rows(h)
+        lo, hi, count = scan_extremes(scancls, np.asarray(obs.origin, np.int64), obs.denom, rows, offs,
                                       np.zeros(0, np.int64))
         per_body = from_scan(L, lo, hi, count, minimum)
     if not per_body:
@@ -114,17 +114,17 @@ def elongation(poly):
 
 def solve(obs, key, tolerance, seconds, cap=4096, **policy):
     """Label one channel: the trusted driver cbc_kernel.certify runs this search policy."""
+    anchor = policy.pop("centroid_anchor", True)
     return certify(obs, tolerance, seconds, cap, lambda kernel, budget: search(kernel, budget, obs, key, tolerance,
-                                                                                 **policy))
+                                                                                 **policy), centroid_anchor=anchor)
 
 
 def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
            batch=96, split_above=1500, elongated=1e4, max_splits=4000, always_split=True, negligible=Fraction(1, 2000),
-           shrink=0.8, prefer_single_dark=True, centroid_anchor=True, park_share=0.25, hull=True, hull_min=512, frag_cap=16):
+           shrink=0.8, prefer_single_dark=True, park_share=0.25, hull=True, hull_min=512, frag_cap=16):
     """Untrusted policy. Returns diagnostics only; the status comes from kernel.release()."""
     if pairs < 0:
         raise ValueError("invalid pair count")
-    obs.centroid_anchor = centroid_anchor  # anchor hint for the screens' `wrong` flags
     timings = {}
     parked = set()
     hull_spent = set()  # handles where the hull step found nothing or changed nothing
@@ -231,7 +231,7 @@ def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
             if prefer_single_dark and r.get("masks") is not None:
                 m = r["masks"]
                 single = (m != 0) & ((m & (m - np.uint64(1))) == 0)
-                dark = obs.scancls.ravel()[ids] == 0
+                dark = kernel.receiver_classes().ravel()[ids] == 0
                 # a dark receiver with one possible blocker is a pure intersection (no fragmentation)
                 pure = single & dark
                 score = score * 2 + pure.astype(np.int64)

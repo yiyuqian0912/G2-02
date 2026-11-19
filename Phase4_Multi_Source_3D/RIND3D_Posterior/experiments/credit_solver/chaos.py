@@ -24,6 +24,7 @@ from time import perf_counter
 import numpy as np
 
 import inputs
+import polycheck
 from cbc_kernel import Kernel
 from compare import certified_reference, tv
 from ledger import decode
@@ -84,7 +85,7 @@ def misuse(kernel, obs, rng, last_ids, counts):
         attempts.append(("write_view", write, ValueError))
     attempts.append(("constant_split", lambda: kernel.split(next(iter(kernel.handles())), (0, 0, 0, 1)), ValueError))
     attempts.append(("stale_handle", lambda: kernel.screen(-12345), KeyError))
-    solid = np.flatnonzero(obs.scancls.ravel() == 2)
+    solid = np.flatnonzero(kernel.receiver_classes().ravel() == 2)
     opened = kernel.open_handles()
     if len(solid) and opened:
         attempts.append(("solid_receiver", lambda: kernel.enforce(opened[0], [int(solid[0])]), ValueError))
@@ -115,7 +116,7 @@ def run(obs, ref, seed, seconds, chaos):
     kernel = Kernel(obs, Budget(seconds, 20000))
     checks, worst, viol = 0, None, []
     counts, ops = {}, {}
-    free = np.flatnonzero(obs.scancls.ravel() != 2)
+    free = np.flatnonzero(kernel.receiver_classes().ravel() != 2)
     dark = [tuple(int(t) for t in np.unravel_index(i, obs.cls.shape)) for i in np.flatnonzero(obs.cls.ravel() == 0)]
     lit = [tuple(int(t) for t in np.unravel_index(i, obs.cls.shape)) for i in np.flatnonzero(obs.cls.ravel() == 1)]
     last = {}
@@ -212,6 +213,8 @@ def main():
     ap.add_argument("--seeds", type=int, default=4)
     ap.add_argument("--seconds", type=float, default=20)
     ap.add_argument("--chaos", type=float, default=0.5)
+    ap.add_argument("--no-verify-splits", dest="verify_splits", action="store_false",
+                    help="do not certify every split with the polycheck oracle")
     args = ap.parse_args()
     slot, w, s = int(args.key[:6]), int(args.key[8:10]), int(args.key[12])
     obs, ident = inputs.load(args.root / "scenes" / f"{slot // 1000:04d}" / f"{slot:06d}.npz", w, s)
@@ -221,7 +224,13 @@ def main():
     for seed in range(args.seeds):
         t = perf_counter()
         obs, _ = inputs.load(args.root / "scenes" / f"{slot // 1000:04d}" / f"{slot:06d}.npz", w, s)
-        res = run(obs, ref, seed, args.seconds, args.chaos)
+        before = polycheck.VERIFIED
+        if args.verify_splits:
+            with polycheck.instrument_splits():  # independent oracle: every split certified
+                res = run(obs, ref, seed, args.seconds, args.chaos)
+        else:
+            res = run(obs, ref, seed, args.seconds, args.chaos)
+        res["splits_verified"] = polycheck.VERIFIED - before
         res.update(key=args.key, L=ident["side"], ref_bound=ref["bound"], wall=perf_counter() - t)
         print(json.dumps(res), flush=True)
 
