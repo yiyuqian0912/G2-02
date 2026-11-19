@@ -101,11 +101,11 @@ class Slots:
 
 
 class Node:
-    __slots__ = ("slot", "rows", "depth", "box", "fine", "nid", "cell")
+    __slots__ = ("slot", "rows", "depth", "box", "fine", "nid", "cell", "nbm", "npar")
 
     def __init__(self, slot, rows, depth, box, fine, nid, cell=-1):
         self.slot, self.rows, self.depth, self.box, self.fine, self.nid = slot, rows, depth, box, fine, nid
-        self.cell = cell
+        self.cell = cell; self.nbm = float("inf"); self.npar = float("inf")
         if box is not None and cell < 0:
             a = np.floor(box[0] * NCELL).astype(np.int64); b = np.ceil(box[1] * NCELL).astype(np.int64) - 1
             if np.all(a == b):
@@ -121,7 +121,9 @@ def box_cells(box):
 class Solver:
     def __init__(self, prob, cap_fine=16384, cap_amb=1 << 16, max_depth=160, max_fine=48, delta_floor=2.0 ** -49, rcap=256,
                  mode="tree"):
-        self.mode = mode; self.prepass = 3; self.fine_sample = 1 << 30; self.sentinel_min = 0
+        self.mode = mode; self.prepass = 3; self.fine_sample = 1 << 30; self.sentinel_min = 0; self.multires = True
+        if self.multires:
+            self.prepass = 0
         self.p = prob; self.rcap = rcap; self.progress = 0; self.cap_fine = cap_fine; self.cap_amb = cap_amb; self.max_depth = max_depth
         self.max_fine = max_fine; self.delta_floor = delta_floor
         self.PLs = Planes(); self.sl = Slots()
@@ -196,6 +198,42 @@ class Solver:
                 return []
         nbk = p.L >> p.lb
         bmark = np.zeros(nbk ** 3, np.int64)
+        node_nbm = float("inf")
+        if self.multires and p.lb > 0:
+            # block resolution first: refutation + undecided level-lb blocks; full receiver resolution only when few
+            code, nbm = PR.scan_tree(Vm, Vr, nv, node.rows, len(node.rows), p.lb, p.pyr, p.poff, p.q, p.cls, p.o, p.N,
+                                     p.L, comps, nc, p.RM, p.RR, p.K, p.ADJ, self.amb, self.cap_amb, bmark, self.wit, 0,
+                                     *prep, p.lb, self.cnt)
+            if code == PR.SC_BUG:
+                raise AssertionError(f"inconsistent sure classification at receiver block {self.wit.tolist()}")
+            if code == PR.SC_OUT:
+                self.stats["scan_s"] += time.perf_counter() - t0; self.stats["block_out"] = self.stats.get("block_out", 0) + 1
+                self._add_thint(int(self.wit[0]), int(self.wit[1]), int(self.wit[2]))
+                self._leaf(node, "OUT", tuple(int(v) for v in self.wit)); self.stats["out"] += 1
+                return []
+            idx = np.flatnonzero(bmark)
+            nst = np.empty((len(idx), 4), np.int64); nst[:, 0] = p.lb
+            nst[:, 1] = idx // (nbk * nbk); nst[:, 2] = (idx // nbk) % nbk; nst[:, 3] = idx % nbk
+            if len(idx) == 0:
+                self.stats["scan_s"] += time.perf_counter() - t0
+                return self._in_or_split(node, lo, hi)
+            # coarse while the block-scale ambiguity is large AND still shrinking (pure blocks can stay undecided at
+            # block resolution even for tiny nodes: a constraint plane may cross a block's hull without separating
+            # its receivers), else full receiver resolution
+            if nbm > self.cap_fine // 512 and nbm < 0.9 * node.nbm:
+                self.stats["scan_s"] += time.perf_counter() - t0; self.stats["block_bisect"] = self.stats.get("block_bisect", 0) + 1
+                if node.depth >= self.max_depth:
+                    return self._undet(node, "tree_depth_block")
+                sp = self._solid_split(node, lo, hi, nst)
+                if sp is not None:
+                    return sp
+                kids = self._bisect(node, lo, hi, nst)
+                for ch in kids:
+                    ch.nbm = nbm
+                return kids
+            node.rows = nst
+            node_nbm = nbm
+            bmark = np.zeros(nbk ** 3, np.int64)
         code, namb = PR.scan_tree(Vm, Vr, nv, node.rows, len(node.rows), p.lb, p.pyr, p.poff, p.q, p.cls, p.o, p.N, p.L,
                                   comps, nc, p.RM, p.RR, p.K, p.ADJ, self.amb, self.cap_amb, bmark, self.wit, self.rcap,
                                   *prep, 0, self.cnt)
@@ -220,7 +258,23 @@ class Solver:
         if node.depth >= self.max_depth or node.fine >= self.max_fine:
             return self._undet(node, "depth_guard")
         if namb > self.cap_fine:
-            return self._bisect(node, lo, hi, nst)
+            sp = self._solid_split(node, lo, hi, nst)
+            if sp is not None:
+                return sp
+            if node.depth > 12 and namb > 0.7 * node.npar:
+                # bisection no longer shrinks the ambiguity (node close to an occluder edge or vertex, where the
+                # relevant coordinate is the pencil angle about the edge): split by a central pencil plane of an
+                # ambiguous receiver instead
+                kids = self._stuck_split(node, nst, comps, namb)
+                if kids is not None:
+                    return kids
+            kids = self._bisect(node, lo, hi, nst)
+            for ch in kids:
+                ch.npar = namb
+            if self.multires and p.lb > 0:
+                for ch in kids:
+                    ch.nbm = node_nbm
+            return kids
         return self._fine(node, nst, namb, comps)
 
     def _add_thint(self, X, Y, t):
@@ -348,6 +402,9 @@ class Solver:
         if node.depth >= self.max_depth or node.fine >= self.max_fine:
             return self._undet(node, "rows_depth_fine")
         if namb > self.cap_fine:
+            sp = self._solid_split(node, lo, hi, nrows)
+            if sp is not None:
+                return sp
             return self._bisect(node, lo, hi, nrows)
         return self._fine(node, nrows, namb, comps)
 
@@ -434,6 +491,53 @@ class Solver:
                     self.cell_lo[cid] = self.cell_lo.get(cid, 0.0) + vlo; self.cell_hi[cid] = self.cell_hi.get(cid, 0.0) + vhi
         self._leaf(node, "IN_BOX", (b0.tolist(), b1.tolist())); self.stats["in_"] += 1; self.stats["in_box"] += 1
         return []
+
+    def _solid_split(self, node, lo, hi, nrows):
+        """A node straddling an occluder's boundary keeps every receiver ambiguous at every scale (part of it is inside
+        the solid). OUT_SOLID if proven inside a component (all facets <= 0 at every vertex: node subset of closed
+        K_c, outside D); otherwise split by the most central straddling facet plane (binary64 rounding + delta slab:
+        the slab is UNDET, its volume tiny). None if the node straddles no component."""
+        p = self.p
+        Vm, Vr, nv = self._verts(node.slot)
+        best = None
+        for c in range(p.C):
+            if np.any(p.AL[c] > hi) or np.any(p.AH[c] < lo):
+                continue
+            outside = False; inside = True; cand = None
+            for i in range(int(p.K[c])):
+                l, h = PR.range_on(p.RM[c, i], p.RR[c, i], Vm, Vr, nv)
+                if l > 0.0:
+                    outside = True
+                    break
+                if h > 0.0:
+                    inside = False
+                    if l < 0.0:
+                        sc = min(h, -l)
+                        if cand is None or sc > cand[0]:
+                            cand = (sc, c, i)
+            if outside:
+                continue
+            if inside:
+                self._leaf(node, "OUT_SOLID", (c,)); self.stats["out_solid"] = self.stats.get("out_solid", 0) + 1
+                return []
+            if cand is not None and (best is None or cand[0] > best[0]):
+                best = cand
+        if best is None:
+            return None
+        _, c, i = best
+        self.stats["solid_split"] = self.stats.get("solid_split", 0) + 1
+        A, B = self._plane_pair(p.RM[c, i].copy(), p.RR[c, i].copy())
+        out = []
+        for ch in self._split(node, A, rows=nrows):
+            if self.bsp_ref[ch.nid] == 2 * A:                  # {A <= 0}: inner side of the facet
+                out.append(ch)
+                continue
+            for g in self._split(ch, B, rows=nrows):
+                if self.bsp_ref[g.nid] == 2 * B:               # slab between the two planes
+                    self._undet(g, "solid_slab")
+                else:
+                    out.append(g)
+        return out
 
     # ------------------------------------------------------------------ coarse: bisection
     def _bisect(self, node, lo, hi, nrows):
@@ -524,6 +628,18 @@ class Solver:
             hs.append((int(HS[h]), HM[h].copy(), HR[h].copy(), tuple(int(v) for v in self.amb[a, :3])))
         self.stats["oneshot"] += 1
         return self._clip_sequence(node, hs, nrows, comps)
+
+    def _stuck_split(self, node, nrows, comps, namb):
+        for a in range(min(namb, self.cap_amb, 64)):
+            X, Y, t = (int(v) for v in self.amb[a, :3])
+            st, nh, obs = self._recv(node.slot, X, Y, t, comps)
+            if st in (PR.R_CONV, PR.R_NONCONV) and nh > 0:
+                self.stats["stuck_split"] = self.stats.get("stuck_split", 0) + 1
+                kids = self._pencil_split(node, (X, Y, t, self.hs_m[:nh].copy(), self.hs_r[:nh].copy()), nrows)
+                for ch in kids:
+                    ch.npar = namb
+                return kids
+        return None
 
     def _pencil_split(self, node, nc, nrows):
         self.stats["pencil_split"] += 1
@@ -636,7 +752,7 @@ class Solver:
         kinds = []; nodes = []; wits = []
         for nid, kind, data in self.leaves:
             kinds.append(kind); nodes.append(nid)
-            wits.append(list(data)[:4] if kind == "OUT" else [0, 0, 0, 0])
+            wits.append(list(data)[:4] if kind == "OUT" else ([int(data[0]), 0, 0, 0] if kind == "OUT_SOLID" else [0, 0, 0, 0]))
         return dict(PL=self.PLs.PL[:self.PLs.n].copy(), parent=np.array(self.bsp_parent, np.int64),
                     ref=np.array(self.bsp_ref, np.int64), leaf_kind=np.array(kinds), leaf_node=np.array(nodes, np.int64),
                     leaf_wit=np.array(wits, np.int64).reshape(-1, 4), root_axes=self.root_axes)

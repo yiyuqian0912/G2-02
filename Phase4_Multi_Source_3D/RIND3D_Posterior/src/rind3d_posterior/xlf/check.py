@@ -44,7 +44,7 @@ def check(prob, cert, rcap=1 << 20):
     bm = np.zeros(p.L ** 3, np.int64)
     top = np.array([[p.q, 0, 0, 0]], np.int64)
     cell_lo = {}; cell_hi = {}; pool = 0.0
-    bad = []; nchk = dict(OUT=0, IN=0, OUT_WINDOW=0, UNDET=0, EMPTY=0)
+    bad = []; nchk = dict(OUT=0, IN=0, OUT_WINDOW=0, OUT_SOLID=0, UNDET=0, EMPTY=0)
     stack = [(0, s)]
     while stack:
         nid, s = stack.pop()
@@ -65,6 +65,10 @@ def check(prob, cert, rcap=1 << 20):
                                        p.K, p.ADJ, amb, len(amb), bm, wit, 1, *prep)
                 if code != PR.SC_OUT:
                     bad.append((nid, f"OUT witness {lwit[k][:3].tolist()} not re-proven"))
+            elif kd == "OUT_SOLID":
+                c = int(lwit[k][0])
+                if not all(PR.range_on(p.RM[c, i], p.RR[c, i], Vm, Vr, nv)[1] <= 0.0 for i in range(int(p.K[c]))):
+                    bad.append((nid, "OUT_SOLID leaf not inside its component"))
             elif kd == "OUT_WINDOW":
                 if not _inside_window(p, PL, A, s):
                     bad.append((nid, "OUT_WINDOW leaf not inside the window box"))

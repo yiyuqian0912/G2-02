@@ -650,7 +650,9 @@ def scan_tree(Vm, Vr, nv, starts, nstart, lb, pyr, poff, q, cls, o, N, L, comps,
     receivers; contradicted when pure and decided against the observation (witness = a receiver of the block).
     bmark[(bx n + by) n + bz] = 1 (n = L >> lb) for every level-lb block holding an ambiguous receiver (the start
     blocks of the children). Returns (code, n_amb). With stop_level > 0 blocks are not descended below that level
-    (a refutation-only pre-pass: SC_OUT is valid, SC_OK carries no completeness information). If more than amb_limit
+    (a refutation-only pre-pass: SC_OUT is valid, SC_OK carries no completeness information). With stop_level == lb the
+    pass is a complete classification at block resolution: every undecided level-lb block is marked (receivers of
+    unmarked blocks are all proven consistent); n_amb counts the PURE undecided blocks. If more than amb_limit
     receivers are ambiguous the descent stops and SC_MANY is returned (no contradiction found so far; no marks)."""
     KD = DM.shape[1]; KL = LM.shape[1]
     NLV = q + 2
@@ -743,6 +745,10 @@ def scan_tree(Vm, Vr, nv, starts, nstart, lb, pyr, poff, q, cls, o, N, L, comps,
                     wit[0] = x0; wit[1] = y0; wit[2] = z0; wit[3] = 1
                     return SC_OUT, namb
             if stop_level > 0 and l <= stop_level:
+                if l == lb and stop_level == lb:      # coarse resolution: mark the undecided level-lb block
+                    bmark[(bx * nb + by) * nb + bz] = 1
+                    if code != P_MIXED:              # count only PURE undecided blocks: genuinely ambiguous at
+                        namb += 1                    # block scale (mixed blocks can only be decided inside)
                 continue
             if l == 0:
                 if code == P_DARK or code == P_LIT:     # single receiver, undecided
