@@ -61,14 +61,28 @@ Exact rational points are sampled from credited IN pieces; each must be legal an
 (independent exact oracle, `exactcheck.py`). Points discarded by each transition kind are sampled the same way;
 none may be feasible.
 
-**v2.4, 7 tasks (L64/L128):**
+**v2.8 (`70522ab`), all 60 L64/L128 tasks (8 s solver budget; 47 certified, 13 incomplete; at most 12 IN pieces
+× 2 points and 30 discarded points per task):**
 
-* 126 IN points, all feasible.
-* 150 discarded points, all infeasible:
-  * 78 from pair conditioning;
-  * 60 from exact cuts;
-  * 12 from screens and clearance settlement.
-* 0 violations. The full run was paused for clean timing.
+| check | sampled | violations |
+|---|---|---|
+| exact points in credited IN pieces must be legal and reproduce every FREE receiver | 604 | **0** |
+| exact points discarded by a transition must not be feasible | 958 | **0** |
+
+* The discarded points came from:
+
+  | transition | points |
+  |---|---|
+  | pair conditioning | 458 |
+  | exact cuts | 409 |
+  | screens (contradictions and clearance settlement) | 90 |
+  | window/obstacle exclusion | 1 |
+
+* 417 receiver decisions needed the oracle's exact rational fallback.
+* An earlier partial audit of v2.4 (7 tasks: 126 + 150 points) also found 0 violations.
+* L = 256 is not audited yet: the exact oracle costs about 12 s per point there.
+
+This is sampled differential evidence, independent of the kernel's code. It does not prove the transitions.
 
 ## 4. Cost (v2.8)
 
