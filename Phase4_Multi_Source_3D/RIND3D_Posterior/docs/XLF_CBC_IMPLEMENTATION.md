@@ -56,6 +56,7 @@ support-plane proposals (validated exactly).
 | Astra's geometry tests (`global_inverse/test_global.py`, `mixed_patch/test_*.py`) | cones, polytopes, envelopes, clearance, encoding | 25 pass |
 | `test_cbc.py` | `scan_ids` ≡ `scan_collect` (ids and masks); **full-window screen ≡ pointwise int64 reference** (contradictions, ambiguous ids, masks; 16 pieces including cut pieces); corrupt lists rejected; split exact and stale handles rejected; enforced children satisfy their receivers (exact segment tests); masks sound (excluded cones miss the piece, exact); body-subset residual screen never weaker than the all-body screen (11-body scene); window and obstacles excluded; end-to-end certificate on decoded bytes; unvisited mass charged | 11 pass |
 | `test_wire.py` | 300 random exact instances: exact encoding, wire_bound within [exact, exact + m·2⁻⁹⁶], true TV ≤ bound; tampered payload rejected; 200 instances: `encode_int` byte-identical to `ledger.encode` (ties included) | 501 pass |
+| `smt_screen.py` (z3, **mechanized**) | over the verified ranges, for all rows and receivers: (1) the scanline endpoint formulas of `screen2._intervals` are exact; (2) no int64 overflow; (3) `raster.fixed` rounding up shrinks guaranteed regions and rounding down grows possible regions, for positive coordinates. Remaining assumption: Numba int64 `//` is floor division (documented Python semantics) | 6/6 PROVED |
 | byte identity | payload sha256 and transition count unchanged across optimizations (float filter, masks, octree, per-edge cache) on 5 tasks | identical |
 | run-time guards | split conserves exact volume; an exact cut cannot create volume; octree credit conserves exact volume; facet rows validated; screen ranges checked | abort on violation (never observed) |
 | exact differential audit (`audit_exact.py`) | real tasks: sampled exact points in IN pieces must be feasible; sampled points discarded by each transition kind must not be feasible | see `XLF_CBC_RESULTS.md` |
@@ -63,8 +64,12 @@ support-plane proposals (validated exactly).
 
 ## 4. Remaining gaps (OPEN)
 
-1. **No machine-checked proof.** The transition lemmas (`XLF_CBC_DESIGN.md`) are manual. The Python code is
-   tested against them, not proved equal to them.
+1. **No machine-checked proof of the transitions.** The transition lemmas (`XLF_CBC_DESIGN.md`) are manual, and
+   the Python code is tested against them, not proved equal to them. Only the screen's integer arithmetic is
+   mechanized (`smt_screen.py`):
+   * the interval endpoints;
+   * the int64 range;
+   * the directed rounding.
 2. **Face-structure invariant of `Poly`.** The fan volume and the facet rows assume convex, cyclically ordered faces.
    They are guarded at run time:
    * split volume conservation;
