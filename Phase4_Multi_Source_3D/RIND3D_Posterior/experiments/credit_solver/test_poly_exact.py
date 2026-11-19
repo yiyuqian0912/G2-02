@@ -199,3 +199,52 @@ def test_check_rejects_corrupted_structures():
             continue
         with pytest.raises(ArithmeticError):
             polycheck.check(Q)
+
+
+def test_fast_check_agrees_with_reference():
+    """check (projected O(k) convexity, filtered signs) == check_reference (exact O(k^2))."""
+    rng = random.Random(11)
+    agree = 0
+    for kind in ("small", "dyadic", "big"):
+        P = Poly.cube()
+        for _ in range(25):
+            neg, pos = P.split(random_row(rng, kind))
+            if neg is None or pos is None:
+                continue
+            for Q in (neg, pos):
+                polycheck.check(Q)
+                polycheck.check_reference(Q)
+                for name, faces in corrupt_variants(Q):
+                    C = Poly([tuple(f) for f in faces])
+                    r1 = r2 = True
+                    try:
+                        polycheck.check(C)
+                    except ArithmeticError:
+                        r1 = False
+                    try:
+                        polycheck.check_reference(C)
+                    except ArithmeticError:
+                        r2 = False
+                    assert r1 == r2, name
+                    agree += 1
+            P = neg if neg.volume >= pos.volume else pos
+    assert agree > 100
+
+
+def test_verify_split_accepts_exact_and_rejects_wrong_halves():
+    rng = random.Random(5)
+    P = Poly.cube()
+    for _ in range(30):
+        r = random_row(rng, "small")
+        neg, pos = P.split(r)  # SPLIT_HOOK is unset here; verify explicitly
+        if neg is None or pos is None:
+            continue
+        polycheck.verify_split(P, r, neg, pos)
+        with pytest.raises(ArithmeticError):
+            polycheck.verify_split(P, r, pos, neg)  # swapped halves
+        other = tuple(x + (1 if i == 3 else 0) for i, x in enumerate(r))
+        n2, p2 = P.split(other)
+        if n2 is not None and p2 is not None and set(n2.vertices) != set(neg.vertices):
+            with pytest.raises(ArithmeticError):
+                polycheck.verify_split(P, r, n2, p2)  # halves of a different plane
+        P = neg if neg.volume >= pos.volume else pos

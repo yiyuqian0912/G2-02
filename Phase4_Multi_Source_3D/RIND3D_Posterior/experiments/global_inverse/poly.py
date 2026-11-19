@@ -37,6 +37,7 @@ def _fsign_terms(row, fv):
 
 
 _NORMAL_MIN = 2.2250738585072014e-308  # smallest positive normal binary64
+SPLIT_HOOK = None  # set by the CBC kernel to certify every split (credit_solver/polycheck.verify_split)
 
 
 def _frow(row):
@@ -165,7 +166,10 @@ class Poly:
             if len(a) >= 3: neg.append(tuple(a))
             if len(b) >= 3: pos.append(tuple(b))
         newface = cap_hull(cap,row)
-        return Poly(neg+[newface]),Poly(pos+[newface])
+        a, b = Poly(neg+[newface]),Poly(pos+[newface])
+        if SPLIT_HOOK is not None:
+            SPLIT_HOOK(self, row, a, b)  # optional per-split certificate (raises on failure)
+        return a, b
 
     @cached_property
     def volume(self):

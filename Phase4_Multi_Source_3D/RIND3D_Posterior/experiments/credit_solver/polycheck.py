@@ -26,7 +26,51 @@ check() raises ArithmeticError on the first violated condition and returns the o
 """
 from math import gcd
 
+import numpy as np
+
 from poly import form
+
+
+def _sign_matrix(rows, p):
+    """Exact signs of form(row, v) for every row and vertex of p.
+
+    Binary64 filter with the same operations, order and margin as poly._fsign_terms
+    (a*x + b*y + c*z, then + d; certain iff |v| > 1e-12 * sum|terms| with
+    1e-280 <= sum|terms| < 1e300); rows that do not convert to finite floats and vertices
+    whose coordinates are not normal binary64 numbers (poly.filter_vertices) are exact.
+    Uncertain entries are evaluated exactly.
+    """
+    verts = p.vertices
+    fv = p.filter_vertices
+    F, V = len(rows), len(verts)
+    R = np.zeros((F, 4))
+    rok = np.ones(F, bool)
+    for i, r in enumerate(rows):
+        try:
+            R[i] = [float(x) for x in r]
+        except OverflowError:
+            rok[i] = False
+    X = np.zeros((V, 3))
+    vok = np.ones(V, bool)
+    for j, f in enumerate(fv):
+        if f is None:
+            vok[j] = False
+        else:
+            X[j] = f
+    with np.errstate(over="ignore", invalid="ignore"):
+        t0 = R[:, 0:1] * X[None, :, 0]
+        t1 = R[:, 1:2] * X[None, :, 1]
+        t2 = R[:, 2:3] * X[None, :, 2]
+        v = ((t0 + t1) + t2) + R[:, 3:4]
+        m = ((np.abs(t0) + np.abs(t1)) + np.abs(t2)) + np.abs(R[:, 3:4])
+        ok = rok[:, None] & vok[None, :] & (m < 1e300) & (m >= 1e-280)
+        sg = np.where(ok & (v > 1e-12 * m), 1, np.where(ok & (v < -1e-12 * m), -1, 0)).astype(np.int8)
+        sure = ok & (np.abs(v) > 1e-12 * m)
+    out = sg.tolist()
+    for i, j in zip(*np.nonzero(~sure)):
+        x = form(rows[i], verts[j])
+        out[i][j] = (x > 0) - (x < 0)
+    return out
 
 
 def _diff(b, a):
@@ -46,7 +90,8 @@ def _fail(msg):
     raise ArithmeticError("face structure: " + msg)
 
 
-def check(p):
+def check_reference(p):
+    """Reference implementation (O(k^2) exact convexity tests); differential oracle for check()."""
     verts = p.vertices
     faces = p.faces
     if len(faces) < 4 or len(verts) < 4:
@@ -151,3 +196,171 @@ def check(p):
     if len(verts) - E + len(faces) != 2:
         _fail("Euler characteristic is not 2")
     return rows
+
+
+def _topology(faces, verts, oriented, rows):
+    """(d)-(g) on outward-oriented cycles: edge pairing, distinct planes, connectivity, links, Euler."""
+    if len(set(rows)) != len(rows):
+        _fail("two faces on one plane")
+    directed = {}
+    for fi, cyc in enumerate(oriented):
+        k = len(cyc)
+        for i in range(k):
+            e = (cyc[i], cyc[(i + 1) % k])
+            if e in directed:
+                _fail("directed edge used twice")
+            directed[e] = fi
+    for (s_, t) in directed:
+        if (t, s_) not in directed:
+            _fail("edge without its reverse (open surface)")
+    parent = list(range(len(faces)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    for (s_, t), fi in directed.items():
+        a, b = find(fi), find(directed[(t, s_)])
+        if a != b:
+            parent[a] = b
+    if len({find(i) for i in range(len(faces))}) != 1:
+        _fail("faces not connected")
+    nxt = {}  # (vertex, face) -> next face around the vertex
+    for fi, cyc in enumerate(oriented):
+        k = len(cyc)
+        for i in range(k):
+            v = cyc[i]
+            nxt[(v, fi)] = directed[(v, cyc[i - 1])]
+    count = {}
+    for (v, fi) in nxt:
+        count[v] = count.get(v, 0) + 1
+    if set(count) != set(verts):
+        _fail("vertex on no face")
+    seen = set()
+    for (v, fi) in nxt:
+        if v in seen:
+            continue
+        seen.add(v)
+        n, f = 1, nxt[(v, fi)]
+        while f != fi:
+            f = nxt[(v, f)]
+            n += 1
+            if n > count[v]:
+                _fail("vertex link is not a cycle")
+        if n != count[v]:
+            _fail("pinch point (several face cycles at one vertex)")
+    E = len(directed) // 2
+    if len(verts) - E + len(faces) != 2:
+        _fail("Euler characteristic is not 2")
+
+
+def _lex(a, b, i, j):
+    """Exact lexicographic comparison of the (i, j) projections of homogeneous a, b: -1, 0, 1."""
+    l, r = a[i] * b[3], b[i] * a[3]
+    if l != r:
+        return -1 if l < r else 1
+    l, r = a[j] * b[3], b[j] * a[3]
+    return (l > r) - (l < r)
+
+
+def check(p):
+    """FS certificate, same conditions as check_reference with cheaper exact tests.
+
+    (b) uses Poly.side (proved binary64 filter, exact fallback) for the supporting test and
+    exact integers for the on-plane test. (c) uses the injective projection that drops the
+    largest normal component: a cycle whose consecutive turns are all strictly of one sign and
+    whose lexicographic order changes direction exactly twice is a strictly convex polygon
+    traversed once. Topology as in check_reference. Returns the outward rows.
+    """
+    verts = p.vertices
+    faces = p.faces
+    if len(faces) < 4 or len(verts) < 4:
+        _fail("fewer than four faces or vertices")
+    for v in verts:
+        if len(v) != 4 or v[3] <= 0 or gcd(*v) != 1:
+            _fail("vertex not primitive with w > 0")
+    rows, oriented = [], []
+    for face in faces:
+        k = len(face)
+        if k < 3 or len(set(face)) != k:
+            _fail("degenerate face cycle")
+        a = face[0]
+        n = _cross(_diff(face[1], a), _diff(face[2], a))
+        if not any(n):
+            _fail("collinear leading triple (not strictly convex)")
+        row = (n[0] * a[3], n[1] * a[3], n[2] * a[3], -_dot3(n, a))
+        g = gcd(*row)
+        rows.append(tuple(x // g for x in row))
+    signs = _sign_matrix(rows, p)
+    index = {v: j for j, v in enumerate(verts)}
+    for fi, face in enumerate(faces):
+        k = len(face)
+        row = rows[fi]
+        sg = signs[fi]
+        if max(sg) > 0:
+            if min(sg) < 0:
+                _fail("face plane separates vertices (not a supporting plane)")
+            row = tuple(-x for x in row)
+            rows[fi] = row
+        if any(sg[index[q]] != 0 for q in face):
+            _fail("face not planar")
+        if all(x == 0 for x in sg):
+            _fail("all vertices on one plane")
+        drop = max(range(3), key=lambda t: abs(row[t]))
+        i, j = (drop + 1) % 3, (drop + 2) % 3
+        turn = 0
+        for t in range(k):
+            a, b, c = face[t - 2], face[t - 1], face[t]
+            cr = ((b[i] * a[3] - a[i] * b[3]) * (c[j] * b[3] - b[j] * c[3])
+                  - (b[j] * a[3] - a[j] * b[3]) * (c[i] * b[3] - b[i] * c[3]))
+            sg = (cr > 0) - (cr < 0)
+            if sg == 0 or (turn and sg != turn):
+                _fail("face cycle not strictly convex")
+            turn = sg
+        changes = 0
+        prev = _lex(face[-1], face[0], i, j)
+        for t in range(k):
+            cur = _lex(face[t], face[(t + 1) % k], i, j)
+            if cur == 0:
+                _fail("repeated projected vertex")
+            if cur != prev:
+                changes += 1
+            prev = cur
+        if changes != 2:
+            _fail("face cycle winds more than once")
+        outward_ccw = turn * (1 if row[drop] > 0 else -1) > 0
+        oriented.append(list(face) if outward_ccw else list(reversed(face)))
+    _topology(faces, verts, oriented, rows)
+    return rows
+
+
+def verify_split(parent, row, neg, pos):
+    """Per-split certificate of the cover invariant (no feasible volume is lost by a split).
+
+    Lemma V: for a polytope P and a plane meeting its interior, the vertices of
+    P & {row <= 0} are exactly the vertices of P with row <= 0 together with the points where
+    an edge of P with strictly opposite end signs crosses the plane (and symmetrically for
+    {row >= 0}). If the face structure of P satisfies FS, its face edges are the edges of P.
+
+    Inductively every polytope satisfies FS (the cube does; each split output is checked
+    here), so the halves are certified exactly when (1) their vertex sets equal the two
+    expected sets of Lemma V (exact signs and exact crossing points) and (2) both pass check().
+    Then conv(V(neg)) = P & {row <= 0} and conv(V(pos)) = P & {row >= 0}: the halves cover P,
+    overlap only on the plane, and their faces describe them exactly. Raises ArithmeticError.
+    """
+    signs = {v: form(row, v) for v in parent.vertices}
+    crossing = set()
+    for f in parent.faces:
+        for a, b in zip(f, f[1:] + f[:1]):
+            u, w = signs[a], signs[b]
+            if (u < 0 < w) or (w < 0 < u):
+                q = tuple(abs(w) * x + abs(u) * y for x, y in zip(a, b))
+                g = gcd(*q)
+                crossing.add(tuple(x // g for x in q))
+    expect_neg = {v for v, x in signs.items() if x <= 0} | crossing
+    expect_pos = {v for v, x in signs.items() if x >= 0} | crossing
+    if set(neg.vertices) != expect_neg or set(pos.vertices) != expect_pos:
+        _fail("split vertex sets differ from the exact half-space vertices")
+    check(neg)
+    check(pos)

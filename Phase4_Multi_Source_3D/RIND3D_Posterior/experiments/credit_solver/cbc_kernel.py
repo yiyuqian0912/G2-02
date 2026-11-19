@@ -67,7 +67,8 @@ except ImportError:
     NATIVE = None
 CELL_UNITS = SCALE // (128 ** 3)  # exact volume of one output cell in units of 2^-160
 SPLIT_COEF_LIMIT = 1 << 4096  # search-proposed split rows (the search's dyadic planes need < 2^450)
-CHECK_LIVE = True  # structural certificate (polycheck) for every live piece charged in a snapshot
+CHECK_LIVE = True
+VERIFY_SPLITS = _os.environ.get("CBC_VERIFY_SPLITS", "1") != "0"  # structural certificate (polycheck) for every live piece charged in a snapshot
 
 
 def _readonly(a, dtype):
@@ -283,6 +284,10 @@ class Kernel:
         # Mixed facets of K + cone(K - P) (shadow_facets: proposals; separators: exact check).
         self.obs.use_mixed = _os.environ.get("CBC_MIXED") != "0"
         self._origin = np.asarray(self.obs.origin, np.int64)
+        # Per-split certificate (polycheck.verify_split): every polytope split inside every
+        # transition is checked for structure, side, provenance and exact volume conservation.
+        import poly as _poly
+        _poly.SPLIT_HOOK = polycheck.verify_split if VERIFY_SPLITS else None
         self._tainted = None
         self._best = None  # (bound, payload) with the smallest bound computed so far
         self._checked = weakref.WeakSet()  # polytopes that passed polycheck.check

@@ -120,7 +120,7 @@ def solve(obs, key, tolerance, seconds, cap=4096, **policy):
 
 def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
            batch=96, split_above=1500, elongated=1e4, max_splits=4000, always_split=True, negligible=Fraction(1, 2000),
-           shrink=0.8, prefer_single_dark=True, centroid_anchor=True, park_share=0.25, hull=True, hull_min=512):
+           shrink=0.8, prefer_single_dark=True, centroid_anchor=True, park_share=0.25, hull=True, hull_min=512, frag_cap=16):
     """Untrusted policy. Returns diagnostics only; the status comes from kernel.release()."""
     if pairs < 0:
         raise ValueError("invalid pair count")
@@ -227,14 +227,22 @@ def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
                         continue
             ids, wrong, bnd = r["ids"], r["wrong"], r["boundary"]
             score = wrong.astype(np.int64) * 2 + bnd.astype(np.int64)
+            pure = None
             if prefer_single_dark and r.get("masks") is not None:
                 m = r["masks"]
                 single = (m != 0) & ((m & (m - np.uint64(1))) == 0)
                 dark = obs.scancls.ravel()[ids] == 0
                 # a dark receiver with one possible blocker is a pure intersection (no fragmentation)
-                score = score * 2 + (single & dark).astype(np.int64)
+                pure = single & dark
+                score = score * 2 + pure.astype(np.int64)
             order = np.argsort(-score, kind="stable")
             k = n if n <= 2 * batch else batch
+            if pure is not None and frag_cap is not None:
+                # every other receiver can split each current part (unions of cones, or
+                # subtractions): cap them per batch so fragmentation stays bounded
+                frag = ~pure[order]
+                keep = ~frag | (np.cumsum(frag) <= frag_cap)
+                order = order[keep]
             chosen = [int(ids[i]) for i in order[:k]]
             kids, _ = kernel.enforce(h, chosen)
             push(kids)
