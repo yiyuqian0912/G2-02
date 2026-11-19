@@ -17,7 +17,7 @@ python -m pytest -q test_cbc.py test_wire.py ../global_inverse/test_global.py
 | module | role | trusted? |
 |---|---|---|
 | `inputs.py` (Astra) | decode one v3 container channel: canonical geometry rows, [x,y,z] class array, origin, problem identity | **yes** (input) |
-| `cbc_kernel.py` | state, transitions, exact enforcement, settlement, octree cell credits, snapshot | **yes** |
+| `cbc_kernel.py` | state, transitions, exact enforcement (mask-restricted), body-subset screens, settlement, octree cell credits, integer encoder, snapshot | **yes** |
 | `screen2.py` | Numba integer screens (full window / residual list), candidate-body masks, range guard | **yes** |
 | `global_inverse/poly.py` (Astra, + float sign filter) | exact homogeneous-integer polytopes: split, volume, `side` | **yes** |
 | `global_inverse/solver.py` (Astra): `cone`, `apply_pair`, `subtract_many` | exact inverse cones, pair conditioning | **yes** |
@@ -54,9 +54,10 @@ support-plane proposals (validated exactly).
 |---|---|---|
 | Astra's assurance tests (`xlf_assurance/test_assurance.py`) | abstract ledger, missing sibling, wire | 13 pass |
 | Astra's geometry tests (`global_inverse/test_global.py`, `mixed_patch/test_*.py`) | cones, polytopes, envelopes, clearance, encoding | 25 pass |
-| `test_cbc.py` | `scan_ids` ≡ `scan_collect` (ids and masks); corrupt lists rejected; split exact and stale handles rejected; enforced children satisfy their receivers (exact segment tests); masks sound (excluded cones miss the piece, exact); window and obstacles excluded; end-to-end certificate on decoded bytes; unvisited mass charged | 9 pass |
-| `test_wire.py` | 300 random exact instances: exact encoding; wire_bound within [exact, exact + m·2⁻⁹⁶]; true TV ≤ bound; tampered payload rejected | 301 pass |
-| byte identity | payload sha256 unchanged across optimizations (float filter, masks, octree) on 5 tasks | identical |
+| `test_cbc.py` | `scan_ids` ≡ `scan_collect` (ids and masks); **full-window screen ≡ pointwise int64 reference** (contradictions, ambiguous ids, masks; 16 pieces including cut pieces); corrupt lists rejected; split exact and stale handles rejected; enforced children satisfy their receivers (exact segment tests); masks sound (excluded cones miss the piece, exact); body-subset residual screen never weaker than the all-body screen (11-body scene); window and obstacles excluded; end-to-end certificate on decoded bytes; unvisited mass charged | 11 pass |
+| `test_wire.py` | 300 random exact instances: exact encoding, wire_bound within [exact, exact + m·2⁻⁹⁶], true TV ≤ bound; tampered payload rejected; 200 instances: `encode_int` byte-identical to `ledger.encode` (ties included) | 501 pass |
+| byte identity | payload sha256 and transition count unchanged across optimizations (float filter, masks, octree, per-edge cache) on 5 tasks | identical |
+| run-time guards | split conserves exact volume; an exact cut cannot create volume; octree credit conserves exact volume; facet rows validated; screen ranges checked | abort on violation (never observed) |
 | exact differential audit (`audit_exact.py`) | real tasks: sampled exact points in IN pieces must be feasible; sampled points discarded by each transition kind must not be feasible | see `XLF_CBC_RESULTS.md` |
 | independent references | exact-kernel certified labels (`yushu/3d-v3-staging` verifier) | see `XLF_CBC_RESULTS.md` |
 
