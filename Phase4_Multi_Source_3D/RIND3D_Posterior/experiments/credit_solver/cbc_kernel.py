@@ -66,6 +66,7 @@ try:  # optional exact GMP helper (native/build.sh); CBC_NATIVE=0 forces the Pyt
 except ImportError:
     NATIVE = None
 CELL_UNITS = SCALE // (128 ** 3)  # exact volume of one output cell in units of 2^-160
+SPLIT_COEF_LIMIT = 1 << 4096  # search-proposed split rows (the search's dyadic planes need < 2^450)
 CHECK_LIVE = True  # structural certificate (polycheck) for every live piece charged in a snapshot
 
 
@@ -160,16 +161,48 @@ def encoded_subset(obs, p, bodies):
         obs.obstacles = [within(Poly.cube(), b) for b in obs.bodies]
         if any(k is None for k in obs.obstacles):
             raise ValueError("expected full-dimensional body in world")
+    mixed = getattr(obs, "use_support", False) and getattr(obs, "use_mixed", False)
+    if mixed:
+        from shadow_facets import Geometry, mixed_candidates
+        if not hasattr(obs, "kgeo"):
+            obs.kgeo = [Geometry(k) for k in obs.obstacles]
+        pgeo = Geometry(p)
     for j in bodies:
         b = obs.bodies[j]
         e = Envelope(b, p.vertices)
         if getattr(obs, "use_support", False):
             e.outer = e.outer + directions(obs.obstacles[j], p)
+            if mixed:
+                e.outer = tuple(dict.fromkeys(e.outer + separators(obs.obstacles[j], p,
+                                                                   mixed_candidates(obs.kgeo[j], pgeo))))
         hint = cone(b, anchor) if any(form(r, anchor) > 0 for r in b) else []
         for planes, up in ((e.inner, True), (e.outer, False), (hint, False)):
             rows.extend(fixed(planes, up))
             offsets.append(len(rows))
     return np.array(rows, np.int64).reshape(-1, 4), np.array(offsets, np.int32)
+
+
+def separators(kpoly, p, candidates):
+    """Exactly validated separating rows: K (clipped to the cube) in {h <= 0}, P in {h >= 0}.
+
+    Any such row is valid for every possible shadow of K over P (and over its subsets): if
+    the segment [s, r] with s in P meets K at k, then r = k + t (k - s) with t >= 0 and
+    h(r) <= h(k) <= 0 (XLF_CBC_DESIGN.md, section 4). Candidates come from an untrusted
+    proposer; a candidate failing the exact test in both orientations is discarded.
+    """
+    out = []
+    kv_all = kpoly.vertices
+    for h in candidates:
+        if len(h) != 4 or not all(type(x) is int for x in h) or not any(h[:3]):
+            continue
+        kv = [form(h, t) for t in kv_all]
+        if max(kv) <= 0:
+            if all(form(h, t) >= 0 for t in p.vertices):
+                out.append(h)
+        elif min(kv) >= 0:
+            if all(form(h, t) <= 0 for t in p.vertices):
+                out.append(tuple(-x for x in h))
+    return tuple(out)
 
 
 def facet_rows(p):
@@ -238,6 +271,8 @@ class Kernel:
         # Exactly validated separating support planes tighten every possible shadow
         # (penumbra.directions: float proposals, exact integer validation; see design doc).
         self.obs.use_support = True
+        # Mixed facets of K + cone(K - P) (shadow_facets: proposals; separators: exact check).
+        self.obs.use_mixed = _os.environ.get("CBC_MIXED") != "0"
         self._origin = np.asarray(self.obs.origin, np.int64)
         self._tainted = None
         self._best = None  # (bound, payload) with the smallest bound computed so far
@@ -348,6 +383,10 @@ class Kernel:
         """Any integer affine row. Both closed halves stay live; null overlap on the plane."""
         if len(row) != 4 or not all(type(v) is int for v in row) or not any(row[:3]):
             raise ValueError("invalid split plane")
+        if any(abs(v) > SPLIT_COEF_LIMIT for v in row):
+            # Every vertex is the intersection of three facet planes, so bounded rows keep all
+            # vertex sizes bounded (no compounding through repeated splits).
+            raise ValueError("split plane coefficients exceed 2^4096")
         piece = self._state.live[h]
         neg, pos = piece.poly.split(tuple(row))
         if neg is None or pos is None:

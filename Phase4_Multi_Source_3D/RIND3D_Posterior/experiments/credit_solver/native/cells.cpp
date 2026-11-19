@@ -242,17 +242,22 @@ static std::vector<Row> facet_rows(const Poly& P) {
 
 static Poly from_py(py::handle faces) {
     Poly P;
-    std::map<std::string, int> index;  // key: decimal tuple text (exact identity of primitive vertices)
+    // key: hexadecimal coordinates (exact identity of primitive vertices; hex conversion has no
+    // digit limit, unlike Python's decimal int-to-str)
+    std::map<std::string, int> index;
     for (py::handle face : faces) {
         std::vector<int> f;
         for (py::handle vert : face) {
-            std::string key = py::str(vert).cast<std::string>();
+            V q;
+            int k = 0;
+            for (py::handle c : vert) {
+                if (k >= 4) throw std::runtime_error("vertex must be (x, y, z, w) with w > 0");
+                q[k++] = to_z(c);
+            }
+            if (k != 4 || q[3] <= 0) throw std::runtime_error("vertex must be (x, y, z, w) with w > 0");
+            std::string key = q[0].get_str(16) + "," + q[1].get_str(16) + "," + q[2].get_str(16) + "," + q[3].get_str(16);
             auto it = index.find(key);
             if (it == index.end()) {
-                V q;
-                int k = 0;
-                for (py::handle c : vert) q[k++] = to_z(c);
-                if (k != 4 || q[3] <= 0) throw std::runtime_error("vertex must be (x, y, z, w) with w > 0");
                 int j = (int)P.v.size();
                 P.v.push_back(q);
                 index[key] = j;

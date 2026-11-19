@@ -92,10 +92,12 @@ def random_row(rng, kind):
 
 @pytest.mark.parametrize("kind,seed", [(k, s) for k in ("small", "dyadic", "big") for s in range(4)])
 def test_split_matches_halfspace_reference(kind, seed):
-    rng = random.Random(1000 * seed + hash(kind) % 1000)
+    rng = random.Random(1000 * seed + ("small", "dyadic", "big").index(kind))  # deterministic
     pieces = [(Poly.cube(), list(CUBE_ROWS))]
     done = 0
-    for _ in range(60):
+    for _ in range(400):
+        if done >= 40:
+            break
         i = rng.randrange(len(pieces))
         P, rows = pieces[i]
         if len(rows) > 16:
