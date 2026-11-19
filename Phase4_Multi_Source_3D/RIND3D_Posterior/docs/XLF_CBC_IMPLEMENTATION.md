@@ -38,7 +38,7 @@ python -m pytest -q test_cbc.py test_wire.py test_poly_exact.py ../global_invers
 | `run.py` writer, `cbc_run.py`, `batch.py` | atomic writer that re-reads the bytes; CLI | writer re-checks |
 | `chaos.py`, `exactcheck.py`, `audit_exact.py`, `compare*.py`, `diag.py`, `hunt.py`, `smt_screen.py` | independent instruments | no (not in the certificate path) |
 
-The trusted base is about 1,700 lines of Python and Numba (plus 360 lines of optional C++). Search code (about 400
+The trusted base is about 1,600 lines of Python and Numba including docstrings (plus 340 lines of optional C++). Search code (about 400
 lines) can change freely without affecting soundness.
 
 ## 2. Code-path review: every operation that can create credit or discard mass
@@ -130,7 +130,7 @@ with how each is discharged per label.
 
 | obligation | discharged per label by | residual trust |
 |---|---|---|
-| polytope arithmetic (split, within, without, volumes, faces) | `CBC_VERIFY_SPLITS=1`: every split certified (Lemma V + FS); credited and charged polytopes always FS-checked | the 70-line checker `polycheck` (simpler than the producer; differential-tested against an O(k²) reference) |
+| polytope arithmetic (split, within, without, volumes, faces) | `CBC_VERIFY_SPLITS=1`: every split certified (Lemma V + FS); credited and charged polytopes always FS-checked | the checker `polycheck` (≈ 230 lines; independent of the producer, differential-tested against an O(k²) reference) |
 | TV bound, encoding, decoding | exact integer computation on the output bytes in every run | `wire_bound`, `encode_int`, `decode` (≈ 60 lines; property-tested) |
 | status, overlap, failure handling | release discipline, atomic commits, taint | ≈ 80 lines of kernel bookkeeping (reviewed; chaos-tested) |
 | receiver screens | z3 proofs of the integer arithmetic | Numba compilation of ≈ 100 lines; CPython big integers |
@@ -149,8 +149,9 @@ remains a development tool: it found no violation, and it is not needed for each
 
 1. **No machine-checked proof** of the cone, envelope, clearance and frontier lemmas. They are manual proofs, and
    the code is reviewed and tested against them.
-2. **Per-split certification costs 1.1–2× in Python.** A native checker would make it the default; v2.9 leaves it
-   opt-in for production and on for the validation campaigns.
+2. **Per-split certification costs wall time in Python:** +23% in total on the canary, and up to about 2× on runs
+   dominated by cuts. It is the default (certified mode); speed mode (`CBC_VERIFY_SPLITS=0`) certifies 10 more
+   canary channels at 10 s. A native checker would remove the trade-off.
 3. **Per-cell distribution inside one IN piece.** The octree's clipped volumes are not individually certified,
    only their total. A native `verify_split` inside the octree would close this.
 4. **Build identity.** Numba `cache=True`, g++ and GMP are unpinned.

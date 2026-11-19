@@ -16,7 +16,8 @@ separate readiness decision. Numbers refer to `XLF_CBC_RESULTS.md` (final build 
    (conservation), not per cell.
    * Close by running `verify_split` on the octree's splits: in Python it costs the same as the kernel's splits;
      in `cells.cpp` it would be nearly free.
-3. **Native per-split certificate.** `verify_split` in Python costs 1.1–2× wall time.
+3. **Native per-split certificate.** `verify_split` in Python costs +23% wall time over the canary, and up to
+   2× on cut-dominated runs, and it costs 10 canary certifications at 10 s.
    * A C++/GMP port (same two checks; the hex conversion is already in `cells.cpp`) would make the certified mode
      cost ≈ 1.1× and remove the speed/assurance trade-off.
 4. **Numba trust.** The screen's integer semantics are proved at source level (z3).
@@ -36,7 +37,7 @@ Remaining failure classes, with the measured cause:
 
 Current numbers to beat:
 * benchmark 8 s: 87/90 with verification off, 84/90 with it on;
-* canary 10 s: `XLF_CBC_RESULTS.md` §6.
+* canary 10 s: 786/807 certified mode, 796/807 speed mode (`XLF_CBC_RESULTS.md` §5).
 
 Ideas measured and **not** adopted (evidence):
 * Grid-aligned refinement of live pieces: the per-cell exact decomposition gives exactly the frontier bound on
@@ -59,7 +60,7 @@ Ideas measured and **not** adopted (evidence):
 A deterministic-first hybrid labels each channel with CBC under a fixed budget and falls back to FastLabel on
 INCOMPLETE. The certification semantics stay separate: a deterministic CERTIFIED envelope versus FastLabel's
 `certified_stat`.
-* Measured canary share of deterministic labels: `XLF_CBC_RESULTS.md` §6.
+* Measured canary share of deterministic labels: 97.4% (certified mode) and 98.6% (speed mode) at about 2× and 1.65× FastLabel's total compute (`XLF_CBC_RESULTS.md` §5).
 * Open measurements: H20 throughput with long-lived workers (the 1–2 s per-process load and JIT is paid once),
   memory at 6–16 workers, and the per-campaign cost of the FastLabel fallbacks.
 * A controlled canary of the hybrid on a fresh, unpublished scene set would be the next step. It is not a

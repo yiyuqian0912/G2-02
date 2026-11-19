@@ -251,7 +251,8 @@ computed independently from the parent's (FS-certified) edges, and both halves m
 `check`. Inductively from the cube, every polytope the kernel ever creates is then FS-valid,
 and every split is exact: the halves cover the parent, overlap only on the plane, and carry
 exact volumes. This certifies the cover invariant I1 for the polytope arithmetic in every run
-without a physical replay. Cost: 1.1–2× wall time in pure Python (§XLF_CBC_RESULTS).
+without a physical replay. It is on by default. Cost in pure Python: +23% wall time over the canary, and up to
+about 2× on cut-dominated runs (XLF_CBC_RESULTS §5).
 
 Independently of `CBC_VERIFY_SPLITS`, every polytope that receives an IN credit, and every
 live polytope charged in a snapshot, passes `check` (RUNTIME-CERTIFIED since v2.9a).
