@@ -77,7 +77,17 @@ def legal(s, bodies, polys, origin, side, n=1024):
     hi = [Fraction(o + side, n) for o in origin]
     if all(lo[i] <= s[i] <= hi[i] for i in range(3)):
         return False
-    return all(dist2_point_poly(s, p, b) > EPS2 for p, b in zip(polys, bodies))
+    sf = [float(x) for x in s]
+    for p, b in zip(polys, bodies):
+        # dist(s, K) >= max_i f_i(s)/|n_i| (K lies in every facet halfspace). A float
+        # value clearly above 2^-26 (relative margin 1e-6 >> rounding) proves legality.
+        lb = max((r[0] * sf[0] + r[1] * sf[1] + r[2] * sf[2] + r[3]) / (r[0] ** 2 + r[1] ** 2 + r[2] ** 2) ** 0.5
+                 for r in b)
+        if lb > 2.0 ** -26 * (1 + 1e-6):
+            continue
+        if dist2_point_poly(s, p, b) <= EPS2:
+            return False
+    return True
 
 
 def _exact_hit(rows, s, r):
@@ -113,8 +123,18 @@ class Oracle:
         self.rows = [np.array([[float(x) for x in r] for r in b]) for b in bodies]
         self.solid = np.argwhere(cls == 2)
 
-    def visible_float(self, s):
+    def visible_float(self, s, chunk=1 << 20):
         """Per FREE receiver: +1 visible, 0 blocked, -1 undecided by the float filter."""
+        if len(self.R) > chunk:
+            full = self.R
+            parts = []
+            try:
+                for i in range(0, len(full), chunk):
+                    self.R = full[i:i + chunk]
+                    parts.append(self.visible_float(s, chunk))
+            finally:
+                self.R = full
+            return np.concatenate(parts)
         M = len(self.R)
         hit = np.zeros(M, bool)
         unsure = np.zeros(M, bool)
@@ -135,7 +155,10 @@ class Oracle:
             near_zero = np.any(zero & (np.abs(fs)[None, :] <= tol), axis=1)
             h = (lo <= hi) & ~miss_const
             gap = np.abs(hi - lo)
-            u = (gap < 1e-9) | near_zero | (np.abs(lo) < 1e-12) | (np.abs(hi - 1) < 1e-12)
+            # lo and hi are each a clamp (0 or 1) or one parameter t; every decision is the
+            # comparison lo <= hi, so a margin on the gap covers all cases (t has relative
+            # error ~1e-15 because |d| > 1e-9 * |row| for every non-constant row).
+            u = (gap < 1e-9) | near_zero
             hit |= h & ~u
             unsure |= u
         out = np.where(hit, 0, 1).astype(np.int8)

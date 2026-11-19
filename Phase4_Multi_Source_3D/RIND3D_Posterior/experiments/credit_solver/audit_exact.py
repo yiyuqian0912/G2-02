@@ -50,15 +50,23 @@ for _name in ("condition_pair", "exclude_window", "split", "screen", "enforce"):
     setattr(Recorder, _name, _wrap(_name))
 
 
-def points(poly, rng, k):
+def points(poly, rng, k, rows=None):
+    """Exact sample points of poly, snapped to a dyadic grid (2^-64 .. 2^-160) while staying inside."""
     verts = [tuple(Fraction(v[i], v[3]) for i in range(3)) for v in poly.vertices]
+    rows = rows if rows is not None else halfspaces(poly)
     out = []
     for j in range(k):
         w = [Fraction(rng.randint(1, 1 << 16)) for _ in verts]
         if j % 3 == 1:  # concentrate near one vertex
             w[rng.randrange(len(w))] *= 1 << 12
         t = sum(w)
-        out.append(tuple(sum(wi * v[i] for wi, v in zip(w, verts)) / t for i in range(3)))
+        x = tuple(sum(wi * v[i] for wi, v in zip(w, verts)) / t for i in range(3))
+        for bits in (64, 96, 128, 160):
+            sc = 1 << bits
+            y = tuple(Fraction(round(c * sc), sc) for c in x)
+            if contains(rows, hom(y)):
+                out.append(y)
+                break
     return out
 
 
@@ -72,6 +80,7 @@ def main():
     ap.add_argument("container", type=Path)
     ap.add_argument("window", type=int)
     ap.add_argument("channel", type=int)
+    ap.add_argument("output", type=Path, nargs="?", default=None)
     ap.add_argument("--seconds", type=float, default=8)
     ap.add_argument("--in-samples", type=int, default=6)
     ap.add_argument("--drop-samples", type=int, default=6)
@@ -110,10 +119,15 @@ def main():
     in_rows = [halfspaces(p) for p in kern.in_parts]
     pairs = [(t, j) for t, (_, parents, _) in enumerate(kern.log) for j in range(len(parents))]
     rng.shuffle(pairs)
+    kinds = sorted({kern.log[t][0] for t, _ in pairs})
+    quota = {k: max(4, args.max_drop_checks // max(1, len(kinds))) for k in kinds}
+    got = {k: 0 for k in kinds}
     cand, tries, rows_cache = [], 0, {}
     for t, j in pairs:
         if len(cand) >= args.max_drop_checks or tries > 40 * args.max_drop_checks:
             break
+        if got[kern.log[t][0]] >= quota[kern.log[t][0]]:
+            continue
         kind, parents, children = kern.log[t]
         if t not in rows_cache:
             rows_cache = {t: [halfspaces(c) for c in children]}
@@ -124,6 +138,7 @@ def main():
             if any(contains(r, h) for r in crow) or any(contains(r, h) for r in in_rows):
                 continue
             cand.append((t, kind, s))
+            got[kind] += 1
     res["drop_candidates_tried"] = tries
     for t, kind, s in cand[:args.max_drop_checks]:
         ok, mism, rc = oracle.feasible(s)
@@ -135,6 +150,8 @@ def main():
             res["violations"].append(dict(kind="DROP_feasible", transition=t, op=kind,
                                           point=[str(x) for x in s]))
     res["seconds"] = perf_counter() - t0
+    if args.output is not None:
+        args.output.write_text(json.dumps(res))
     print(json.dumps(res))
 
 

@@ -50,15 +50,16 @@ def test_scan_ids_matches_full_scan(conditioned):
         p = k.poly(h)
         rows, offs = encoded(obs, p)
         check_ranges(rows, obs.origin, obs.side, obs.denom)
-        n, ids, w, b = scan_collect(obs.scancls, np.asarray(obs.origin, np.int64), obs.denom, rows, offs,
+        n, ids, w, b, mk = scan_collect(obs.scancls, np.asarray(obs.origin, np.int64), obs.denom, rows, offs,
                                     np.zeros(0, np.int64), 1 << 22)
         sub = np.sort(rng.choice(free, size=min(5000, len(free)), replace=False)).astype(np.int64)
-        m, ids2, w2, b2 = scan_ids(obs.scancls, sub, np.asarray(obs.origin, np.int64), obs.denom, rows, offs)
+        m, ids2, w2, b2, mk2 = scan_ids(obs.scancls, sub, np.asarray(obs.origin, np.int64), obs.denom, rows, offs)
         if n < 0:
             assert m < 0 or m >= 0  # a contradiction elsewhere need not lie in the subset
             continue
-        expect = np.intersect1d(ids, sub)
+        expect, ia, ib = np.intersect1d(ids, sub, return_indices=True)
         assert m >= 0 and np.array_equal(ids2, expect)
+        assert np.array_equal(mk[ia], mk2)  # identical candidate-body masks
 
 
 def test_scan_ids_rejects_corrupt_lists(conditioned):
@@ -180,3 +181,26 @@ def test_unvisited_mass_is_charged():
     assert unk > 0                      # other pieces were never visited
     assert omitted <= bound             # charging them never helps the certificate
     assert bound > omitted              # and here it strictly matters
+
+
+def test_masks_are_sound(conditioned):
+    """Bodies outside a receiver's mask have inverse cones that miss the piece (exact)."""
+    from poly import within
+    obs, k = conditioned
+    checked = 0
+    for h in sorted(k.open_handles(), key=k.volume, reverse=True)[:4]:
+        r = k.screen(h)
+        if r["outcome"] != "open" or r["ids"] is None:
+            continue
+        piece = k._state.live[r["handle"]]
+        L = obs.side
+        for idx, m in list(zip(piece.pending, piece.masks))[:40]:
+            idx, m = int(idx), int(m)
+            x, y, z = idx % L, idx // L % L, idx // (L * L)
+            rr = obs.world((x, y, z))
+            for c, body in enumerate(obs.bodies):
+                if not m >> c & 1:
+                    from solver import cone
+                    assert within(piece.poly, cone(body, rr)) is None
+                    checked += 1
+    assert checked > 0

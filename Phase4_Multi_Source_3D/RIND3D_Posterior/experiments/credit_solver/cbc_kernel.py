@@ -37,8 +37,9 @@ import inputs  # noqa: F401  (installs pinned research paths)
 from envelopes import clearance_partition
 from ledger import decode, encode
 from poly import Poly, form, grid_pieces
-from raster import encoded, enforce as exact_enforce
+from raster import encoded
 from screen2 import check_ranges, scan_collect, scan_ids
+from poly import within
 from solver import apply_pair, cone, subtract_many
 from kernel import SCALE, ceil_mass, cell_id, single_cell, wire_bound
 
@@ -51,6 +52,7 @@ class Piece:
     pending: object = None        # None: all FREE receivers except `done`; else sorted int64 ids
     done: frozenset = frozenset()  # receivers enforced exactly while pending is None
     deferred: bool = False         # visibility proved; clearance shell only (never rescreened)
+    masks: object = None           # uint64 per pending id: bodies whose possible shadow contains it
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,7 @@ class Kernel:
             raise ValueError("window outside the world")
         self._state = State({0: Piece(Poly.cube())}, Counter(), Counter(), 1, False)
         self.stats = Counter()
+        self._cones = {}
         self.obs.scancls = np.ascontiguousarray(self.obs.cls.T)
         # Exactly validated separating support planes tighten every possible shadow
         # (penumbra.directions: float proposals, exact integer validation; see design doc).
@@ -154,7 +157,7 @@ class Kernel:
         for piece in self._state.live.values():
             parts = self.obs.exclude_window([piece.poly], self.budget)
             parts = subtract_many(parts, solids, self.budget)
-            children.extend(Piece(q, piece.pending, piece.done, piece.deferred) for q in parts)
+            children.extend(Piece(q, piece.pending, piece.done, piece.deferred, piece.masks) for q in parts)
             self.budget.check(len(children))
         self._commit(self.handles(), children, exclude=True)
 
@@ -164,7 +167,7 @@ class Kernel:
         cones_a = [cone(b, a) for b in self.obs.bodies]
         children = []
         for piece in self._state.live.values():
-            children.extend(Piece(q, piece.pending, piece.done, piece.deferred)
+            children.extend(Piece(q, piece.pending, piece.done, piece.deferred, piece.masks)
                             for q in apply_pair(piece.poly, cones_d, cones_a, self.budget))
             self.budget.check(len(children))
         self._commit(self.handles(), children)
@@ -179,8 +182,8 @@ class Kernel:
         if neg is None or pos is None:
             return [h]  # the plane misses the interior: no transition
         self.stats["splits"] += 1
-        return self._commit((h,), [Piece(neg, piece.pending, piece.done, piece.deferred),
-                                    Piece(pos, piece.pending, piece.done, piece.deferred)])
+        return self._commit((h,), [Piece(neg, piece.pending, piece.done, piece.deferred, piece.masks),
+                                    Piece(pos, piece.pending, piece.done, piece.deferred, piece.masks)])
 
     def screen(self, h):
         """Classify pending receivers on the piece. Returns a dict; the piece may be consumed."""
@@ -195,11 +198,12 @@ class Kernel:
         check_ranges(rows, self.obs.origin, self.obs.side, self.obs.denom)
         if piece.pending is None:
             skipped = np.array(sorted(piece.done), np.int64)
-            n, ids, wrong, bnd = scan_collect(self.obs.scancls, self._origin, self.obs.denom, rows, offs,
-                                              skipped, COLLECT_CAP)
+            n, ids, wrong, bnd, masks = scan_collect(self.obs.scancls, self._origin, self.obs.denom, rows, offs,
+                                                     skipped, COLLECT_CAP)
             self.stats["full_scans"] += 1
         else:
-            n, ids, wrong, bnd = scan_ids(self.obs.scancls, piece.pending, self._origin, self.obs.denom, rows, offs)
+            n, ids, wrong, bnd, masks = scan_ids(self.obs.scancls, piece.pending, self._origin, self.obs.denom,
+                                                 rows, offs)
             self.stats["list_scans"] += 1
             self.stats["list_receivers"] += len(piece.pending)
         self.stats["screen_seconds"] += perf_counter() - t0
@@ -213,7 +217,8 @@ class Kernel:
             return self._settle(h, piece)
         if n > len(ids):  # overflow: keep the full-window obligation
             return dict(outcome="open", handle=h, ambiguous=n, ids=None, wrong=None, boundary=None)
-        new = self._commit((h,), [Piece(p, np.ascontiguousarray(ids), frozenset(), False)])[0]
+        new = self._commit((h,), [Piece(p, np.ascontiguousarray(ids), frozenset(), False,
+                                        np.ascontiguousarray(masks))])[0]
         return dict(outcome="open", handle=new, ambiguous=n, ids=ids, wrong=wrong, boundary=bnd)
 
     def _settle(self, h, piece):
@@ -241,9 +246,10 @@ class Kernel:
             raise ValueError("no receivers")
         for i in sel:
             self._receiver(self._idx_pos(i))  # FREE and inside the window
+        cand = self._candidates(piece, sel)
         parts = [piece.poly]
-        for idx in sel:
-            parts = exact_enforce(self.obs, parts, idx, self.budget)
+        for idx, bodies in zip(sel, cand):
+            parts = self._exact_cut(parts, idx, bodies)
             if not parts:
                 break
         same = len(parts) == 1 and parts[0] is piece.poly
@@ -256,10 +262,59 @@ class Kernel:
             pos, drop = pos[ok], drop[ok]
             pos = pos[piece.pending[pos] == drop]
             rest = np.delete(piece.pending, pos)
-            children = [Piece(q, rest, frozenset(), False) for q in parts]
+            rmask = None if piece.masks is None else np.delete(piece.masks, pos)
+            children = [Piece(q, rest, frozenset(), False, rmask) for q in parts]
         self.stats["receiver_cuts"] += len(sel)
         self.stats["cuts_no_change" if same else "cuts_changed"] += 1
         return self._commit((h,), children), same
+
+    def _candidates(self, piece, sel):
+        """Bodies that can block each receiver on this piece (kernel's own screen masks).
+
+        A body outside the mask has a possible shadow (over the piece, hence over every
+        subset) that misses the receiver, so its inverse cone misses the piece a.e.
+        Receivers without a stored mask use every body.
+        """
+        nb = len(self.obs.bodies)
+        every = tuple(range(nb))
+        if piece.masks is None or piece.pending is None or nb > 64:
+            return [every] * len(sel)
+        pos = np.searchsorted(piece.pending, np.array(sel, np.int64))
+        out = []
+        for i, q in zip(sel, pos):
+            if q < len(piece.pending) and piece.pending[q] == i:
+                m = int(piece.masks[q])
+                out.append(tuple(c for c in range(nb) if m >> c & 1))
+            else:
+                out.append(every)
+        return out
+
+    def _cone(self, c, idx):
+        key = (c, idx)
+        hit = self._cones.get(key)
+        if hit is None:
+            hit = cone(self.obs.bodies[c], self.obs.world(self._idx_pos(idx)))
+            if len(self._cones) > 200000:
+                self._cones.clear()
+            self._cones[key] = hit
+        return hit
+
+    def _exact_cut(self, parts, idx, bodies):
+        """Exact inverse-cone enforcement of one receiver over the candidate bodies."""
+        x, y, z = self._idx_pos(idx)
+        cones = [self._cone(c, idx) for c in bodies]
+        if int(self.obs.cls[x, y, z]) == 1:
+            return subtract_many(parts, cones, self.budget)
+        out = []
+        for p in parts:
+            prior = []
+            for hcone in cones:
+                q = within(p, hcone)
+                if q is not None:
+                    out.extend(subtract_many([q], prior, self.budget))
+                    prior.append(hcone)
+                self.budget.check(len(out))
+        return out
 
     # ---------------------------------------------------------------- accounting
     def _grid_credit(self, parts):

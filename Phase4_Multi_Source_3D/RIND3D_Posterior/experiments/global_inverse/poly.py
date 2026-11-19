@@ -15,6 +15,34 @@ def form(row, p):
     return a*x + b*y + c*z + d*w
 
 
+def _fsign_terms(row, fv):
+    """Float filter for sign(form(row, p)) at a vertex with float coordinates fv = p[:3]/p[3].
+
+    Returns +1/-1 when certain, 0 when the exact value must be computed. Each term has
+    relative error <= 3u and the 4-term sum adds <= 3u * sum|terms| (u = 2^-53), so a
+    margin of 1e-12 * sum|terms| is far above the rounding error. Non-finite or tiny sums
+    fall back to exact evaluation.
+    """
+    a, b, c, d = row
+    t0, t1, t2 = a * fv[0], b * fv[1], c * fv[2]
+    v = t0 + t1 + t2 + d
+    m = abs(t0) + abs(t1) + abs(t2) + abs(d)
+    if not (m < 1e300) or m < 1e-280:
+        return 0
+    if v > 1e-12 * m:
+        return 1
+    if v < -1e-12 * m:
+        return -1
+    return 0
+
+
+def _frow(row):
+    try:
+        return tuple(float(x) for x in row)
+    except OverflowError:
+        return None
+
+
 def primitive(v):
     k = gcd(*v)
     return tuple(x//k for x in v) if k else tuple(v)
@@ -58,8 +86,38 @@ class Poly:
             faces.append(tuple(face))
         return cls(faces)
 
+    @cached_property
+    def fvertices(self):
+        # Correctly rounded int/int division; no overflow for these magnitudes.
+        return tuple((p[0] / p[3], p[1] / p[3], p[2] / p[3]) for p in self.vertices)
+
+    def side(self, row, frow=None):
+        """Exact classification: -1 if all vertex values <= 0, +1 if all >= 0, else 0.
+
+        Uses the float filter where it is certain and exact integers elsewhere.
+        """
+        fr = _frow(row) if frow is None else frow
+        neg = pos = False
+        for p, fv in zip(self.vertices, self.fvertices):
+            s = _fsign_terms(fr, fv) if fr is not None else 0
+            if s == 0:
+                v = form(row, p)
+                s = (v > 0) - (v < 0)
+            if s > 0:
+                pos = True
+            elif s < 0:
+                neg = True
+            if pos and neg:
+                return 0
+        return -1 if not pos else 1  # all <= 0 first, exactly as the original max/min tests
+
     def split(self, row):
         """Return closures of negative and positive volume pieces, respectively."""
+        side = self.side(row)
+        if side < 0:
+            return self,None
+        if side > 0:
+            return None,self
         signs = {p:form(row,p) for p in self.vertices}
         if max(signs.values()) <= 0:
             return self,None
@@ -115,9 +173,9 @@ def within(poly, rows):
 
 def without(poly, rows):
     """Subtract one closed convex set, retaining disjoint positive-volume interiors."""
-    if any(all(form(r,p)>=0 for p in poly.vertices) and any(form(r,p)>0 for p in poly.vertices)
-           for r in rows):
-        return [poly]
+    for r in rows:
+        if poly.side(r) > 0:  # all vertex values >= 0 and at least one > 0
+            return [poly]
     result = []
     for r in rows:
         poly,outside = poly.split(r)

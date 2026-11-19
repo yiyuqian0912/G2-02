@@ -42,7 +42,7 @@ def run_one(t, args, env):
            "--seconds", str(args.seconds)] + args.extra
     start = perf_counter()
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=args.seconds * 4 + 120)
+        p = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=args.timeout or args.seconds * 4 + 120)
         code, out, err = p.returncode, p.stdout, p.stderr
     except subprocess.TimeoutExpired as exc:
         code, out, err = -9, exc.stdout or "", "hard timeout"
@@ -72,11 +72,15 @@ def main():
     ap.add_argument("--only", nargs="*", default=None, help="task keys")
     ap.add_argument("--extra", default="", help="extra runner arguments, one string")
     ap.add_argument("--no-warm", action="store_true")
+    ap.add_argument("--sizes", type=int, nargs="*", default=None)
+    ap.add_argument("--timeout", type=float, default=None, help="hard per-process timeout (s)")
     args = ap.parse_args()
     args.extra = args.extra.split()
     tasks = tasks_from(args.manifests)
     if args.only:
         tasks = [t for t in tasks if t["key"] in set(args.only)]
+    if args.sizes:
+        tasks = [t for t in tasks if t["L"] in args.sizes]
     (args.out / "results").mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", PYTHONDONTWRITEBYTECODE="1")
     if tasks and not args.no_warm:
