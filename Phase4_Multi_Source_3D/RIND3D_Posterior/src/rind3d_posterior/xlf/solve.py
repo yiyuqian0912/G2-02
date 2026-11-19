@@ -124,7 +124,7 @@ class Solver:
     def __init__(self, prob, cap_fine=16384, cap_amb=1 << 16, max_depth=160, max_fine=48, delta_floor=2.0 ** -49, rcap=256,
                  mode="tree"):
         self.mode = mode; self.prepass = 3; self.fine_sample = 1 << 30; self.sentinel_min = 0; self.multires = True
-        self.stuck_splits = False        # pencil splits of stalled nodes: off (exploded on 000043_w02_s1; see XLF_RESULTS)
+        self.stuck_splits = True         # median pencil splits of stalled nodes (no enumeration abort)
         if self.multires:
             self.prepass = 0
         self.p = prob; self.rcap = rcap; self.progress = 0; self.cap_fine = cap_fine; self.cap_amb = cap_amb; self.max_depth = max_depth
@@ -241,7 +241,7 @@ class Solver:
             bmark = np.zeros(nbk ** 3, np.int64)
         code, namb = PR.scan_tree(Vm, Vr, nv, node.rows, len(node.rows), p.lb, p.pyr, p.poff, p.q, p.cls, p.o, p.N, p.L,
                                   comps, nc, p.RM, p.RR, p.K, p.ADJ, self.amb, self.cap_amb, bmark, self.wit, self.rcap,
-                                  *prep, 0, self.cnt, self.cap_fine if (node.stuck and self.stuck_splits) else (1 << 62))
+                                  *prep, 0, self.cnt, 1 << 62)
         self.stats["starts"] = self.stats.get("starts", 0) + len(node.rows)
         if code == PR.SC_MANY:
             # stalled node: the full ambiguous set is not needed to split it again by a pencil plane
@@ -649,16 +649,46 @@ class Solver:
         return self._clip_sequence(node, hs, nrows, comps)
 
     def _stuck_split(self, node, nrows, comps, namb):
-        for a in range(min(namb, self.cap_amb, 64)):
+        """Median pencil split. Near an occluder edge e the receivers' constraints are planes through line(e) and the
+        relevant coordinate is the pencil angle about e: a node touching line(e) keeps a wide angular range however
+        small it is in x, y, z. Sample the ambiguous receivers, take the edge carrying most straddling pair constraints
+        and split by the constraint plane of median angle (halves the ambiguity of that edge per split)."""
+        p = self.p
+        m = min(namb, self.cap_amb)
+        idx = np.unique(np.linspace(0, m - 1, min(m, 256)).astype(np.int64))
+        groups = {}
+        for a in idx:
             X, Y, t = (int(v) for v in self.amb[a, :3])
             st, nh, obs = self._recv(node.slot, X, Y, t, comps)
-            if st in (PR.R_CONV, PR.R_NONCONV) and nh > 0:
-                self.stats["stuck_split"] = self.stats.get("stuck_split", 0) + 1
-                kids = self._pencil_split(node, (X, Y, t, self.hs_m[:nh].copy(), self.hs_r[:nh].copy()), nrows)
-                for ch in kids:
-                    ch.npar = namb; ch.stuck = True
-                return kids
-        return None
+            if st not in (PR.R_CONV, PR.R_NONCONV):
+                continue
+            rx = (p.o + np.array([X, Y, t]) + 0.5) / p.N
+            for h in range(nh):
+                c, i, j, kind = (int(v) for v in self.hs_key[h])
+                if kind != 1:
+                    continue
+                fi = float(p.RM[c, i, :3] @ rx + p.RM[c, i, 3]); fj = float(p.RM[c, j, :3] @ rx + p.RM[c, j, 3])
+                # plane = -f_j(r) f_i + f_i(r) f_j: angle of (alpha, beta) = (-f_j(r), f_i(r)) modulo pi (key order free)
+                a_, b_ = (-fj, fi) if i < j else (fi, -fj)
+                psi = float(np.arctan2(b_, a_)) % np.pi
+                groups.setdefault((c, min(i, j), max(i, j)), []).append((psi, self.hs_m[h].copy(), self.hs_r[h].copy()))
+        if not groups:
+            return None
+        key = max(groups, key=lambda k: len(groups[k]))
+        lst = sorted(groups[key], key=lambda e: e[0])
+        psi, hm, hr = lst[len(lst) // 2]
+        self.stats["stuck_split"] = self.stats.get("stuck_split", 0) + 1
+        A, B = self._plane_pair(hm, hr)
+        out = []
+        for ch in self._split(node, A, rows=nrows):
+            ch.npar = namb; ch.stuck = True; ch.fine = node.fine
+            if self.bsp_ref[ch.nid] == 2 * A + 1:
+                for g in self._split(ch, B, rows=nrows):
+                    g.npar = namb; g.stuck = True; g.fine = node.fine
+                    out.append(g)
+            else:
+                out.append(ch)
+        return out
 
     def _pencil_split(self, node, nc, nrows):
         self.stats["pencil_split"] += 1
