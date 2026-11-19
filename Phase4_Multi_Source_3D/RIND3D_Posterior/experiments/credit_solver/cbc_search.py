@@ -133,6 +133,9 @@ def solve(obs, key, tolerance, seconds, cap=4096, pairs=24, strategy="interface"
             r = kernel.screen(h)
             if r["outcome"] in ("out", "in", "shell"):
                 if r["outcome"] == "in" and kernel.positive:
+                    lo_v, unk_v = kernel.lower_total(), kernel.unknown_volume()
+                    if unk_v > 2 * tolerance * (lo_v + unk_v):
+                        continue  # hint: the bound cannot be near the target yet; skip the snapshot
                     payload, bound = checkpoint()
                     trace.append([round(perf_counter() - t0, 3), float(bound)])
                     if bound <= tolerance:

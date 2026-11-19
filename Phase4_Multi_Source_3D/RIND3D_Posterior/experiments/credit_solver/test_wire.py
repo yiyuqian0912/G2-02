@@ -77,3 +77,15 @@ def test_rejects_tampered_or_invalid_payloads():
         decode(bytes(payload))          # no longer exactly normalized
     with pytest.raises(ValueError):
         wire_bound(encode(lower), {}, {}, 0, {})  # no positive feasible mass
+
+
+@pytest.mark.parametrize("seed", range(200))
+def test_integer_encoder_matches_reference(seed):
+    from cbc_kernel import encode_int
+    rng = random.Random(10_000 + seed)
+    m = rng.randint(1, 40)
+    lower = {c: rng.choice((1, rng.randint(1, 1 << 160), rng.randint(1, 1 << 20))) for c in rng.sample(range(128 ** 3), m)}
+    if rng.random() < 0.3:  # equal masses exercise the tie-breaking by cell id
+        v = rng.randint(1, 1 << 100)
+        lower = {c: v for c in lower}
+    assert encode_int(lower) == encode(lower)

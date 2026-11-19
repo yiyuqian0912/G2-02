@@ -57,6 +57,24 @@ def cell_box_rows(i, j, k, n=128):
     return rows
 
 
+def encode_int(lower):
+    """Integer-only equivalent of ledger.encode (same bytes; property-tested).
+
+    Quotas TICKS*m/total share one denominator, so the fractional parts compare as the
+    integer remainders of divmod(TICKS*m, total); ties break by cell id as in ledger.encode.
+    """
+    from ledger import RECORD, TICKS
+    total = sum(lower.values())
+    if total <= 0 or any(v <= 0 for v in lower.values()):
+        raise ValueError("positive lower mass required")
+    qr = {c: divmod(TICKS * m, total) for c, m in lower.items()}
+    ticks = {c: q for c, (q, r) in qr.items()}
+    missing = TICKS - sum(ticks.values())
+    for c in sorted(qr, key=lambda c: (-qr[c][1], c))[:missing]:
+        ticks[c] += 1
+    return b"".join(RECORD.pack(c, n / TICKS) for c, n in sorted(ticks.items()) if n)
+
+
 def remap_masks(masks, rel):
     """Local bit c (position in rel) -> global body bit rel[c]."""
     out = np.zeros(len(masks), np.uint64)
@@ -241,6 +259,7 @@ class Kernel:
         self._commit(self.handles(), children, exclude=True)
 
     def condition_pair(self, dark, lit):
+        t_pair = perf_counter()
         d, a = self._receiver(dark, 0), self._receiver(lit, 1)
         cones_d = [cone(b, d) for b in self.obs.bodies]
         cones_a = [cone(b, a) for b in self.obs.bodies]
@@ -251,6 +270,7 @@ class Kernel:
             self.budget.check(len(children))
         self._commit(self.handles(), children)
         self.stats["pairs"] += 1
+        self.stats["pair_seconds"] += perf_counter() - t_pair
 
     def split(self, h, row):
         """Any integer affine row. Both closed halves stay live; null overlap on the plane."""
@@ -338,6 +358,7 @@ class Kernel:
             raise ValueError("no receivers")
         for i in sel:
             self._receiver(self._idx_pos(i))  # FREE and inside the window
+        t_enf = perf_counter()
         cand = self._candidates(piece, sel)
         parts = [piece.poly]
         for idx, bodies in zip(sel, cand):
@@ -360,6 +381,7 @@ class Kernel:
             children = [Piece(q, rest, frozenset(), False, rmask) for q in parts]
         self.stats["receiver_cuts"] += len(sel)
         self.stats["cuts_no_change" if same else "cuts_changed"] += 1
+        self.stats["enforce_seconds"] += perf_counter() - t_enf
         return self._commit((h,), children), same
 
     def _candidates(self, piece, sel):
@@ -488,8 +510,12 @@ class Kernel:
             cid = single_cell(piece.poly)
             if cid is not None:
                 unknown_in[cid] += amount
-        payload = encode(state.lower)
+        payload = encode_int(state.lower)
         return payload, wire_bound(payload, state.lower, state.upper_in, unknown_total, unknown_in)
+
+    def unknown_volume(self):
+        """Search hint: total live volume (exact)."""
+        return sum((p.poly.volume for p in self._state.live.values()), Fraction(0))
 
     def unknown_fraction(self):
         """Search hint: live volume relative to proved IN volume."""
