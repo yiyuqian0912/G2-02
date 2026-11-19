@@ -70,6 +70,9 @@ def main():
                     help="label engine (default: the contract's labels.engine; v2: fastlabel, v1: tpe)")
     ap.add_argument("--fastlabel-n-tasks", type=int, help="planned label count of the campaign (delta = 0.01 / n)")
     ap.add_argument("--fastlabel-base-seed", type=int, help="base seed of the FastLabel label streams")
+    ap.add_argument("--allow-code-change", action="store_true",
+                    help="resume a root produced by different code (logged in logs/code_changes.jsonl; see the contract's "
+                         "labels.code_freeze)")
     a = ap.parse_args()
     conf = json.loads(Path(a.config).read_text()) if a.config else {}
     contract = json.loads(Path(conf.get("contract", a.contract)).read_text())
@@ -90,6 +93,7 @@ def main():
              label_slots=parse_range(a.label_slots or conf.get("label_slots"), None),
              label_sample=[int(x) for x in a.label_sample.split(",")] if a.label_sample else None,
              label_engine=a.label_engine or conf.get("label_engine"),
+             allow_code_change=a.allow_code_change or conf.get("allow_code_change", False),
              fastlabel={k: v for k, v in dict(n_tasks=a.fastlabel_n_tasks or conf.get("fastlabel_n_tasks"),
                                               base_seed=a.fastlabel_base_seed or conf.get("fastlabel_base_seed")).items()
                         if v is not None})

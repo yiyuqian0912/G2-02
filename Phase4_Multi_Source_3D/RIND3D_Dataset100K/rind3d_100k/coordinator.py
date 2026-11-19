@@ -72,6 +72,9 @@ def contract_digest(c):
     d = copy.deepcopy(c)
     for kk in ("status", "supersedes"):
         d.pop(kk, None)
+    if isinstance(d.get("labels"), dict):              # documentation of existing rules, not scientific content
+        for kk in ("normalization", "code_freeze"):
+            d["labels"].pop(kk, None)
     for blk in ("planning", "controller"):
         if isinstance(d.get(blk), dict):
             d[blk].pop("epoch_scenes", None)
@@ -104,6 +107,40 @@ def detect_resources():
     return dict(cpus=cpus, cgroup_cpus=quota, mem_available=mem, gpus=gpus, host=socket.gethostname())
 
 
+CODE_TREES = (("RIND3D_Posterior/src/rind3d_posterior/fastlabel", (".py", ".cu")),
+              ("RIND3D_Dataset100K/rind3d_100k", (".py",)),
+              ("RIND3D_Generator/src/rind3d", (".py", ".cu", ".cpp", ".h", ".hpp")))
+
+
+def code_provenance(repo=None):
+    """sha256 over the labeller, physics and pipeline sources (sorted relative paths and bytes): works without git."""
+    import hashlib
+    repo = Path(repo) if repo else Path(__file__).resolve().parents[2]
+    h = hashlib.sha256(); n = 0
+    for sub, exts in CODE_TREES:
+        base = repo / sub
+        for f in sorted(p for p in base.rglob("*") if p.is_file() and p.suffix in exts and "__pycache__" not in p.parts):
+            h.update(str(f.relative_to(repo)).encode()); h.update(b"\0"); h.update(f.read_bytes()); n += 1
+    return dict(digest=h.hexdigest(), files=n, trees=[t for t, _ in CODE_TREES])
+
+
+def check_code(root, allow_change=False, current=None):
+    """Code freeze of a campaign root (contract labels.code_freeze). Returns the recorded provenance."""
+    root = Path(root); cp = root / "CODE.json"; cur = current or code_provenance()
+    if not cp.exists():
+        atomic_write(cp, json.dumps(cur, indent=1).encode())
+        return cur
+    old = json.loads(cp.read_text())
+    if old["digest"] != cur["digest"]:
+        if not allow_change:
+            raise SystemExit("root was produced by different labeller/physics/pipeline code (CODE.json digest): resuming "
+                             "would mix code versions and spend extra certificate attempts; rerun with "
+                             "--allow-code-change to record the change explicitly")
+        (root / "logs").mkdir(parents=True, exist_ok=True)
+        append_line(root / "logs" / "code_changes.jsonl", json.dumps(dict(old=old["digest"], new=cur["digest"])))
+    return old
+
+
 class Coordinator:
     def __init__(self, root, contract, opts):
         self.root = Path(root); self.cfg = contract; self.o = opts
@@ -117,6 +154,7 @@ class Coordinator:
                 raise SystemExit("root holds a different contract (id, seed or scientific fields differ)")
         else:
             atomic_write(cp, json.dumps(contract, indent=1).encode())
+        self.code = check_code(self.root, bool(opts.get("allow_code_change")))
         self.a, self.b = opts["slots"]
         self.man_path = self.root / "manifest" / "physical.jsonl"
         self.recs = {}
