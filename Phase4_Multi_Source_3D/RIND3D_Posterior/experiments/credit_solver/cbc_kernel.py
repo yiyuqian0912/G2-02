@@ -35,6 +35,8 @@ Arrays stored in pieces are read-only and the search receives read-only views an
 polytope copies, so a (buggy, non-malicious) search cannot alter kernel evidence.
 """
 import copy
+import json
+import math
 from collections import Counter
 from dataclasses import dataclass
 from fractions import Fraction
@@ -57,14 +59,9 @@ import polycheck
 
 COLLECT_CAP = 1 << 21  # largest residual obligation list stored explicitly
 
-try:  # optional exact GMP helper (native/build.sh); CBC_NATIVE=0 forces the Python path
-    import os as _os
-    import sys as _sys
-    from pathlib import Path as _Path
-    _sys.path.insert(0, str(_Path(__file__).resolve().parent / "native"))
-    NATIVE = None if _os.environ.get("CBC_NATIVE") == "0" else __import__("cbc_cells")
-except ImportError:
-    NATIVE = None
+import evidence
+from validated_input import validate
+
 CELL_UNITS = SCALE // (128 ** 3)  # exact volume of one output cell in units of 2^-160
 SPLIT_COEF_LIMIT = 1 << 4096  # search-proposed split rows (the search's dyadic planes need < 2^450)
 CHECK_LIVE = True
@@ -81,7 +78,7 @@ def _readonly(a, dtype):
 def _view(a):
     if a is None:
         return None
-    v = a.view()
+    v = a.copy()
     v.flags.writeable = False
     return v
 
@@ -93,6 +90,7 @@ class Release:
     bound: object        # Fraction: exact upper TV bound of payload (best recorded), or None
     tolerance: Fraction
     reason: str
+    binding: bytes | None = None
 
 
 def _transition(fn):
@@ -103,7 +101,9 @@ def _transition(fn):
             raise RuntimeError("kernel tainted by a failed guard: " + self._tainted)
         try:
             return fn(self, *args, **kwargs)
-        except ArithmeticError as exc:
+        except (Limit, ValueError, KeyError):
+            raise
+        except Exception as exc:
             self._tainted = f"{fn.__name__}: {type(exc).__name__}: {exc}"
             raise
     return run
@@ -265,19 +265,7 @@ def private_problem(observation, centroid_anchor=True):
     made read-only, and every derived cache the trusted code reads (obstacles clipped to the
     cube, their facet geometry, the clearance covers) is computed here, once.
     """
-    side = int(observation.side)
-    if int(observation.denom) != 2048 or side not in (64, 128, 256):
-        raise ValueError("kernel verified for N=1024 and v3 window sizes only")
-    origin = tuple(int(o) for o in observation.origin)
-    if len(origin) != 3 or any(o < 0 or o + side > 1024 for o in origin):
-        raise ValueError("window outside the world")
-    bodies = tuple(tuple(tuple(int(x) for x in r) for r in b) for b in observation.bodies)
-    if any(len(r) != 4 for b in bodies for r in b):
-        raise ValueError("obstacle rows must be homogeneous 4-vectors")
-    cls = np.array(observation.cls, dtype=np.uint8, copy=True)
-    if cls.shape != (side,) * 3 or (cls.size and int(cls.max()) > 2):  # uint8: values in {0, 1, 2}
-        raise ValueError("class array must be (L, L, L) with values 0, 1, 2")
-    cls.flags.writeable = False
+    bodies, cls, origin = validate(observation)
     obs = Observation(bodies, cls, origin, 1024)
     scancls = np.ascontiguousarray(cls.T).copy()
     scancls.flags.writeable = False
@@ -295,6 +283,7 @@ def private_problem(observation, centroid_anchor=True):
 class Kernel:
     def __init__(self, observation, budget, centroid_anchor=True):
         self._obs = private_problem(observation, centroid_anchor)
+        self._problem_identity = evidence.problem(self._obs)
         self.budget = budget
         self._state = State({0: Piece(Poly.cube())}, Counter(), Counter(), 1, False)
         self.stats = Counter()
@@ -321,6 +310,10 @@ class Kernel:
     def pending_count(self, h):
         p = self._state.live[h]
         return None if p.pending is None else len(p.pending)
+
+    def proposal_problem(self):
+        o = self._obs
+        return Observation(o.bodies, _view(o.cls), o.origin, 1024)
 
     def receiver_classes(self):
         """Read-only [z, y, x] class view (hint for the search)."""
@@ -589,35 +582,7 @@ class Kernel:
 
     # ---------------------------------------------------------------- accounting
     def _grid_credit(self, parts):
-        if NATIVE is not None:
-            return self._grid_credit_native(parts)
         return self._grid_credit_python(parts)
-
-    def _grid_credit_native(self, parts):
-        """GMP octree (native/cells.cpp), same algorithm as _grid_credit_python and exactly
-        equal per-cell credits (differential test). Conservation is re-checked here against
-        the independent Python rational volume of each piece."""
-        started = perf_counter()
-        lo, hi = Counter(), Counter()
-        try:
-            for p in parts:
-                self.budget.check()
-                credits, boundary, interior = NATIVE.grid_credit(p.faces, 128, 160)
-                subtotal = 0
-                for cid, low, high in credits:
-                    if low:
-                        lo[cid] += low
-                    hi[cid] += high
-                    subtotal += low
-                total = p.volume * SCALE
-                ok = (subtotal <= total < subtotal + boundary) if boundary else (subtotal == total)
-                if not ok:
-                    raise ArithmeticError("native grid integration failed volume conservation")
-                self.stats["grid_intersections"] += boundary
-                self.stats["cells_interior"] += interior
-            return lo, hi
-        finally:
-            self.stats["integration_seconds"] += perf_counter() - started
 
     def _grid_credit_python(self, parts):
         """Exact per-cell credits of IN pieces (units 2^-160): floor for lower, ceiling for upper.
@@ -727,7 +692,8 @@ class Kernel:
             return Release("INCOMPLETE", None, None, tolerance, "no positive feasible mass")
         bound, payload = self._best
         if bound <= tolerance:
-            return Release("CERTIFIED", payload, bound, tolerance, "tv_target")
+            return Release("CERTIFIED", payload, bound, tolerance, "tv_target",
+                           evidence.seal(self._problem_identity, payload, bound, tolerance))
         return Release("INCOMPLETE", None, bound, tolerance, "bound above tolerance")
 
     def unknown_volume(self):
@@ -746,6 +712,23 @@ class Kernel:
         return unk, lo
 
 
+class ProposalAccess:
+    """Public operations for a same-process, non-reflective proposal policy."""
+    __slots__ = ("_kernel",)
+    _operations = frozenset(("condition_pair", "contact", "enforce", "envelope_rows",
+        "exclude_window", "handles", "is_open", "lower_total_float", "open_handles",
+        "pending_count", "poly", "positive", "proposal_problem", "receiver_classes",
+        "screen", "snapshot", "split", "unknown_volume", "volume", "projective_patch"))
+
+    def __init__(self, kernel):
+        self._kernel = kernel
+
+    def __getattr__(self, name):
+        if name not in self._operations:
+            raise AttributeError(name)
+        return getattr(self._kernel, name)
+
+
 def certify(obs, tolerance, seconds, cap, search, centroid_anchor=True):
     """Trusted driver: owns the budget and the kernel, runs the untrusted search, releases.
 
@@ -753,12 +736,12 @@ def certify(obs, tolerance, seconds, cap, search, centroid_anchor=True):
     with any exception: all three are abstentions of the search. Only kernel.release()
     decides the status, payload and bound of the result; diagnostics cannot override them.
     """
-    if type(tolerance) is not Fraction or not 0 <= tolerance <= 1 or seconds <= 0 or cap < 1:
+    if type(tolerance) is not Fraction or not 0 <= tolerance <= 1 or not math.isfinite(seconds) or seconds <= 0 or type(cap) is not int or cap < 1:
         raise ValueError("invalid budget or tolerance")
     budget = Budget(seconds, cap)
     kernel = Kernel(obs, budget, centroid_anchor)
     try:
-        details = dict(search(kernel, budget) or {})
+        details = dict(search(ProposalAccess(kernel), copy.copy(budget)) or {})
     except Limit as exc:
         details = dict(search_reason=str(exc))
     except Exception as exc:  # noqa: BLE001  (a failed search abstains; the kernel state stays valid)
@@ -766,5 +749,11 @@ def certify(obs, tolerance, seconds, cap, search, centroid_anchor=True):
     rel = kernel.release(tolerance)
     details.update(status=rel.status, tv=None if rel.bound is None else str(rel.bound), reason=rel.reason,
                    live=len(kernel.handles()), positive=kernel.positive, stats=dict(kernel.stats))
+    for reserved in ("certificate", "payload", "wire", "wire_sha256", "cells", "problem", "format", "tolerance"):
+        details.pop(reserved, None)
+    if rel.binding is not None:
+        details["certificate"] = json.loads(rel.binding)
+    if rel.status == "ERROR":
+        raise ArithmeticError(rel.reason or "failed certification guard")
     return rel.payload, details
 

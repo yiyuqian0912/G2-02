@@ -201,7 +201,11 @@ static QQ volume(const Poly& P) {
             Z cx = c[0] * o[3] - o[0] * c[3], cy = c[1] * o[3] - o[1] * c[3], cz = c[2] * o[3] - o[2] * c[3];
             Z det = ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
             Z den = a[3] * b[3] * c[3] * o[3] * o[3] * o[3];
-            total += QQ(abs(det), den);
+            if (det != 0) {
+                QQ term(abs(det), den);
+                term.canonicalize();
+                total += term;
+            }
         }
     }
     total /= 6;

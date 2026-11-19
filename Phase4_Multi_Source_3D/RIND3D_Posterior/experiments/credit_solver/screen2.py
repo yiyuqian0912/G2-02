@@ -38,13 +38,13 @@ MAX_MASK_BODIES = 64
 
 
 def check_ranges(rows, origin, side, denom):
-    if rows.size and int(np.abs(rows).max()) > ROW_LIMIT:
+    if rows.size and (int(rows.min()) < -ROW_LIMIT or int(rows.max()) > ROW_LIMIT):
         raise ArithmeticError("screen row exceeds the verified fixed-point range")
     if denom > COORD_LIMIT or any(2 * (o + side) + 1 > COORD_LIMIT + 1 for o in origin):
         raise ArithmeticError("receiver coordinates exceed the verified range")
 
 
-@njit(cache=True)
+@njit(cache=False)
 def _intervals(origin, denom, wy, wz, rows, off, L, glo, ghi):
     for group in range(len(off) - 1):
         lo, hi = 0, L - 1
@@ -63,7 +63,7 @@ def _intervals(origin, denom, wy, wz, rows, off, L, glo, ghi):
         ghi[group] = hi
 
 
-@njit(cache=True)
+@njit(cache=False)
 def _mask(x, glo, ghi, nb):
     m = np.uint64(0)
     if nb > 64:
@@ -75,14 +75,14 @@ def _mask(x, glo, ghi, nb):
     return m
 
 
-@njit(cache=True)
+@njit(cache=False)
 def _boundary(cls, x, y, z, act, L):
     return ((x > 0 and cls[z, y, x - 1] == 1 - act) or (x + 1 < L and cls[z, y, x + 1] == 1 - act)
             or (y > 0 and cls[z, y - 1, x] == 1 - act) or (y + 1 < L and cls[z, y + 1, x] == 1 - act)
             or (z > 0 and cls[z - 1, y, x] == 1 - act) or (z + 1 < L and cls[z + 1, y, x] == 1 - act))
 
 
-@njit(cache=True)
+@njit(cache=False)
 def scan_collect(cls, origin, denom, rows, off, skipped, cap):
     """Full-window scanline screen. Returns (n or code, ids[:min(n,cap)], wrong, boundary, mask)."""
     L = cls.shape[0]
@@ -133,7 +133,7 @@ def scan_collect(cls, origin, denom, rows, off, skipped, cap):
     return n, ids[:m], wrong_out[:m], bnd_out[:m], mask_out[:m]
 
 
-@njit(cache=True)
+@njit(cache=False)
 def scan_ids(cls, ids_in, origin, denom, rows, off):
     """Screen only the listed receivers (an inherited obligation set, sorted ascending).
 

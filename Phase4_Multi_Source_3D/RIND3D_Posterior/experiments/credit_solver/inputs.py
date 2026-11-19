@@ -16,23 +16,28 @@ for directory in ("mixed_patch", "global_inverse", "xlf_assurance"):
 
 from certificates import integer_row
 from solver import Observation
+from validated_input import integer
+import evidence
 
 
 def load(path, window, channel):
+    window, channel = integer(window), integer(channel)
     with np.load(path, allow_pickle=False) as container:
         windows = container["windows"]
         if not 0 <= window < len(windows) or not 0 <= channel < 4:
             raise ValueError("invalid window/channel")
         w = windows[window]
-        side = int(w["L"])
-        origin = tuple(int(w[k]) for k in "xyz")
+        side = integer(w["L"])
+        origin = tuple(integer(w[k]) for k in "xyz")
         meta = json.loads(container["meta"].tobytes())
         if (meta["resolution"] != 1024 or side not in (64,128,256)
-                or not int(w["mask"]) & (1 << channel)
+                or not integer(w["mask"]) & (1 << channel)
                 or any(a < 0 or a+side > 1024 for a in origin)):
             raise ValueError("unsupported or ineligible v3 observation")
         blob = container["obs"].tobytes()
         entries = container["obs_index"]
+        if entries.dtype.kind not in "iu" or entries.ndim != 2 or entries.shape[1] != 4:
+            raise ValueError("expected integer crop index with four columns")
         width = side**3 // 8
         def bits(index):
             matches = [(int(start),int(size)) for i,j,start,size in entries
@@ -56,8 +61,8 @@ def load(path, window, channel):
                    for c in decode_convex(load_geometry(io.BytesIO(geometry))))
     cls.flags.writeable = False
     obs = Observation(bodies,cls,origin,1024)
-    return obs, dict(schema="rind3d-v3-free-channel/world-volume-128/v1",
+    identity = evidence.problem(obs)
+    return obs, dict(**identity, schema="rind3d-v3-free-channel/world-volume-128/v1",
                      geometry_sha256=hashlib.sha256(geometry).hexdigest(),
-                     observation_xyz_sha256=hashlib.sha256(cls.tobytes()).hexdigest(),
-                     origin=list(origin), resolution=1024, side=side, window=window,
+                     window=window,
                      channel=channel, family=str(meta["family"]), slot=int(meta["slot"]))

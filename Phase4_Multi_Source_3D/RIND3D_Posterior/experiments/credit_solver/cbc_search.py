@@ -91,7 +91,7 @@ def hull_receivers(kernel, h, obs, r, minimum):
     """Convex-hull extreme receivers of the single-blocker dark ambiguous sets (proposal)."""
     from hull_proposals import from_list, from_scan, scan_extremes
     L = obs.side
-    scancls = kernel.receiver_classes()
+    scancls = obs.cls.T
     if r["ids"] is not None and r.get("masks") is not None:
         dark = scancls.ravel()[r["ids"]] == 0
         per_body = from_list(L, r["ids"], r["masks"], dark, minimum)
@@ -115,7 +115,7 @@ def elongation(poly):
 def solve(obs, key, tolerance, seconds, cap=4096, **policy):
     """Label one channel: the trusted driver cbc_kernel.certify runs this search policy."""
     anchor = policy.pop("centroid_anchor", True)
-    return certify(obs, tolerance, seconds, cap, lambda kernel, budget: search(kernel, budget, obs, key, tolerance,
+    return certify(obs, tolerance, seconds, cap, lambda kernel, budget: search(kernel, budget, kernel.proposal_problem(), key, tolerance,
                                                                                  **policy), centroid_anchor=anchor)
 
 
@@ -231,7 +231,7 @@ def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
             if prefer_single_dark and r.get("masks") is not None:
                 m = r["masks"]
                 single = (m != 0) & ((m & (m - np.uint64(1))) == 0)
-                dark = kernel.receiver_classes().ravel()[ids] == 0
+                dark = obs.cls.T.ravel()[ids] == 0
                 # a dark receiver with one possible blocker is a pure intersection (no fragmentation)
                 pure = single & dark
                 score = score * 2 + pure.astype(np.int64)

@@ -87,6 +87,9 @@ def write_result(path, identity, tolerance, payload, details):
             raise ArithmeticError("serialized envelope changed")
         if rec["status"]=="CERTIFIED":
             restored = base64.b64decode(rec["wire"],validate=True)
+            if rec.get("certificate") is not None:
+                from evidence import check_seal
+                check_seal(rec["certificate"], restored, rec["tv"], tolerance, rec["problem"])
             if restored!=payload or sha256(restored).hexdigest()!=rec["wire_sha256"]:
                 raise ArithmeticError("wire mismatch")
             if not 0<=Fraction(rec["tv"])<=tolerance or len(decode(restored))!=rec["cells"]:

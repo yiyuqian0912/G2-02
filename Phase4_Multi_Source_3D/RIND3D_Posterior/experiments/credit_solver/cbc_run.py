@@ -6,6 +6,7 @@ from pathlib import Path
 import resource
 from time import perf_counter, process_time
 
+import evidence
 import inputs
 from cbc_search import solve
 from run import write_result
@@ -51,7 +52,9 @@ def main():
                              batch=args.batch, split_above=args.split_above,
                              prefer_single_dark=args.prefer_single_dark, centroid_anchor=args.centroid_anchor,
                              hull=args.hull)
-    details["solver"] = "claude-cbc-v2"
+    details["solver"] = evidence.VERSION
+    if details["status"] == "CERTIFIED":
+        evidence.check_seal(details["certificate"], payload, details["tv"], args.tolerance, identity)
     details["jit_warm_seconds"] = warm
     write_result(args.output, identity, args.tolerance, payload, details)
     print(json.dumps(dict(key=key, wall=perf_counter() - t, cpu=process_time() - c,
