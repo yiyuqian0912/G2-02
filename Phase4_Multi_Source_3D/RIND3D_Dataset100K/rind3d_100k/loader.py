@@ -20,7 +20,11 @@ Weights are loss weights, never model inputs. Estimators of P_A: "rate", "quota"
 always the Rao-Blackwellised sum_m c(m) rate_m / rate_n of the exact-m rate stream.
 
 **Supervision:** certified posterior labels (statuses in `accept`, deterministic `certified` and statistical
-`certified_stat`, tv_bound <= max_tv). `fallback="onehot"` gives an example without an accepted label the true-source
+`certified_stat`, tv_bound <= max_tv). **Normalisation rule:** the label of a slot is the EXACT normalisation
+lo / sum(lo) of its stored per-cell binary64 volumes `lo` (`certified_stat`: lo = hi = vol(B ∩ cell)), and tv_bound
+refers to that vector. The returned `q` is its binary64 evaluation `lo / lo.sum()`; for n <= 128^3 cells it is within total
+variation gamma_(n+1) / 2 < 1.2e-10 of the exact normalisation (any summation order); it need not sum to 1 exactly
+(RIND3D_Posterior/docs/FASTLABEL_V34_CERTIFICATION.md §6.3). `fallback="onehot"` gives an example without an accepted label the true-source
 cell, marked `onehot_fallback`; it is never presented as a certified posterior. `supervision="onehot"` is the one-hot
 baseline. Missing labels are never dropped silently (`missing`, `report`).
 

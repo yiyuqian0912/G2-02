@@ -1,0 +1,134 @@
+{
+ "by_ref": {
+  "tp_engine": {
+   "n": 54,
+   "n_stat": 39,
+   "max_tv_upper": 0.01440740290242791,
+   "max_tv_upper_stat_key": "000059_w11_s3",
+   "max_excess_rel": 5.746977151648783e-10,
+   "n_over_eps": 0,
+   "max_one_minus_p_upper": 0.014218446154790688
+  },
+  "tp_cert": {
+   "n": 15,
+   "n_stat": 10,
+   "max_tv_upper": 0.00976915818579634,
+   "max_tv_upper_stat_key": "000007_w09_s2",
+   "max_excess_rel": 6.051105819838483e-18,
+   "n_over_eps": 0,
+   "max_one_minus_p_upper": 0.009741765368531398
+  },
+  "astra": {
+   "n": 30,
+   "n_stat": 17,
+   "max_tv_upper": 0.04374092836782074,
+   "max_tv_upper_stat_key": "000025_w04_s0",
+   "max_excess_rel": 7.049763155490561e-10,
+   "n_over_eps": 0,
+   "max_one_minus_p_upper": 0.021823097689261346
+  }
+ },
+ "violations": [],
+ "stat_labels": {
+  "n": 50,
+  "n_independent": 24,
+  "max_tv_upper": 0.04374092836782074,
+  "median_tv_upper": 0.0004923726761485889,
+  "max_tv_upper_independent": 0.04374092836782074,
+  "max_one_minus_p_upper_tight": 0.014218446156647814
+ },
+ "serialization": {
+  "max_abs_sum_minus_1": 2.63486750660632e-16,
+  "max_tv_float_vs_exact": 1.31743375330316e-16,
+  "all_within_bound": true,
+  "n_exactly_normalised": 25,
+  "n": 75
+ },
+ "validation_consistency": [
+  {
+   "key": "000001_w00_s0",
+   "n": 20000,
+   "fail": 30,
+   "one_minus_p_exact": [
+    0.0016368561350898153,
+    0.0019816415242464073
+   ],
+   "p_value": 0.7140811088049904
+  },
+  {
+   "key": "000004_w00_s0",
+   "n": 20000,
+   "fail": 0,
+   "one_minus_p_exact": [
+    3.4447993834765686e-10,
+    3.4447993834765686e-10
+   ],
+   "p_value": 1.0
+  },
+  {
+   "key": "000004_w08_s0",
+   "n": 20000,
+   "fail": 0,
+   "one_minus_p_exact": [
+    1.3592181707290475e-11,
+    1.3592181707290475e-11
+   ],
+   "p_value": 1.0
+  },
+  {
+   "key": "000006_w00_s0",
+   "n": 20000,
+   "fail": 7,
+   "one_minus_p_exact": [
+    0.0004160072403946008,
+    0.00041600724039516187
+   ],
+   "p_value": 0.8183958831532168
+  },
+  {
+   "key": "000006_w04_s0",
+   "n": 20000,
+   "fail": 0,
+   "one_minus_p_exact": [
+    0.0,
+    0.0
+   ],
+   "p_value": 1.0
+  },
+  {
+   "key": "000009_w00_s0",
+   "n": 20000,
+   "fail": 7,
+   "one_minus_p_exact": [
+    0.00041423558335120024,
+    0.00041423558337172863
+   ],
+   "p_value": 0.8278763644577554
+  },
+  {
+   "key": "000026_w04_s0",
+   "n": 20000,
+   "fail": 0,
+   "one_minus_p_exact": [
+    2.5108701830466223e-10,
+    2.5108701830466223e-10
+   ],
+   "p_value": 1.0
+  }
+ ],
+ "certificate_rules": {
+  "n": 11,
+  "failures": {}
+ },
+ "cost": {
+  "n": 50,
+  "rounds_hist": {
+   "1": 6,
+   "2": 39,
+   "3": 5
+  },
+  "mean_tested": 878.08,
+  "max_tested": 2176,
+  "stage1_fraction": 0.74
+ }
+}
