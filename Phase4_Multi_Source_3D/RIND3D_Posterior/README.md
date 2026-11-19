@@ -29,6 +29,10 @@ This package is the maintained form of the tau-pencil engine (TPE), Phases 1–2
 * The label q = L/ΣL.
 * A deterministic TV bound `tv_bound(L, U)` on TV(q, Uniform(F_W)). This is sparse: there is no dense 128³ tensor.
 
+## Deterministic Local-first research solver
+
+The isolated CBC research entry point reads one v3 channel and writes a sparse 128³ posterior with a deterministic TV bound on its decoded bytes when the bound is established. It has an exact SOLID consistency check, a rational integration backend and an optional projected receiver-patch experiment. [Mathematics and usage](docs/ASTRA_XLF_CERTIFIED_INTERFACE.md) · [Matched results and limitations](docs/ASTRA_XLF_CERTIFIED_RESULTS.md)
+
 ## Engines
 
 | Engine | What it is |

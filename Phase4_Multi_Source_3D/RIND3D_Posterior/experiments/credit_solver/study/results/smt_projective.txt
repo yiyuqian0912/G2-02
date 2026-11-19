@@ -1,0 +1,4 @@
+closed contact and entry ordering PROVED
+segment with nonpositive endpoints PROVED
+reciprocal sign preservation PROVED
+extrema survive same-class convex combinations PROVED

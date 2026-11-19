@@ -1,0 +1,7 @@
+a>0 upper endpoint exact: PROVED
+a<0 lower endpoint exact: PROVED
+a=0 constant row: PROVED
+int64 range: PROVED
+fixed(up) shrinks guaranteed regions: PROVED
+fixed(down) grows possible regions: PROVED
+ALL PROVED
