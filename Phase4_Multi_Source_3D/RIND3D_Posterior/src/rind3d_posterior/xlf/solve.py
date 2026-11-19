@@ -27,6 +27,24 @@ EPS_CLEAR = 2.0 ** -26
 NCELL = 128
 
 
+def add_dn(acc, v):
+    """Rigorous lower bound of the exact sum acc + v (binary64; two_sum residual decides the rounding direction).
+    Per-cell enclosures are sums of per-piece enclosures: a round-to-nearest sum may overshoot the exact sum of the
+    lower bounds (or undershoot that of the upper bounds), so every accumulation is directed."""
+    s = acc + v
+    bv = s - acc
+    e = (acc - (s - bv)) + (v - bv)
+    return float(np.nextafter(s, -np.inf)) if e < 0.0 else s
+
+
+def add_up(acc, v):
+    """Rigorous upper bound of the exact sum acc + v (see add_dn)."""
+    s = acc + v
+    bv = s - acc
+    e = (acc - (s - bv)) + (v - bv)
+    return float(np.nextafter(s, np.inf)) if e > 0.0 else s
+
+
 class Problem:
     def __init__(self, scene, cls, o, N):
         self.scene = scene; self.cls = np.ascontiguousarray(cls, np.uint8); self.o = np.asarray(o, np.int64)
@@ -427,7 +445,7 @@ class Solver:
         vlo, vhi = PY.volume(node.slot, self.sl.a["Fn"], self.sl.a["Fv"], self.sl.a["Vm"], self.sl.a["Vr"], self.sl.a["nF"])
         self.undet_vol[why] = self.undet_vol.get(why, 0.0) + vhi
         if node.cell >= 0:
-            self.cell_hi[node.cell] = self.cell_hi.get(node.cell, 0.0) + vhi
+            self.cell_hi[node.cell] = add_up(self.cell_hi.get(node.cell, 0.0), vhi)
         else:
             self._cell_volumes(node.slot, False)
         self._leaf(node, "UNDET", vhi); self.stats["undet"] += 1
@@ -482,7 +500,7 @@ class Solver:
         if node.cell >= 0:
             vlo, vhi = PY.volume(node.slot, a["Fn"], a["Fv"], a["Vm"], a["Vr"], a["nF"])
             cid = node.cell
-            self.cell_lo[cid] = self.cell_lo.get(cid, 0.0) + vlo; self.cell_hi[cid] = self.cell_hi.get(cid, 0.0) + vhi
+            self.cell_lo[cid] = add_dn(self.cell_lo.get(cid, 0.0), vlo); self.cell_hi[cid] = add_up(self.cell_hi.get(cid, 0.0), vhi)
             self._leaf(node, "IN", (vlo, vhi)); self.stats["in_"] += 1
             return []
         if node.box is None:
@@ -502,7 +520,7 @@ class Solver:
                     v = float(e[0]) * float(e[1]) * float(e[2])
                     vlo = np.nextafter(np.nextafter(v, 0.0) * (1 - 2 ** -50), 0.0); vhi = np.nextafter(v * (1 + 2 ** -50), np.inf)
                     cid = int((ix * NCELL + iy) * NCELL + iz)
-                    self.cell_lo[cid] = self.cell_lo.get(cid, 0.0) + vlo; self.cell_hi[cid] = self.cell_hi.get(cid, 0.0) + vhi
+                    self.cell_lo[cid] = add_dn(self.cell_lo.get(cid, 0.0), vlo); self.cell_hi[cid] = add_up(self.cell_hi.get(cid, 0.0), vhi)
         self._leaf(node, "IN_BOX", (b0.tolist(), b1.tolist())); self.stats["in_"] += 1; self.stats["in_box"] += 1
         return []
 
@@ -746,8 +764,8 @@ class Solver:
                 vlo, vhi = PY.volume(s, A["Fn"], A["Fv"], A["Vm"], A["Vr"], A["nF"])
                 cid = int((ca[0] * NCELL + ca[1]) * NCELL + ca[2])
                 if is_in:
-                    self.cell_lo[cid] = self.cell_lo.get(cid, 0.0) + vlo
-                self.cell_hi[cid] = self.cell_hi.get(cid, 0.0) + vhi
+                    self.cell_lo[cid] = add_dn(self.cell_lo.get(cid, 0.0), vlo)
+                self.cell_hi[cid] = add_up(self.cell_hi.get(cid, 0.0), vhi)
                 self.sl.put(s); continue
             k = int(np.argmax(span)); m = int(ca[k] + (span[k] + 1) // 2); val = m / NCELL
             pid = self.PLs.axis_plane(k, val)

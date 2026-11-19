@@ -17,7 +17,7 @@ No snapping, no tolerance: the clipping combinatorics is exact; only vertex coor
 import numpy as np
 from numba import njit
 
-from .ar import (U, TINY, INFL, G3, G5, dn, up, det3_float, det3_exp, det4_rows_sign, det3_sign, exp_approx)
+from .ar import (U, TINY, INFL, G3, G4, G5, dn, up, det3_float, det3_exp, det4_rows_sign, det3_sign, exp_approx)
 
 MV = 256        # vertices per polytope
 MF = 96         # faces per polytope
@@ -76,7 +76,9 @@ def _affine_at(PL, h, vm, vr):
     a = PL[h]
     s = a[0] * vm[0] + a[1] * vm[1] + a[2] * vm[2] + a[3]
     ab = abs(a[0] * vm[0]) + abs(a[1] * vm[1]) + abs(a[2] * vm[2]) + abs(a[3])
-    rad = (abs(a[0]) * vr[0] + abs(a[1]) * vr[1] + abs(a[2]) * vr[2]) * INFL + G3 * ab * INFL + TINY
+    # three products and three additions: gamma_4 (the former gamma_3 is violated by ~1e-3 of random 4-term sums
+    # as an enclosure; it was nevertheless sufficient for sos_sign, whose decisions only need the bound near zero)
+    rad = (abs(a[0]) * vr[0] + abs(a[1]) * vr[1] + abs(a[2]) * vr[2]) * INFL + G4 * ab * INFL + TINY
     return s, rad
 
 
@@ -341,7 +343,7 @@ def volume(s, Fn, Fv, Vm, Vr, nF):
         return 0.0, 0.0
     x0m = Vm[s, Fv[s, 0, 0]]; x0r = Vr[s, Fv[s, 0, 0]]
     am = np.empty(3); ar = np.empty(3); bm = np.empty(3); br = np.empty(3); cm = np.empty(3); cr = np.empty(3)
-    tot = 0.0; trad = 0.0; tab = 0.0; nt = 0
+    tlo = 0.0; thi = 0.0
     for f in range(nf):
         n = Fn[s, f]
         p0 = Fv[s, f, 0]
@@ -356,13 +358,11 @@ def volume(s, Fn, Fv, Vm, Vr, nF):
                 d = Vm[s, p2, t] - x0m[t]
                 cm[t] = d; cr[t] = (Vr[s, p2, t] + x0r[t]) * INFL + U * abs(d) * INFL + TINY
             dm, dr = _det3_mr(am, ar, bm, br, cm, cr)
-            tot += dm; trad += dr; tab += abs(dm); nt += 1
-    # summation error gamma_{nt-1} sum|terms|; division by 6
-    gs = (nt + 1) * U / (1.0 - (nt + 1) * U)
-    rad = (trad + gs * tab) * INFL + TINY
-    mid = tot / 6.0
-    rad = up(rad / 6.0 * INFL + U * abs(mid))
-    lo = dn(mid - rad); hi = up(mid + rad)
+            # interval accumulation with outward rounding: each fan determinant lies in [dm - dr, dm + dr]
+            tlo = dn(tlo + dn(dm - dr)); thi = up(thi + up(dm + dr))
+    # (the former mid-radius sum covered the rounding of the radius sum only by INFL = 1 + 64u, i.e. up to ~64 fan
+    # triangles; directed accumulation needs no a priori count)
+    lo = dn(tlo / 6.0); hi = up(thi / 6.0)
     return max(lo, 0.0), hi
 
 
@@ -377,7 +377,7 @@ def affine_range(s, a0, a1, a2, b, r_coef, Vm, Vr, nV):
         m = a0 * vm[0] + a1 * vm[1] + a2 * vm[2] + b
         ab = abs(a0 * vm[0]) + abs(a1 * vm[1]) + abs(a2 * vm[2]) + abs(b)
         rad = ((abs(a0) + r_coef[0]) * vr[0] + (abs(a1) + r_coef[0]) * vr[1] + (abs(a2) + r_coef[0]) * vr[2]
-               + r_coef[0] * (abs(vm[0]) + abs(vm[1]) + abs(vm[2])) + r_coef[1]) * INFL + G3 * ab * INFL + TINY
+               + r_coef[0] * (abs(vm[0]) + abs(vm[1]) + abs(vm[2])) + r_coef[1]) * INFL + G4 * ab * INFL + TINY
         if m - rad < lo:
             lo = m - rad
         if m + rad > hi:

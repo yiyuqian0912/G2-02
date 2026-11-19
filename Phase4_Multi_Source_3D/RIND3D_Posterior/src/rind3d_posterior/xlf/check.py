@@ -19,7 +19,9 @@ import numpy as np
 
 from ..certify import poly as PY, tvb
 from . import pred as PR
-from .solve import Slots, NCELL, EPS_CLEAR
+from fractions import Fraction as Q
+
+from .solve import Slots, NCELL, EPS_CLEAR, add_dn, add_up
 
 
 def check(prob, cert, rcap=1 << 20):
@@ -115,14 +117,18 @@ def check(prob, cert, rcap=1 << 20):
 
 
 def _inner_plane_ok(p, PL, A, s, a, c, i):
-    """Plane a has {a <= 0} subset {f_i < 0} on the unit cube (a = f_i / sc shifted by more than the coefficient
-    error E, as built by Solver._plane_pair), and the polytope in slot s lies in {a <= 0} (exact side test)."""
-    cm = p.RM[c, i]; cr = p.RR[c, i]; sc = float(np.max(np.abs(cm)))
-    h = cm / sc
-    if not np.all(PL[a, :3] == h[:3]):
+    """{a <= 0} n [0, 1]^3 is contained in {f_i < 0} for EVERY row f_i in the enclosure RM +- RR, and the polytope in
+    slot s lies in {a <= 0} (exact side test). The first part is decided EXACTLY in rationals: with sc > 0,
+        sup_{x in [0,1]^3, f in RM +- RR} (f(x) / sc - a(x)) = sum_k max(0, (RM_k + RR_k) / sc - a_k) + (RM_3 + RR_3) / sc - a_3 < 0
+    implies f(x) < sc a(x) <= 0 wherever a(x) <= 0. (The former float test `a_3 - h_3 > E` omitted the rounding of
+    sc * h_k inside E and accepted offsets that are too small; see tests/test_xlf_numerics.py.)"""
+    sc = Q(float(np.max(np.abs(p.RM[c, i]))))
+    if sc <= 0:
         return False
-    E = float(np.sum(np.abs(cm - sc * h) + cr)) * (1 + 2 ** -40) / sc
-    if not (PL[a, 3] - h[3] > E * (1 + 2 ** -30)):
+    hi = [Q(float(p.RM[c, i, t])) + Q(float(p.RR[c, i, t])) for t in range(4)]
+    ar = [Q(float(PL[a, t])) for t in range(4)]
+    sup = sum((max(Q(0), hi[t] / sc - ar[t]) for t in range(3)), Q(0)) + hi[3] / sc - ar[3]
+    if not sup < 0:
         return False
     return _side(PL, A, s, a) == -1
 
@@ -209,8 +215,8 @@ def _cells(PL, PLn, sl, s0, is_in, cell_lo, cell_hi):
             vlo, vhi = PY.volume(s, A["Fn"], A["Fv"], A["Vm"], A["Vr"], A["nF"])
             cid = int((ca[0] * NCELL + ca[1]) * NCELL + ca[2])
             if is_in:
-                cell_lo[cid] = cell_lo.get(cid, 0.0) + vlo
-            cell_hi[cid] = cell_hi.get(cid, 0.0) + vhi
+                cell_lo[cid] = add_dn(cell_lo.get(cid, 0.0), vlo)
+            cell_hi[cid] = add_up(cell_hi.get(cid, 0.0), vhi)
             sl.put(s); continue
         k = int(np.argmax(span)); m = int(ca[k] + (span[k] + 1) // 2); val = m / NCELL
         pid = _axis_id(PL[:PLn[0]], k, val)
