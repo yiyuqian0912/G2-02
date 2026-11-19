@@ -40,6 +40,21 @@ def reference_bounds():
     return bounds
 
 
+CERT = Path("/home/yushu/Projects/RIND/RIND3D_100K_v3_work/xlf_cbc/ref_cert")
+
+
+def certified_reference(key):
+    """Exact-kernel certified label (independent verifier): q, per-cell [lo, hi], bound."""
+    f = CERT / "labels" / f"{key}_tp_label.npz"
+    if not f.exists():
+        return None
+    z = np.load(f)
+    q = dict(zip(z["cells"].tolist(), (z["lo"] / z["lo"].sum()).tolist()))
+    return dict(q=q, lo=dict(zip(z["cells"].tolist(), z["lo"].tolist())),
+                hi=dict(zip(z["cells"].tolist(), z["hi"].tolist())), pool=float(z["pool"]),
+                bound=float(z["tv_bound"]), name=f.name)
+
+
 def reference(key):
     for d in (GI / "reference", GI / "fresh_reference"):
         f = d / f"{key}_cpu.npz"
@@ -80,7 +95,14 @@ def main():
             envelope = json.loads(env_path.read_bytes())
             p = decode(base64.b64decode(envelope["wire"]))
             row["cells"] = len(p)
-            q, name = reference(key)
+            cr = certified_reference(key)
+            if cr is not None:
+                row.update(ref=cr["name"], ref_status="exact_certified", ref_bound=cr["bound"], ref_cells=len(cr["q"]),
+                           tv_to_ref=tv(p, cr["q"]))
+                row["consistent"] = row["tv_to_ref"] <= row["tv"] + cr["bound"] + 1e-9
+                q = None
+            else:
+                q, name = reference(key)
             if q is not None:
                 st, b = bounds.get(key, (None, None))
                 row.update(ref=name, ref_status=st, ref_bound=b, ref_cells=len(q), tv_to_ref=tv(p, q))
@@ -106,6 +128,8 @@ def main():
         print("  max tv_to_ref", worst.get("tv_to_ref"), worst["key"], "bound", worst["tv"], "ref", worst.get("ref_bound"))
     for r in bad:
         print("  INCONSISTENT", r)
+    ex = [r for r in cert if r.get("ref_status") == "exact_certified"]
+    print(f"  against exact-certified references: {len(ex)} compared, {sum(r['consistent'] is False for r in ex)} inconsistent")
 
 
 if __name__ == "__main__":

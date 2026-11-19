@@ -36,6 +36,7 @@ def tasks_from(manifests):
 
 def run_one(t, args, env):
     container = args.root / "scenes" / f"{t['slot']//1000:04d}" / f"{t['slot']:06d}.npz"
+    (args.out / "results").mkdir(parents=True, exist_ok=True)
     result = args.out / "results" / f"{t['key']}.json"
     cmd = [args.python, str(HERE / args.runner), str(container), str(t["w"]), str(t["s"]), str(result),
            "--seconds", str(args.seconds)] + args.extra
@@ -70,6 +71,7 @@ def main():
     ap.add_argument("--python", default=sys.executable)
     ap.add_argument("--only", nargs="*", default=None, help="task keys")
     ap.add_argument("--extra", default="", help="extra runner arguments, one string")
+    ap.add_argument("--no-warm", action="store_true")
     args = ap.parse_args()
     args.extra = args.extra.split()
     tasks = tasks_from(args.manifests)
@@ -77,6 +79,10 @@ def main():
         tasks = [t for t in tasks if t["key"] in set(args.only)]
     (args.out / "results").mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", PYTHONDONTWRITEBYTECODE="1")
+    if tasks and not args.no_warm:
+        # Compile and cache the JIT kernels once, so no timed task pays compilation.
+        w = dict(tasks[0], key="warmup")
+        run_one(w, argparse.Namespace(**{**vars(args), "seconds": 2.0, "out": args.out / "warmup"}), env)
     log = (args.out / "runs.jsonl").open("a")
     with ThreadPoolExecutor(args.jobs) as pool:
         for rec in pool.map(lambda t: run_one(t, args, env), tasks):

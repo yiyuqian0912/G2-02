@@ -1,0 +1,39 @@
+"""CLI for the CBC kernel v2 + search. Same envelope format and atomic writer as run.py."""
+import argparse
+from fractions import Fraction
+import json
+from pathlib import Path
+import resource
+from time import perf_counter, process_time
+
+import inputs
+from cbc_search import solve
+from run import write_result
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("container", type=Path)
+    ap.add_argument("window", type=int)
+    ap.add_argument("channel", type=int)
+    ap.add_argument("output", type=Path)
+    ap.add_argument("--tolerance", type=Fraction, default=Fraction(1, 20))
+    ap.add_argument("--seconds", type=float, default=8)
+    ap.add_argument("--cap", type=int, default=4096)
+    ap.add_argument("--pairs", type=int, default=24)
+    ap.add_argument("--batch", type=int, default=96)
+    ap.add_argument("--split-above", type=int, default=1500)
+    args = ap.parse_args()
+    t, c = perf_counter(), process_time()
+    obs, identity = inputs.load(args.container, args.window, args.channel)
+    key = f"{identity['slot']:06d}_w{args.window:02d}_s{args.channel}"
+    payload, details = solve(obs, key, args.tolerance, args.seconds, cap=args.cap, pairs=args.pairs,
+                             batch=args.batch, split_above=args.split_above)
+    details["solver"] = "claude-cbc-v2"
+    write_result(args.output, identity, args.tolerance, payload, details)
+    print(json.dumps(dict(key=key, wall=perf_counter() - t, cpu=process_time() - c,
+                          peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, **details)))
+
+
+if __name__ == "__main__":
+    main()
