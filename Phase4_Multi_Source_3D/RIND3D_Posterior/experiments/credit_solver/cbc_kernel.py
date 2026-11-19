@@ -288,6 +288,7 @@ class Kernel:
         # transition is checked for structure, side, provenance and exact volume conservation.
         import poly as _poly
         _poly.SPLIT_HOOK = polycheck.verify_split if VERIFY_SPLITS else None
+        self._verified0 = polycheck.VERIFIED
         self._tainted = None
         self._best = None  # (bound, payload) with the smallest bound computed so far
         self._checked = weakref.WeakSet()  # polytopes that passed polycheck.check
@@ -740,6 +741,7 @@ def certify(obs, tolerance, seconds, cap, search):
     except Exception as exc:  # noqa: BLE001  (a failed search abstains; the kernel state stays valid)
         details = dict(search_reason="search_error", search_error=f"{type(exc).__name__}: {exc}")
     rel = kernel.release(tolerance)
+    kernel.stats["splits_verified"] = polycheck.VERIFIED - kernel._verified0
     details.update(status=rel.status, tv=None if rel.bound is None else str(rel.bound), reason=rel.reason,
                    live=len(kernel.handles()), positive=kernel.positive, stats=dict(kernel.stats))
     return rel.payload, details

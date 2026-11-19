@@ -4,8 +4,17 @@ Branch `claude/xlf-correct-by-construction`. Builds on Astra's theorem (`XLF_PRO
 transition design (`XLF_CORRECT_BY_CONSTRUCTION.md`) and Astra's exact geometry (`experiments/global_inverse/`).
 Code: `experiments/credit_solver/cbc_kernel.py` and `screen2.py` (trusted), `cbc_search.py` (untrusted).
 
-Status words: **PROVEN** (argued here or in Astra's documents, not machine-checked), **IMPLEMENTED**, **TESTED**,
-**OPEN**.
+Assurance labels (used in all XLF_CBC documents):
+
+| label | meaning |
+|---|---|
+| **MATHEMATICALLY PROVEN** | a complete argument is written here or in Astra's documents; not machine-checked |
+| **IMPLEMENTATION-VERIFIED** | the property of the code itself is mechanically proved (z3) over the stated ranges |
+| **EXACT-DIFFERENTIAL-TESTED** | the code agrees with an independent exact (rational or integer) reference on the stated test population; not a proof |
+| **RUNTIME-CERTIFIED** | an exact check runs inside every labelling run and aborts (no certificate) on failure |
+| **EMPIRICALLY TESTED** | agreement with references or audits on real tasks; not a proof over continuous regions |
+| **CONDITIONAL** | holds if a stated, unverified assumption holds |
+| **OPEN** | not established |
 
 ## 1. Target and certificate
 
@@ -140,29 +149,196 @@ An IN piece Q is integrated by an octree over its grid range, each node carrying
 
 Conservation is exact: vol(Q)·2¹⁶⁰ − Σ lower ∈ [0, #boundary cells).
 
-## 5. Search policy (untrusted)
+## 4d. The exact possible shadow (MATHEMATICALLY PROVEN; v2.9b)
+
+**Lemma O.** Let K, P be compact convex sets with disjoint interiors and U = ⋃_{s∈P} S_K(s) the
+set of receivers blocked by K for some source of P. Then U is convex and its closure is the
+Minkowski sum O = K + cone(K − P).
+
+*Proof.* r ∈ U iff r = M k − (M − 1) s for some k ∈ K, s ∈ P, M ≥ 1 (the segment [s, r] meets
+K at k = s + (r − s)/M). For two such points with (k₁, s₁, M₁), (k₂, s₂, M₂) and t ∈ [0, 1],
+the combination t r₁ + (1 − t) r₂ equals M k − (M − 1) s with M = tM₁ + (1 − t)M₂,
+k = (tM₁k₁ + (1 − t)M₂k₂)/M ∈ K and s = (t(M₁−1)s₁ + (1 − t)(M₂−1)s₂)/(M − 1) ∈ P (if M = 1
+the combination lies in K ⊆ U). So U is convex.
+U ⊆ K + cone(K − P) because r = k + (M − 1)(k − s). Conversely k₁ + λ(k₂ − s) is the limit as
+t → 0 of (1 − t)k₁ + t(k₂ + (λ/t)(k₂ − s)), a convex combination of points of U. ∎
+
+**Facets of O.** The facet normals of a Minkowski sum of a polytope and a polyhedral cone come
+from three kinds of face pairs: a facet of K; a facet of cone(K − P); or an edge of K together
+with an extreme ray k − p. Every non-K facet therefore lies on a plane that separates K from P
+and contains (an edge of K and a vertex of P) or (a vertex of K and an edge of P); a facet of
+cone(K − P) also contains such a pair (its plane touches K and P along faces of dimension ≥ 0
+whose sum spans it). By the separation lemma (§4) every such plane is valid.
+
+**What was missing.** v2.8 used the facets of K that P lies outside, the all-vertex pair
+rows, and the facets of cone(K − P) proposed by `penumbra.directions`. The mixed facets
+(edge of K × vertex of P, edge of P × vertex of K) that are not cone facets were never proposed.
+Whenever P straddles a facet plane of K the possible shadow was strictly larger than O. On
+stuck pieces, 10⁵ lit receivers were ambiguous while exact cuts showed that they did not cut
+the piece (531 of 537 batch cuts changed nothing).
+
+**Implementation.** `shadow_facets.mixed_candidates` (untrusted) enumerates the candidate
+planes with a binary64 preselection and builds each row exactly from three homogeneous
+vertices; `cbc_kernel.separators` (trusted) keeps a row only if
+max_{v ∈ vert(K ∩ cube)} h(v) ≤ 0 ≤ min_{v ∈ vert P} h(v) in exact integers. With every
+candidate proposed, the possible shadow equals O up to the directed rounding of §4.
+Effect: ambiguous receivers on stuck pieces 10⁵ → 10¹–10² (§XLF_CBC_RESULTS).
+
+## 4e. Receiver convexity (MATHEMATICALLY PROVEN; used by the search, v2.9c)
+
+**Lemma H.** For a source s outside a convex body K, the shadow S_K(s) = {s + λ(k − s) : k ∈ K,
+λ ≥ 1} is convex (same argument as for C_K(r)). Hence for any receiver set R,
+⋂_{r ∈ R} C_K(r) = ⋂_{r ∈ ext conv R} C_K(r): a source reproduces "R is dark because of K" iff
+it reproduces the extreme points of conv R.
+
+**Use.** For a piece P, let R_K be the dark ambiguous receivers whose only possible blocker is
+K (candidate mask = {K}). The search enforces only the convex-hull vertices of R_K (per
+scanline, only the minimum and maximum x can be extreme), each an exact intersection with
+C_K(r) that never fragments the piece. The next screen then proves all of R_K, because every
+vertex of the cut piece lies in every C_K(r), r ∈ R_K, so R_K lies in the exact guaranteed
+shadow (up to the directed rounding). At L = 256 this replaces 1.6–9.9 × 10⁶ ambiguous
+receivers by 50–80 exact cuts. The lemma is used only for efficiency: the kernel enforces
+each proposed receiver exactly and re-proves everything in later screens, so a wrong hull
+can only cost time.
+
+## 4f. Contact vertices in the guaranteed shadow (MATHEMATICALLY PROVEN; v2.9c)
+
+For a vertex v of P inside the closed body K, every segment [v, r] meets K, so S_K(v) is all
+of space. The guaranteed shadow is therefore computed from the vertices outside K only:
+r ∈ ⋂_{v ∉ K} S_K(v) puts every vertex (those in K trivially) into C_K(r), and P = conv(vert P)
+⊆ C_K(r). If all vertices lie in K, then P ⊆ K is illegal a.e. and the guaranteed shadow is
+the whole window. (Envelope evaluated the rows of contact vertices, which over-constrained:
+sound, but it left dark receivers behind obstacle contacts ambiguous.)
+
+## 4g. Polytope arithmetic certificates (MATHEMATICALLY PROVEN; RUNTIME-CERTIFIED)
+
+**FS (face-structure invariant).** The face cycles of a polytope Q tile the boundary of
+conv(vert Q) exactly once, each as a strictly convex polygon. `polycheck.check` verifies:
+(a) primitive vertices with w > 0;
+(b) every face spans a supporting plane, with all vertices ≤ 0 and the face's vertices = 0;
+(c) strictly convex cycles that wind once;
+(d) every directed edge used once and its reverse once (after orienting faces outward);
+(e) distinct face planes;
+(f) faces connected, with a single face cycle around each vertex;
+(g) Euler characteristic 2.
+
+**Lemma FS.** (a)–(f) imply that the union S of the faces is homeomorphic to the boundary of
+H = ⋂ face rows and that H = conv(vert Q).
+
+*Proof sketch.* Each face lies on a supporting plane of H, hence in ∂H, so the inclusion
+φ: S → ∂H is defined. φ is a local homeomorphism at face interiors and at edge interiors,
+because the two faces of an edge lie on opposite sides of it on ∂H by (d). Near a vertex the
+faces form one cycle (f) of consecutive angular sectors. If they wound around the vertex more
+than once, two faces on distinct planes (e) would overlap in an open subset of ∂H, where the
+supporting plane is unique: a contradiction. So φ is a covering map of the sphere ∂H by the
+connected surface S, hence a homeomorphism. Then ∂H ⊆ S ⊆ conv(vert Q) ⊆ H, so
+H = conv(vert Q). ∎
+
+Consequences: the fan volume is vol(conv vert Q); the face rows cut out exactly Q (octree
+inside tests); every face edge is an edge of Q (split's edge walk).
+
+**Lemma V (split).** For a polytope P and a plane meeting its interior, the vertices of
+P ∩ {row ≤ 0} are exactly the vertices of P with row ≤ 0 together with the points where an
+edge of P with strictly opposite end signs crosses the plane. `Poly.split` computes exactly
+these: exact signs, exact primitive crossing points, Sutherland–Hodgman clipping of each
+strictly convex face cycle, and the cap as the strict convex hull of the plane points in an
+injective projection. Cap points never lie inside a cap edge, so no T-junctions arise. FS is
+preserved (distinct planes, because a face plane would put P on one side of it).
+
+**Per-split certificate (`polycheck.verify_split`, `CBC_VERIFY_SPLITS=1`).** For every split
+inside every transition, the vertex sets of both halves must equal the two sets of Lemma V,
+computed independently from the parent's (FS-certified) edges, and both halves must pass
+`check`. Inductively from the cube, every polytope the kernel ever creates is then FS-valid,
+and every split is exact: the halves cover the parent, overlap only on the plane, and carry
+exact volumes. This certifies the cover invariant I1 for the polytope arithmetic in every run
+without a physical replay. Cost: 1.1–2× wall time in pure Python (§XLF_CBC_RESULTS).
+
+Independently of `CBC_VERIFY_SPLITS`, every polytope that receives an IN credit, and every
+live polytope charged in a snapshot, passes `check` (RUNTIME-CERTIFIED since v2.9a).
+
+## 4h. Release discipline (by construction; v2.9a)
+
+* The kernel records every (payload, bound) it computes in `snapshot`.
+* `Kernel.release(tolerance)` returns CERTIFIED only for the best recorded pair, and only if
+  its bound is ≤ tolerance. It returns INCOMPLETE otherwise.
+* The trusted driver `cbc_kernel.certify` owns the budget and the kernel. It runs the
+  untrusted search behind an exception barrier: a time limit, a fragment cap or any search
+  exception is an abstention. It writes the status, payload and bound from the release only.
+* Any ArithmeticError inside a transition (a failed structural, conservation or range guard,
+  or an overflow) taints the kernel. No further transitions run, and the release is ERROR.
+* The search gets read-only views of the kernel's obligation arrays and copies of polytopes.
+  Proposed split rows must be integer, non-constant and bounded by 2⁴⁰⁹⁶ (this bounds every
+  vertex size, because each vertex is the intersection of three facet planes).
+
+Soundness is therefore independent of the search policy. This is also tested: the chaos
+search drives the kernel with random legal operations and misuse attempts, and checks every
+snapshot against an exact reference (XLF_CBC_RESULTS §3).
+
+## 5. Search policy (untrusted; v2.9d)
 
 1. Condition on 24 maximin interface pairs (Astra's protocol), then exclude the window and the obstacles.
 2. Always work on the largest open piece, because it dominates the unknown term.
-3. Park pieces smaller than 1/2000 of the proved lower volume. They stay charged.
-4. After a screen with n ambiguous receivers:
+3. Park pieces smaller than 1/2000 of the proved lower volume, within a parking budget of a quarter of the
+   tolerance. Parked pieces stay charged.
+4. After a screen with n > 512 ambiguous receivers, take the **hull step** (§4e) first: enforce the convex-hull
+   vertices of each single-blocker dark set. The set comes from the stored obligation list, or, if the list
+   overflowed, from a scanline-extreme scan (`hull_proposals.scan_extremes`). The step is skipped for a lineage
+   whose last hull step did not shrink the obligations by 20%.
+5. Otherwise, after a screen with n ambiguous receivers:
    * if the piece touches an obstacle and n > 1500:
      * if it lies outside one obstacle facet and touches its plane, split by a parallel plane at half its height;
      * otherwise split by a dyadic axis plane half way from the contact vertex (apex isolation);
    * if the previous split shrank R by more than 20% and n > 1500, split at the long-axis midpoint;
-   * otherwise enforce up to 96 ambiguous receivers exactly, those wrong at the anchor source first, then interface
-     receivers.
-5. Snapshot the exact bound after every IN settlement. Stop at TV ≤ tolerance, when no work remains, or at the time
-   budget.
+   * otherwise enforce up to 96 ambiguous receivers exactly, in this priority order:
+     1. single-blocker dark receivers (non-fragmenting);
+     2. receivers wrong at the anchor source;
+     3. interface receivers.
+
+     At most 16 fragmenting receivers go into one batch: multi-blocker dark receivers (unions of cones) and lit
+     receivers (subtractions).
+6. Snapshot the exact bound after an IN settlement when the float hint says it can be near the tolerance. Stop at
+   TV ≤ tolerance, when no work remains, or at the time budget. The kernel's release decides the status.
 
 **Why the obstacle-contact rule matters.** Shadow boundaries pass through occluder edges, so feasible cones often
 have an apex on an obstacle. At that vertex both envelopes degenerate: nearly every receiver is ambiguous while the
-whole piece is consistent. In Astra's kernel this caused 37 of the 56 failures.
+whole piece is consistent. In Astra's kernel this caused 37 of the 56 failures. §4d and §4f remove most of the
+degeneracy on the envelope side.
 
-## 6. What the design does not claim
+## 6. Exploiting the posterior theorem directly (analysis, v2.9)
+
+The certificate needs only l_c ≤ μ(F ∩ C_c) and the frontier charges, not a reconstruction of F. Two
+consequences were examined.
+
+1. **Unknown mass inside a cell is free for that cell.** A live piece inside cell c is not charged in U₋c. For a
+   concentrated posterior, refining or grid-splitting live pieces inside the dominant cell cannot improve the bound
+   beyond the other cells' terms. Splitting multi-cell live pieces at 128-grid planes is a pure kernel split, with
+   no physics, and turns their charge into per-cell charges (the capacity form).
+   * **Measured on the 54 canary failures with positive lower mass:** the bound with every live piece decomposed
+     exactly per cell equals the frontier bound in every case (to three digits). The tail consists of spread
+     posteriors over 10³–2 × 10⁵ cells with almost no mass in any single cell. **EMPIRICALLY TESTED** (no effect
+     on the tail), so grid-aware refinement was not adopted.
+2. **How loose is B = 1 − Σ_c min(p_c, a_c) for the released payload p = l/Σl?** For a cell set S, let U(S) be
+   the largest unknown and slack mass that can lie in S. The exact worst case over the posteriors consistent with
+   the credits is max_S U(S)(L − l(S)) / (L (L + U(S))), with L = Σ l. **MATHEMATICALLY PROVEN** (elementary):
+   the adversary maximizes q(S) − p(S) by placing all admissible unknown mass in S. Consequences:
+   * For spread posteriors the maximum is attained by S = the cells with little payload that the unknown pieces
+     reach, and it approaches B (both ≈ U/(L + U)).
+   * Only when the unknown mass can lie only in cells that already carry most of the payload (e.g. two cells
+     of equal mass) is B up to 2× pessimistic.
+   * Moreover, no payload can guarantee less than half the TV diameter of the consistent set, so even a
+     minimax-optimal payload gains at most 2×.
+   * Because the hard tail is spread, a refined bound would gain little. It is recorded, not implemented
+     (it would add a combinatorial maximisation to the trusted base).
+
+The productive direction was instead to reduce the geometric work that determines U: exact possible shadows (§4d),
+receiver convexity (§4e) and contact vertices (§4f).
+
+## 7. What the design does not claim
 
 * Termination or a latency bound for every input. Abstention (INCOMPLETE) is always available.
 * Exact recovery of F. Only the TV certificate is claimed.
-* Protection against hostile code in the same process. This is a single-owner research model.
-* Machine-checked proofs. The arguments above are manual. `XLF_CBC_IMPLEMENTATION.md` lists the tests and the
-  remaining gaps between these lemmas and the code.
+* Protection against hostile code in the same process. This is a single-owner research model: the search is
+  assumed buggy at worst, not malicious at the interpreter level.
+* Machine-checked proofs of the geometric lemmas. The arguments above are manual; the integer arithmetic of the
+  screens is mechanized (z3), and the polytope arithmetic is runtime-certified when `CBC_VERIFY_SPLITS=1`.
+  `XLF_CBC_IMPLEMENTATION.md` lists the code-path review, the tests and the remaining gaps.

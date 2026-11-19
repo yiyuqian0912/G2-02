@@ -73,6 +73,9 @@ def _sign_matrix(rows, p):
     return out
 
 
+VERIFIED = 0  # number of splits certified by verify_split in this process
+
+
 def _diff(b, a):
     """(b/wb - a/wa) scaled by wa*wb > 0 (exact, sign-preserving)."""
     return (b[0] * a[3] - a[0] * b[3], b[1] * a[3] - a[1] * b[3], b[2] * a[3] - a[2] * b[3])
@@ -349,6 +352,7 @@ def verify_split(parent, row, neg, pos):
     Then conv(V(neg)) = P & {row <= 0} and conv(V(pos)) = P & {row >= 0}: the halves cover P,
     overlap only on the plane, and their faces describe them exactly. Raises ArithmeticError.
     """
+    global VERIFIED
     signs = {v: form(row, v) for v in parent.vertices}
     crossing = set()
     for f in parent.faces:
@@ -364,3 +368,4 @@ def verify_split(parent, row, neg, pos):
         _fail("split vertex sets differ from the exact half-space vertices")
     check(neg)
     check(pos)
+    VERIFIED += 1
