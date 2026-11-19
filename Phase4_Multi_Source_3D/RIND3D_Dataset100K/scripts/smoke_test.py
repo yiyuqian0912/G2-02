@@ -61,7 +61,8 @@ def s_env():
 
 
 def s_pytest():
-    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPO / "RIND3D_Posterior" / "src"), str(REPO / "RIND3D_Dataset1K"), str(HERE)]))
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPO / "RIND3D_Posterior" / "src"), str(REPO / "RIND3D_Dataset1K"), str(HERE),
+                                                     str(REPO / "RIND3D_Generator" / "curved")]))
     out = {}
     for name, d in (("posterior", REPO / "RIND3D_Posterior" / "tests"), ("dataset100k", HERE / "tests")):
         r = subprocess.run([sys.executable, "-m", "pytest", "-q", str(d)], capture_output=True, text=True, env=env, timeout=3600)

@@ -47,7 +47,7 @@ def containers(pattern, label):
         kb = os.path.getsize(p) / 1e3; sizes.append(kb); byk.setdefault(meta["k"], []).append(kb)
         for w in meta["windows_full"]:
             m.append(w["m"])
-            lf += [f for j, f in enumerate(w["lit_frac"]) if int(w["mask"]) >> j & 1]
+            lf += [f for j, f in enumerate(w.get("active_frac", w.get("lit_frac"))) if int(w["mask"]) >> j & 1]
     sizes = np.array(sizes)
     print(f"{label}: {len(sizes)} containers, mean {sizes.mean():.0f} KB (min {sizes.min():.0f}, max {sizes.max():.0f}); "
           f"by k: " + ", ".join(f"k={k}: {np.mean(v):.0f} KB (n={len(v)})" for k, v in sorted(byk.items())) +

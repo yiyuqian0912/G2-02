@@ -113,7 +113,7 @@ def run_scene_curved(cfg, slot, k, factory, attempt=0):
         free = ~rec["solid"]
         for j in range(k):
             b = _packz(rec["lits"][j], cctx); index.append((w, j, blobs.tell(), len(b))); blobs.write(b)
-        wstats.append(dict(free=int(free.sum()), lit_frac=[float(rec["lits"][j][free].mean()) for j in range(k)]))
+        wstats.append(dict(free=int(free.sum()), active_frac=[float(rec["lits"][j][free].mean()) for j in range(k)]))
     fields = [("window", "<i4"), ("x", "<i4"), ("y", "<i4"), ("z", "<i4"), ("L", "<i4"), ("Lp", "<i4"), ("m", "<i1"),
               ("mask", "<u1"), ("k", "<i1"), ("stream", "<i1"), ("mixed_mask", "<u1")]
     W = np.zeros(len(windows), dtype=fields)

@@ -280,7 +280,7 @@ def run_scene(cfg, slot, k, c_table, factory, attempt=0):
         inf = [j for j in range(k) if (rec["mask"] >> j) & 1]
         ham = [float(np.mean(rec["lits"][a][free] != rec["lits"][b][free])) for ai, a in enumerate(inf) for b in inf[ai + 1:]]
         wstats.append(dict(overlap_hist=np.bincount(S, minlength=k + 1)[:k + 1].tolist(), free=int(free.sum()),
-                           lit_frac=[float(rec["lits"][j][free].mean()) for j in range(k)],
+                           active_frac=[float(rec["lits"][j][free].mean()) for j in range(k)],
                            min_pair_hamming=min(ham) if ham else None))
     fields = [("window", "<i4"), ("x", "<i4"), ("y", "<i4"), ("z", "<i4"), ("L", "<i4"), ("Lp", "<i4"), ("m", "<i1"),
               ("mask", "<u1"), ("k", "<i1")]
