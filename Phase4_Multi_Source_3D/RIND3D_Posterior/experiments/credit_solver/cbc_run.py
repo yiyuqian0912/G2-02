@@ -38,6 +38,8 @@ def main():
     ap.add_argument("--seconds", type=float, default=8)
     ap.add_argument("--cap", type=int, default=4096)
     ap.add_argument("--pairs", type=int, default=24)
+    ap.add_argument("--patch-depth", type=int, choices=(0,1,2), help="attempt complete projected receiver-block constraints on initial source pieces")
+    ap.add_argument("--strategy", choices=("interface","interface_random","random_classes","classes_spread"), default="interface")
     ap.add_argument("--batch", type=int, default=96)
     ap.add_argument("--split-above", type=int, default=1500)
     ap.add_argument("--no-single-dark", dest="prefer_single_dark", action="store_false")
@@ -51,7 +53,7 @@ def main():
     payload, details = solve(obs, key, args.tolerance, args.seconds, cap=args.cap, pairs=args.pairs,
                              batch=args.batch, split_above=args.split_above,
                              prefer_single_dark=args.prefer_single_dark, centroid_anchor=args.centroid_anchor,
-                             hull=args.hull)
+                             hull=args.hull, strategy=args.strategy, patch_depth=args.patch_depth)
     details["solver"] = evidence.VERSION
     if details["status"] == "CERTIFIED":
         evidence.check_seal(details["certificate"], payload, details["tv"], args.tolerance, identity)

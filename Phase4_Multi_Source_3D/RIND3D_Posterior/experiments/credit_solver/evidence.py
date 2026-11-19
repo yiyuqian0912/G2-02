@@ -36,7 +36,7 @@ def problem(obs):
 def _build_bytes():
     from rind3d import geometry
     from rind3d.rendering import polyhedra
-    import certificates, envelopes, kernel, ledger, penumbra, poly, raster, solver, whole
+    import certificates, envelopes, interface_chart, kernel, ledger, penumbra, poly, raster, solver, whole
     import zstandard
     from rind import storage, contracts
     from llvmlite.binding import ffi
@@ -45,7 +45,7 @@ def _build_bytes():
     files = {name: HERE/name for name in (
         "evidence.py","cbc_kernel.py","screen2.py","polycheck.py","validated_input.py","inputs.py",
         "cbc_search.py","cbc_run.py","run.py","shadow_facets.py","hull_proposals.py")}
-    for module in (storage,contracts,geometry,polyhedra,certificates,envelopes,kernel,ledger,penumbra,poly,raster,solver,whole):
+    for module in (storage,contracts,geometry,polyhedra,certificates,envelopes,interface_chart,kernel,ledger,penumbra,poly,raster,solver,whole):
         files[module.__name__] = Path(module.__file__)
     runtime = {}
     for key, path in (("llvm", ffi.lib._name), ("numba", _helperlib.__file__),
@@ -77,3 +77,26 @@ def check_seal(binding, payload, bound, tolerance, identity):
         st["tv"]!=str(bound) or st["tolerance"]!=str(tolerance) or
         any(identity[k]!=v for k,v in st["problem"].items())):
         raise ArithmeticError("certificate disagrees with problem, wire or bound")
+
+
+def artifact_digest(identity, binding):
+    return digest(canonical([identity, binding["statement_sha256"]]))
+
+
+def check_artifact(rec, expected_identity):
+    """Verify an extracted new-format envelope against independently expected input metadata."""
+    import base64
+    from fractions import Fraction
+    from ledger import decode
+    if (rec["format"] != "astra-xlf-certified-interface/1" or rec["status"] != "CERTIFIED"
+            or rec["solver"] != VERSION or rec["problem"] != expected_identity):
+        raise ValueError("unexpected artifact, status or input identity")
+    wire = base64.b64decode(rec["wire"], validate=True)
+    binding = rec["certificate"]
+    bound, tolerance = Fraction(rec["tv"]), Fraction(rec["tolerance"])
+    check_seal(binding, wire, bound, tolerance, expected_identity)
+    if (rec["artifact_sha256"] != artifact_digest(expected_identity, binding)
+            or digest(wire) != rec["wire_sha256"] or not 0 <= bound <= tolerance <= 1
+            or len(decode(wire)) != rec["cells"]):
+        raise ArithmeticError("changed artifact binding or invalid output")
+    return decode(wire)

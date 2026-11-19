@@ -159,7 +159,7 @@ def test_subnormal_coordinates_use_exact_signs():
     P = within(Poly.cube(), [(tiny.denominator, 0, 0, -tiny.numerator)])  # x <= 2^-1100
     assert P is not None
     polycheck.check(P)
-    assert any(fv is None for fv in P.filter_vertices)
+    assert any(Fraction(v[0], v[3]) == tiny for v in P.vertices)
     # a row whose float evaluation at those vertices would be dominated by rounding
     big = (1 << 1000) * 3
     row = (big, 0, 0, -1)  # 3*2^1000 * x - 1 <= 0  <=>  x <= 2^-1000 / 3 (true for all of P)

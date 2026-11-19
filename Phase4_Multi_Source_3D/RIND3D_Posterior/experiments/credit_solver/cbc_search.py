@@ -121,7 +121,7 @@ def solve(obs, key, tolerance, seconds, cap=4096, **policy):
 
 def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
            batch=96, split_above=1500, elongated=1e4, max_splits=4000, always_split=True, negligible=Fraction(1, 2000),
-           shrink=0.8, prefer_single_dark=True, park_share=0.25, hull=True, hull_min=512, frag_cap=16):
+           shrink=0.8, prefer_single_dark=True, park_share=0.25, hull=True, hull_min=512, frag_cap=16, patch_depth=None, patch_roots=3):
     """Untrusted policy. Returns diagnostics only; the status comes from kernel.release()."""
     if pairs < 0:
         raise ValueError("invalid pair count")
@@ -144,6 +144,8 @@ def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
         for dark, lit in (choose_pairs(obs.cls, pairs, seed, strategy) if pairs else []):
             kernel.condition_pair(dark, lit)
         timings["discovery_seconds"] = perf_counter() - t0
+        timings["seed_volume"] = kernel.unknown_volume()
+        timings["seed_pieces"] = len(kernel.handles())
         kernel.exclude_window()
         splits = 0
         heap = []  # (-volume, handle); stale entries are skipped on pop
@@ -153,7 +155,9 @@ def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
             for x in handles:
                 if kernel.is_open(x):
                     heapq.heappush(heap, (-float(kernel.volume(x)), x))
-        push(kernel.open_handles())
+        roots = kernel.open_handles()
+        patch_queue = set(sorted(roots, key=kernel.volume, reverse=True)[:patch_roots]) if patch_depth is not None else set()
+        push(roots)
         while True:
             budget.check()
             h = None
@@ -171,7 +175,14 @@ def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
                 parked_volume[0] += vol_h
                 continue
             inherited = kernel.pending_count(h)
-            r = kernel.screen(h)
+            if h in patch_queue:
+                patch_queue.remove(h)
+                r = kernel.projective_patch(h, patch_depth)
+                if r["outcome"] == "open":
+                    h = r["handle"]
+                    r = kernel.screen(h)
+            else:
+                r = kernel.screen(h)
             if r["outcome"] in ("out", "in", "shell"):
                 if r["outcome"] == "in" and kernel.positive:
                     lo_v, unk_v = kernel.lower_total_float(), kernel.unknown_volume()

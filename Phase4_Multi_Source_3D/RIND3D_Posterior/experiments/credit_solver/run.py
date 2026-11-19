@@ -69,6 +69,12 @@ def write_result(path, identity, tolerance, payload, details):
     if payload is not None:
         result.update(cells=len(decode(payload)), wire=base64.b64encode(payload).decode("ascii"),
                       wire_sha256=sha256(payload).hexdigest())
+    import evidence
+    if details.get("solver") == evidence.VERSION:
+        result["format"] = "astra-xlf-certified-interface/1"
+        if result["status"] == "CERTIFIED":
+            evidence.check_seal(result["certificate"], payload, result["tv"], tolerance, identity)
+            result["artifact_sha256"] = evidence.artifact_digest(identity, result["certificate"])
     raw = json.dumps(result,sort_keys=True,allow_nan=False,separators=(",",":")).encode()
     path = Path(path)
     path.parent.mkdir(parents=True,exist_ok=True)
@@ -87,6 +93,8 @@ def write_result(path, identity, tolerance, payload, details):
             raise ArithmeticError("serialized envelope changed")
         if rec["status"]=="CERTIFIED":
             restored = base64.b64decode(rec["wire"],validate=True)
+            if rec["format"] == "astra-xlf-certified-interface/1":
+                evidence.check_artifact(rec, identity)
             if rec.get("certificate") is not None:
                 from evidence import check_seal
                 check_seal(rec["certificate"], restored, rec["tv"], tolerance, rec["problem"])

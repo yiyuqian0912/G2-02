@@ -274,6 +274,9 @@ def private_problem(observation, centroid_anchor=True):
     obs.obstacles = [within(Poly.cube(), b) for b in bodies]
     if any(k is None for k in obs.obstacles):
         raise ValueError("expected full-dimensional body in world")
+    if any(any(v[i] <= 0 or v[i] >= v[3] for i in range(3))
+           for k in obs.obstacles for v in k.vertices):
+        raise ValueError("expected strictly world-contained convex components")
     from shadow_facets import Geometry
     obs.kgeo = [Geometry(k) for k in obs.obstacles]
     obs.clearance_covers = clearance_covers(obs)
@@ -357,6 +360,7 @@ class Kernel:
         return new_ids
 
     def _receiver(self, pos, label=None):
+        pos = tuple(pos)
         if len(pos) != 3 or any(type(i) is not int or not 0 <= i < self._obs.side for i in pos):
             raise ValueError("invalid receiver coordinate")
         c = int(self._obs.cls[pos])
@@ -424,6 +428,44 @@ class Kernel:
         self.stats["splits"] += 1
         return self._commit((h,), [Piece(neg, piece.pending, piece.done, piece.deferred, piece.masks),
                                     Piece(pos, piece.pending, piece.done, piece.deferred, piece.masks)])
+
+    @_transition
+    def projective_patch(self, h, depth):
+        """Try collective projective explanations before ordinary receiver screening.
+
+        Every receiver block remains an obligation until the partition covers the whole
+        window. On partial cover, keep the narrowed piece and all its prior obligations.
+        A budget exception before the single commit leaves the previous frontier intact.
+        """
+        if type(depth) is not int or depth not in (0, 1, 2):
+            raise ValueError("patch depth must be 0, 1 or 2")
+        if not self._state.outside_window or not self.is_open(h):
+            raise ValueError("expected an open piece outside the observation")
+        piece = self._state.live[h]
+        counts = Counter()
+        start = perf_counter()
+        try:
+            q, covered = self._obs.reduce_patches(piece.poly, depth, self.budget, counts)
+        finally:
+            self.stats["patch_seconds"] += perf_counter() - start
+            for name, value in counts.items():
+                key = "patch_" + name
+                if name.endswith("_max"):
+                    self.stats[key] = max(self.stats[key], value)
+                else:
+                    self.stats[key] += value
+        if q is None:
+            self._commit((h,), [])
+            self.stats["patch_out"] += 1
+            return dict(outcome="out")
+        narrowed = Piece(q, piece.pending, piece.done, False, piece.masks)
+        if covered:
+            self.stats["patch_complete_visibility"] += 1
+            return self._settle(h, narrowed)
+        self.stats["patch_partial"] += 1
+        if q is not piece.poly:
+            h = self._commit((h,), [narrowed])[0]
+        return dict(outcome="open", handle=h)
 
     @_transition
     def screen(self, h):
@@ -747,7 +789,7 @@ def certify(obs, tolerance, seconds, cap, search, centroid_anchor=True):
     except Exception as exc:  # noqa: BLE001  (a failed search abstains; the kernel state stays valid)
         details = dict(search_reason="search_error", search_error=f"{type(exc).__name__}: {exc}")
     rel = kernel.release(tolerance)
-    details.update(status=rel.status, tv=None if rel.bound is None else str(rel.bound), reason=rel.reason,
+    details.update(solver=evidence.VERSION, status=rel.status, tv=None if rel.bound is None else str(rel.bound), reason=rel.reason,
                    live=len(kernel.handles()), positive=kernel.positive, stats=dict(kernel.stats))
     for reserved in ("certificate", "payload", "wire", "wire_sha256", "cells", "problem", "format", "tolerance"):
         details.pop(reserved, None)

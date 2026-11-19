@@ -101,14 +101,20 @@ def choose_pairs(cls, count, seed, strategy):
                 p,q = tuple(map(int,p)),tuple(map(int,q))
                 pools.append((p,q) if cls[p]==0 else (q,p))
     if not pools: raise ValueError("no direct FREE interface")
-    if strategy=="random_classes":
+    if strategy in ("random_classes", "classes_spread"):
         result=[]
         for k in (0,1):
             inds=np.flatnonzero(cls==k)
-            ids=rng.choice(inds,min(count,len(inds)),replace=False)
+            n = count if strategy == "random_classes" else len(pools)
+            ids=rng.choice(inds,min(n,len(inds)),replace=False)
             result.append([tuple(map(int,p)) for p in zip(*np.unravel_index(ids,cls.shape))])
-        return list(zip(*result))
-    if strategy!="interface": raise ValueError(strategy)
+        pools = list(zip(*result))
+        if strategy == "random_classes":
+            return pools
+    elif strategy == "interface_random":
+        return [pools[i] for i in rng.choice(len(pools),min(count,len(pools)),replace=False)]
+    elif strategy != "interface":
+        raise ValueError(strategy)
     # Maximin order on doubled midpoints (integer), with a deterministic first edge.
     m = np.array([np.add(a,b) for a,b in pools])
     picked=[]
@@ -180,8 +186,10 @@ class Observation:
         return kinds,rv
 
     def _band(self,loc,side,hinge):
-        c,i,j=hinge
+        c,i,j=hinge[:3]
         front,back=self.bodies[c][i],self.bodies[c][j]
+        if len(hinge)==4 and hinge[3]:
+            front=tuple(-x for x in front)
         data=self.cls[tuple(slice(i,i+side) for i in loc)]
         cuts=[]
         for active in (True,False):
@@ -210,8 +218,12 @@ class Observation:
             else: return False
         return True
 
-    def certify_piece(self,p,depth,budget,stats):
-        """Cuts from earlier receiver blocks shrink the domain of later proofs."""
+    def reduce_patches(self,p,depth,budget,stats, reciprocal=True):
+        """Apply certified receiver-product cuts. An unknown block retains all obligations."""
+        from interface_chart import interface_chart, extend_rank
+        basis = []
+        hinges = set()
+        blockers = set()
         stack=[((0,0,0),self.side,0)]
         outstanding=[]
         while stack:
@@ -219,10 +231,28 @@ class Observation:
             loc,side,d=stack.pop()
             kinds,rv=self.block(loc,side)
             if kinds==0: continue
-            state,hinge=bounding_mask(self.bodies,p,rv)
+            if reciprocal:
+                state,hinge=interface_chart(self.bodies,p.vertices,rv)
+            else:
+                state,hinge=bounding_mask(self.bodies,p,rv)
             stats[state]+=1
             if state=="pencil":
+                distinct = hinge not in hinges
+                hinges.add(hinge)
+                if reciprocal and hinge[3]:
+                    stats["receiver_oriented_patches"] += 1
+                blockers.add(hinge[0])
+                stats["hinges_in_one_piece_max"] = max(stats["hinges_in_one_piece_max"],len(hinges))
+                stats["blockers_in_one_piece_max"] = max(stats["blockers_in_one_piece_max"],len(blockers))
                 cuts=self.band(loc,side,hinge)
+                stats["extremal_rows"] += len(cuts) if cuts is not None else 0
+                if distinct and cuts and kinds == 3:
+                    extend_rank(basis,cuts[0][:3])
+                    stats["direction_rank_max"] = max(stats["direction_rank_max"],len(basis))
+                if kinds == 3:
+                    stats["mixed_patches"] += 1
+                    data = self.cls[tuple(slice(v,v+side) for v in loc)]
+                    stats["mixed_free_obligations"] += int(np.count_nonzero(data!=2))
                 p=within(p,cuts) if cuts is not None else None
                 if p is None: return None,True
             elif state=="unknown":
@@ -234,7 +264,11 @@ class Observation:
                                  for k in product((0,half),repeat=3))
             elif (state=="miss" and kinds&1) or (state=="hit" and kinds&2):
                 return None,True
-        return p,not outstanding and self.cleared(p)
+        return p,not outstanding
+
+    def certify_piece(self,p,depth,budget,stats):
+        q, covered = self.reduce_patches(p,depth,budget,stats,reciprocal=False)
+        return q, covered and (q is None or self.cleared(q))
 
     def exclude_window(self,parts,budget):
         rows=[]

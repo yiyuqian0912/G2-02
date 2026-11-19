@@ -26,51 +26,12 @@ check() raises ArithmeticError on the first violated condition and returns the o
 """
 from math import gcd
 
-import numpy as np
-
 from poly import form
 
 
 def _sign_matrix(rows, p):
-    """Exact signs of form(row, v) for every row and vertex of p.
-
-    Binary64 filter with the same operations, order and margin as poly._fsign_terms
-    (a*x + b*y + c*z, then + d; certain iff |v| > 1e-12 * sum|terms| with
-    1e-280 <= sum|terms| < 1e300); rows that do not convert to finite floats and vertices
-    whose coordinates are not normal binary64 numbers (poly.filter_vertices) are exact.
-    Uncertain entries are evaluated exactly.
-    """
-    verts = p.vertices
-    fv = p.filter_vertices
-    F, V = len(rows), len(verts)
-    R = np.zeros((F, 4))
-    rok = np.ones(F, bool)
-    for i, r in enumerate(rows):
-        try:
-            R[i] = [float(x) for x in r]
-        except OverflowError:
-            rok[i] = False
-    X = np.zeros((V, 3))
-    vok = np.ones(V, bool)
-    for j, f in enumerate(fv):
-        if f is None:
-            vok[j] = False
-        else:
-            X[j] = f
-    with np.errstate(over="ignore", invalid="ignore"):
-        t0 = R[:, 0:1] * X[None, :, 0]
-        t1 = R[:, 1:2] * X[None, :, 1]
-        t2 = R[:, 2:3] * X[None, :, 2]
-        v = ((t0 + t1) + t2) + R[:, 3:4]
-        m = ((np.abs(t0) + np.abs(t1)) + np.abs(t2)) + np.abs(R[:, 3:4])
-        ok = rok[:, None] & vok[None, :] & (m < 1e300) & (m >= 1e-280)
-        sg = np.where(ok & (v > 1e-12 * m), 1, np.where(ok & (v < -1e-12 * m), -1, 0)).astype(np.int8)
-        sure = ok & (np.abs(v) > 1e-12 * m)
-    out = sg.tolist()
-    for i, j in zip(*np.nonzero(~sure)):
-        x = form(rows[i], verts[j])
-        out[i][j] = (x > 0) - (x < 0)
-    return out
+    """Keep row values as unbounded integers; callers need only their sign."""
+    return [[form(row, v) for v in p.vertices] for row in rows]
 
 
 VERIFIED = 0  # splits certified by verify_split in this process (test and audit instrument)
@@ -270,7 +231,7 @@ def _lex(a, b, i, j):
 def check(p):
     """FS certificate, same conditions as check_reference with cheaper exact tests.
 
-    (b) uses Poly.side (proved binary64 filter, exact fallback) for the supporting test and
+    (b) uses exact integer row evaluations for the supporting test and
     exact integers for the on-plane test. (c) uses the injective projection that drops the
     largest normal component: a cycle whose consecutive turns are all strictly of one sign and
     whose lexicographic order changes direction exactly twice is a strictly convex polygon

@@ -15,37 +15,6 @@ def form(row, p):
     return a*x + b*y + c*z + d*w
 
 
-def _fsign_terms(row, fv):
-    """Float filter for sign(form(row, p)) at a vertex with float coordinates fv = p[:3]/p[3].
-
-    Returns +1/-1 when certain, 0 when the exact value must be computed. Each term has
-    relative error <= 3u and the 4-term sum adds <= 3u * sum|terms| (u = 2^-53), so a
-    margin of 1e-12 * sum|terms| is far above the rounding error. Non-finite or tiny sums
-    fall back to exact evaluation.
-    """
-    a, b, c, d = row
-    t0, t1, t2 = a * fv[0], b * fv[1], c * fv[2]
-    v = t0 + t1 + t2 + d
-    m = abs(t0) + abs(t1) + abs(t2) + abs(d)
-    if not (m < 1e300) or m < 1e-280:
-        return 0
-    if v > 1e-12 * m:
-        return 1
-    if v < -1e-12 * m:
-        return -1
-    return 0
-
-
-_NORMAL_MIN = 2.2250738585072014e-308  # smallest positive normal binary64
-
-
-def _frow(row):
-    try:
-        return tuple(float(x) for x in row)
-    except OverflowError:
-        return None
-
-
 def primitive(v):
     k = gcd(*v)
     return tuple(x//k for x in v) if k else tuple(v)
@@ -94,41 +63,16 @@ class Poly:
         # Correctly rounded int/int division; no overflow for these magnitudes.
         return tuple((p[0] / p[3], p[1] / p[3], p[2] / p[3]) for p in self.vertices)
 
-    @cached_property
-    def filter_vertices(self):
-        """Float coordinates where the filter's relative-error model holds, else None.
-
-        A subnormal coordinate (0 < |x| < 2^-1022) has only an absolute error bound, so
-        the 3u-per-term analysis of _fsign_terms does not apply; such vertices are always
-        evaluated exactly. (Unreachable with the search's dyadic planes, possible with
-        arbitrary integer split rows.)
-        """
-        out = []
-        for p, fv in zip(self.vertices, self.fvertices):
-            # exact zero is exact; a nonzero coordinate must round to a normal number
-            ok = all(p[i] == 0 or abs(fv[i]) >= _NORMAL_MIN for i in range(3))
-            out.append(fv if ok else None)
-        return tuple(out)
-
-    def side(self, row, frow=None):
-        """Exact classification: -1 if all vertex values <= 0, +1 if all >= 0, else 0.
-
-        Uses the float filter where it is certain and exact integers elsewhere.
-        """
-        fr = _frow(row) if frow is None else frow
+    def side(self, row):
+        """Classify both halfspaces from exact homogeneous integers."""
         neg = pos = False
-        for p, fv in zip(self.vertices, self.filter_vertices):
-            s = _fsign_terms(fr, fv) if fr is not None and fv is not None else 0
-            if s == 0:
-                v = form(row, p)
-                s = (v > 0) - (v < 0)
-            if s > 0:
-                pos = True
-            elif s < 0:
-                neg = True
-            if pos and neg:
+        for vertex in self.vertices:
+            value = form(row, vertex)
+            neg |= value < 0
+            pos |= value > 0
+            if neg and pos:
                 return 0
-        return -1 if not pos else 1  # all <= 0 first, exactly as the original max/min tests
+        return 1 if pos else -1
 
     def split(self, row):
         """Return closures of negative and positive volume pieces, respectively."""
