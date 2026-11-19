@@ -7,25 +7,36 @@
 * **What it predicts:** that source's posterior on a global 128³ grid.
 * **Supervision:** certified posterior labels computed from the full geometry, which the Student never sees.
 
-**Status.** `yushu/3d` is the canonical RIND3D-100K pre-production branch. The pipeline is validated on a laptop. The 16 × H20 production gate has not been run.
-* **Contract v2** is unchanged and reproducible (`RIND3D_Dataset100K/contract/RIND3D_100K_CONTRACT_v2.json`).
-* **Contract v3** is provisional and has not been run at scale. It has two changes: only windows with a *direct
-  FREE–FREE response interface* are eligible, and thin slabs are observable (≥ 2 voxels thick, 6-connected sampling).
-  See `RIND3D_Dataset100K/docs/SAMPLING_IMPACT_V3.md` and `RIND3D_Dataset100K/docs/THIN_SLABS_V3.md`.
-* **Research:**
-  - local inverse geometry and a local-first certified labelling pathway (`docs/LOCAL_INVERSE_GEOMETRY.md`,
+**Status (release 2026-11-18/19).** `yushu/3d` is the authoritative RIND3D-100K v3 production branch.
+* **Production profile:** contract v3 (`RIND3D_100K_V3_CONTRACT.md`).
+  * Direct FREE–FREE response-interface eligibility.
+  * Observable thin slabs (≥ 2 voxels, 6-connected sampling).
+  * Nine convex-polyhedral families.
+  * **FastLabel v3.4** statistical certification (`RIND3D_Posterior/docs/FASTLABEL_V34_CERTIFICATION.md`).
+* **Validated on a laptop:** tests, smoke test, and a 36-scene canary with crash/resume. See
+  `RELEASE_CANARY_2026-11-18.md`.
+* **Not yet run:** the 16 × H20 production gate (`RIND3D_Dataset100K/docs/H20_CANARY_RUNBOOK.md`). The 100K campaign
+  has not been launched.
+* **Start here:**
+  * `HANDOFF.md`: what is done, what is next;
+  * `PRODUCTION_RUNBOOK.md`: commands;
+  * `NEXT.md`: open actions;
+  * `RESEARCH_ARCHIVE.md`: XLF, deterministic certification, local-first, Astra's results.
+* **Research, not on the production path:**
+  * local inverse geometry and the local-first studies (`docs/LOCAL_INVERSE_GEOMETRY.md`,
     `RIND3D_Posterior/docs/LOCALFIRST_COMPARISON.md`);
-  - curved occluders, closed balls, physical stage only, no labels (`RIND3D_Generator/curved/`,
-    `docs/CURVED_OCCLUDERS.md`);
-  - per-family generator benchmark (`RIND3D_Dataset100K/docs/GENERATOR_BENCHMARK_V3.md`).
+  * curved occluders: closed balls, physical stage only, no certified labels, refused by the production profile
+    (`docs/CURVED_ASSESSMENT.md`, `docs/CURVED_OCCLUDERS.md`);
+  * the per-family generator benchmark (`RIND3D_Dataset100K/docs/GENERATOR_BENCHMARK_V3.md`).
 
 **Terminology.**
 * RIND3D is presented as a general driver-source / binary-response inference framework. A receiver is
   *response-active* or *response-inactive*, and the two meet at a *response interface*.
 * The implemented physics is still a visibility-based binary response: active iff the closed segment from the driver
   source misses the closed solid. The general vocabulary does not mean other response mechanisms are supported.
-* Serialized keys and APIs keep their legacy names (`lit`, `dark`, `lit_frac`, `cls` 0/1/2) for compatibility with 1K
-  and v2.
+* The 1K formats and internal arrays keep their legacy names (`lit`, `dark`, `cls` 0/1/2: 0 inactive, 1 active,
+  2 SOLID). The v3 container metadata uses `active_frac`, and the loader exposes `response`/`responses`,
+  `informative` and `driver_sources()`. No 100K data existed before v3, so no 100K compatibility mode is kept.
 * Definitions, legacy names, and the boundary between full-world (teacher) information and local-only Student inputs:
   `docs/RIND3D/GLOSSARY.md`.
 
@@ -33,7 +44,7 @@
 
 | path | content |
 |---|---|
-| `RIND3D_Dataset100K/` | **the 100K dataset pipeline**: contract v2 (provisional), local-only physical stage, FastLabel labels, multi-GPU coordinator, durable storage, validators, the training loader, the smoke test (`README.md`) |
+| `RIND3D_Dataset100K/` | **the 100K dataset pipeline**: contract v3 (production), local-only physical stage, FastLabel labels, multi-GPU coordinator, durable storage, validators, the training loader, the smoke test (`README.md`) |
 | `RIND3D_Posterior/` | posterior labellers: exact tau-pencil, and **FastLabel** (`src/rind3d_posterior/fastlabel/`, `docs/FASTLABEL_CORE.md`) |
 | `RIND3D_Generator/` | **the generator**: canonical geometry, certified CPU / CUDA visibility, storage. A provenance-tracked source tree, also used by Phase3 |
 | `RIND3D_Dataset1K/` | the 1K reference pipeline and its release tools, kept for regression and reproducibility |
