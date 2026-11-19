@@ -22,10 +22,18 @@ elif [[ ! -f "${boost_prefix}/lib/cmake/Boost-1.92.0/BoostConfig.cmake" ]]; then
   fi
   mkdir -p "${deps_dir}" "${deps_dir}/boost-package"
   if [[ ! -f "${boost_archive}" ]]; then
-    curl -L --fail --show-error --silent \
-      "https://geo.mirror.pkgbuild.com/extra/os/x86_64/boost-1.92.0-1-x86_64.pkg.tar.zst" \
-      -o "${boost_archive}.download"
-    mv "${boost_archive}.download" "${boost_archive}"
+    # the Arch Linux Archive keeps every package version (stable); the rolling mirror drops superseded ones (404)
+    for url in "https://archive.archlinux.org/packages/b/boost/boost-1.92.0-1-x86_64.pkg.tar.zst" \
+               "https://geo.mirror.pkgbuild.com/extra/os/x86_64/boost-1.92.0-1-x86_64.pkg.tar.zst"; do
+      if curl -L --fail --show-error --silent "${url}" -o "${boost_archive}.download"; then
+        mv "${boost_archive}.download" "${boost_archive}"
+        break
+      fi
+    done
+    if [[ ! -f "${boost_archive}" ]]; then
+      echo "Boost 1.92.0-1 package unavailable: set RIND_DEPS_DIR (offline deps) or RIND_BOOST_PREFIX" >&2
+      exit 1
+    fi
   fi
   actual_sha="$(sha256sum "${boost_archive}" | cut -d' ' -f1)"
   if [[ "${actual_sha}" != "${boost_sha}" ]]; then

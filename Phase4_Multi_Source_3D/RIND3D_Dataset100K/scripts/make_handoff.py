@@ -70,8 +70,8 @@ def main():
     manifest = dict(
         package="rind3d-100k-handoff", created=time.strftime("%Y-%m-%dT%H:%M:%S%z"), commit=commit,
         branch=git("rev-parse", "--abbrev-ref", "HEAD"), remote=git("remote", "get-url", "origin"),
-        contract=json.loads((HERE / "contract" / "RIND3D_100K_CONTRACT_v2.json").read_text())["contract"],
-        contract_sha256=sh("RIND3D_Dataset100K/contract/RIND3D_100K_CONTRACT_v2.json"),
+        contract=json.loads((HERE / "contract" / "RIND3D_100K_CONTRACT_v3.json").read_text())["contract"],
+        contract_sha256=sh("RIND3D_Dataset100K/contract/RIND3D_100K_CONTRACT_v3.json"),
         contract_v1_sha256=sh("RIND3D_Dataset100K/contract/RIND3D_100K_CONTRACT_v1.json"),
         fixtures_index_sha256=sh("RIND3D_Dataset100K/handoff/fixtures/labels/INDEX.json"),
         fastlabel_fixtures_sha256=sh("RIND3D_Dataset100K/handoff/fixtures/fastlabel_v2/INDEX.json"),

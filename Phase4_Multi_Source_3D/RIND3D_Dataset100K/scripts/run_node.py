@@ -53,8 +53,9 @@ def default_env(root):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", required=True)
-    ap.add_argument("--contract", default=str(HERE / "contract" / "RIND3D_100K_CONTRACT_v2.json"),
-                    help="contract JSON (default: v2, the provisional pre-production contract; v1 for regression only)")
+    ap.add_argument("--contract", default=str(HERE / "contract" / "RIND3D_100K_CONTRACT_v3.json"),
+                    help="contract JSON (default: v3, the production contract; v2 and v1 for regression and "
+                         "reproducibility only)")
     ap.add_argument("--config")
     ap.add_argument("--slots"); ap.add_argument("--label-slots")
     ap.add_argument("--gpus"); ap.add_argument("--phys-per-gpu", type=int); ap.add_argument("--label-gpu-per-gpu", type=int)
@@ -92,6 +93,8 @@ def main():
              fastlabel={k: v for k, v in dict(n_tasks=a.fastlabel_n_tasks or conf.get("fastlabel_n_tasks"),
                                               base_seed=a.fastlabel_base_seed or conf.get("fastlabel_base_seed")).items()
                         if v is not None})
+    from rind3d_100k.profile import check_certified_profile
+    check_certified_profile(contract, a.label_engine or conf.get("label_engine"))   # curved / unknown families refused
     default_env(a.root)
     from rind3d_100k.coordinator import Coordinator
     sys.exit(Coordinator(a.root, contract, o).run())

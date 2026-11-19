@@ -147,12 +147,17 @@ def fastlabel_tasks(container):
 
 def v2_fixtures(slots, work):
     """Contract v2 physical fixtures and FastLabel fixtures (see the module docstring)."""
+    return scene_fixtures("v2", slots, work)
+
+
+def scene_fixtures(ver, slots, work):
+    """Physical fixtures of contract <ver> (v2: regression; v3: production) and its FastLabel fixtures."""
     from rind3d.rendering.backends import BackendFactory
     from rind3d_100k.controller import plan_epoch
     from rind3d_100k.physical import run_scene
-    cfg = json.loads((HERE / "contract" / "RIND3D_100K_CONTRACT_v2.json").read_text())
+    cfg = json.loads((HERE / "contract" / f"RIND3D_100K_CONTRACT_{ver}.json").read_text())
     plans = plan_epoch(cfg, 0, [])
-    out = HERE / "handoff" / "fixtures" / "physical_v2"; out.mkdir(parents=True, exist_ok=True)
+    out = HERE / "handoff" / "fixtures" / f"physical_{ver}"; out.mkdir(parents=True, exist_ok=True)
     work = Path(work); work.mkdir(parents=True, exist_ok=True)
     fac = BackendFactory()
     # phase 1: physical scenes. Phase 2: FastLabel. One rind3d CUDA runtime per phase: two runtimes in one process
@@ -166,15 +171,20 @@ def v2_fixtures(slots, work):
             d.update(v2_scene_fixture(rec, payload), timing=rec["timing"], work=rec["work"])
             c = work / f"slot_{slot:06d}.npz"; c.write_bytes(payload); done.append((slot, c))
         (out / f"slot_{slot:06d}.json").write_text(json.dumps(d, indent=0, default=str))
-        print("physical_v2", slot, rec["status"], rec["timing"].get("total"), flush=True)
+        print(f"physical_{ver}", slot, rec["status"], rec["timing"].get("total"), flush=True)
     import subprocess
-    r = subprocess.run([sys.executable, __file__, "--v2-labels", str(work)] + [str(c) for _, c in done], check=True)
+    r = subprocess.run([sys.executable, __file__, f"--{ver}-labels", str(work)] + [str(c) for _, c in done], check=True)
 
 
 def v2_label_fixtures(containers):
     """Phase 2 of v2_fixtures (separate process): FastLabel labels of the fixture scenes."""
+    return label_fixtures_ver("v2", containers)
+
+
+def label_fixtures_ver(ver, containers):
+    """Phase 2 of scene_fixtures (separate process: one rind3d CUDA runtime per process): FastLabel labels."""
     from rind3d_posterior.fastlabel import label_window_fast, window_from_100k
-    cfg = json.loads((HERE / "contract" / "RIND3D_100K_CONTRACT_v2.json").read_text())
+    cfg = json.loads((HERE / "contract" / f"RIND3D_100K_CONTRACT_{ver}.json").read_text())
     fl_cfg = {kk: cfg["labels"]["fastlabel"][kk] for kk in ("n_tasks", "base_seed", "family_delta", "eps")}
     index = []
     for c in containers:
@@ -186,7 +196,7 @@ def v2_label_fixtures(containers):
                               tv_bound=float(lab["tv_bound"]), path=lab["meta"]["path"], n_cells=lab["meta"]["n_cells"],
                               certificate={kk: cert.get(kk) for kk in ("kind", "n", "K", "stage", "round", "a1", "a2")}))
             print("fastlabel", slot, w, j, lab["status"], index[-1]["digest"], flush=True)
-    fo = HERE / "handoff" / "fixtures" / "fastlabel_v2"; fo.mkdir(parents=True, exist_ok=True)
+    fo = HERE / "handoff" / "fixtures" / f"fastlabel_{ver}"; fo.mkdir(parents=True, exist_ok=True)
     (fo / "INDEX.json").write_text(json.dumps(dict(contract=cfg["contract"], config=fl_cfg, labels=index), indent=1))
 
 
@@ -194,13 +204,14 @@ if __name__ == "__main__":
     ps = (0, 4)
     if "--physical-slots" in sys.argv:
         a, b = sys.argv[sys.argv.index("--physical-slots") + 1].split(":"); ps = (int(a), int(b))
-    if "--v2-labels" in sys.argv:
-        v2_label_fixtures(sys.argv[sys.argv.index("--v2-labels") + 2:])
-        sys.exit(0)
-    if "--v2" in sys.argv:
-        wk = sys.argv[sys.argv.index("--work") + 1] if "--work" in sys.argv else str(HERE / ".cache_fixtures_v2")
-        v2_fixtures(ps, wk)
-        sys.exit(0)
+    for ver in ("v2", "v3"):
+        if f"--{ver}-labels" in sys.argv:
+            label_fixtures_ver(ver, sys.argv[sys.argv.index(f"--{ver}-labels") + 2:])
+            sys.exit(0)
+        if f"--{ver}" in sys.argv:
+            wk = sys.argv[sys.argv.index("--work") + 1] if "--work" in sys.argv else str(HERE / f".cache_fixtures_{ver}")
+            scene_fixtures(ver, ps, wk)
+            sys.exit(0)
     rel = Path(sys.argv[1])
     prior(rel)
     label_fixtures(rel)

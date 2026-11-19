@@ -10,12 +10,13 @@ Steps:
    reference;
 4. physical fixtures: contract-v1 slots 0..3 regenerated from scratch; windows, every crop's packed bits and
    Lambda_hat must equal the reference (cross-machine determinism of the certified renderer);
-4b. contract-v2 physical fixtures (production contract): slots 0..3 regenerated; windows with streams, crop bits,
+4b. contract-v2 physical fixtures (regression): slots 0..3 regenerated; windows with streams, crop bits,
    rate-stream histograms and P_A must equal the reference; the containers are kept in <work>/fixtures_v2;
 4c. FastLabel fixtures: the v2 fixture labels recomputed on those containers; every digest (cells, masses, status,
    tv_bound) must equal the reference (cross-device bit-exactness of the statistical labeller);
-4d. Gate A smoke: the GPU verifier against the certified renderer on two windows of the v2 fixture scenes;
-5. mini node run: run_node on 2 slots with the default contract (v2) and FastLabel labels, then the validator with
+4d/4e. the same for contract v3 (PRODUCTION: direct response-interface eligibility, thin slabs T_min = 2);
+4f. Gate A smoke: the GPU verifier against the certified renderer on two windows of the v3 fixture scenes;
+5. mini node run: run_node on 2 slots with the default contract (v3) and FastLabel labels, then the validator with
    physics spot checks and label validation (sha256, certificates, true source in support);
 6. journal: append, torn tail, recovery.
 Steps 4b-5 run in subprocesses: one rind3d CUDA runtime per process.
@@ -80,15 +81,19 @@ def _sub(fn_name, *args, timeout=7200):
 
 
 def physical_v2(work):
+    return physical_ver(work, "v2")
+
+
+def physical_ver(work, ver):
     from rind3d.rendering.backends import BackendFactory
     from rind3d_100k.controller import plan_epoch
     from rind3d_100k.physical import run_scene
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from make_fixtures import v2_scene_fixture
-    cfg = json.loads((HERE / "contract" / "RIND3D_100K_CONTRACT_v2.json").read_text())
+    cfg = json.loads((HERE / "contract" / f"RIND3D_100K_CONTRACT_{ver}.json").read_text())
     plans = plan_epoch(cfg, 0, []); fac = BackendFactory(); res = []
-    out = Path(work) / "fixtures_v2"; out.mkdir(parents=True, exist_ok=True)
-    for f in sorted((HERE / "handoff" / "fixtures" / "physical_v2").glob("slot_*.json")):
+    out = Path(work) / f"fixtures_{ver}"; out.mkdir(parents=True, exist_ok=True)
+    for f in sorted((HERE / "handoff" / "fixtures" / f"physical_{ver}").glob("slot_*.json")):
         ref = json.loads(f.read_text()); slot = ref["slot"]; pl = plans[slot]
         rec, payload = run_scene(cfg, slot, pl["k"], pl["c_table"], fac, 0)
         d = dict(slot=slot, k=pl["k"] == ref["k"], status=rec["status"] == ref["status"])
@@ -104,13 +109,17 @@ def physical_v2(work):
 
 
 def fastlabel_v2(work):
+    return fastlabel_ver(work, "v2")
+
+
+def fastlabel_ver(work, ver):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from make_fixtures import fastlabel_digest
     from rind3d_posterior.fastlabel import label_window_fast, window_from_100k
-    ref = json.loads((HERE / "handoff" / "fixtures" / "fastlabel_v2" / "INDEX.json").read_text())
+    ref = json.loads((HERE / "handoff" / "fixtures" / f"fastlabel_{ver}" / "INDEX.json").read_text())
     res = []
     for r in ref["labels"]:
-        c = Path(work) / "fixtures_v2" / f"slot_{r['slot']:06d}.npz"
+        c = Path(work) / f"fixtures_{ver}" / f"slot_{r['slot']:06d}.npz"
         t0 = time.perf_counter()
         lab = label_window_fast(window_from_100k(c, r["window"], r["source"]), **ref["config"])
         res.append(dict(slot=r["slot"], window=r["window"], source=r["source"], ok=fastlabel_digest(lab) == r["digest"],
@@ -119,12 +128,16 @@ def fastlabel_v2(work):
 
 
 def gate_a_v2(work):
+    return gate_a_ver(work, "v2")
+
+
+def gate_a_ver(work, ver):
     from rind3d_posterior.fastlabel import window_from_100k
     from rind3d_posterior.fastlabel.gate_a import check_window
-    ref = json.loads((HERE / "handoff" / "fixtures" / "fastlabel_v2" / "INDEX.json").read_text())
+    ref = json.loads((HERE / "handoff" / "fixtures" / f"fastlabel_{ver}" / "INDEX.json").read_text())
     res = []
     for r in ref["labels"][:2]:
-        rec = check_window(window_from_100k(Path(work) / "fixtures_v2" / f"slot_{r['slot']:06d}.npz", r["window"], r["source"]),
+        rec = check_window(window_from_100k(Path(work) / f"fixtures_{ver}" / f"slot_{r['slot']:06d}.npz", r["window"], r["source"]),
                            seed=r["window"])
         res.append({kk: rec[kk] for kk in ("key", "L", "legal", "field_diff", "batch_disagree", "bad_violation", "ok")})
     return dict(ok=bool(res) and all(x["ok"] for x in res), results=res)
@@ -221,9 +234,11 @@ def main():
         ok &= step("2_engine_regression", s_pytest, rep)
     ok &= step("3_label_fixtures", lambda: s_fixtures(a.full_fixtures), rep)
     ok &= step("4_physical_fixtures", s_physical, rep)
-    ok &= step("4b_physical_fixtures_v2", lambda: _sub("physical_v2", a.work), rep)
-    ok &= step("4c_fastlabel_fixtures_v2", lambda: _sub("fastlabel_v2", a.work), rep)
-    ok &= step("4d_gate_a_smoke", lambda: _sub("gate_a_v2", a.work), rep)
+    ok &= step("4b_physical_fixtures_v2", lambda: _sub("physical_ver", a.work, "v2"), rep)
+    ok &= step("4c_fastlabel_fixtures_v2", lambda: _sub("fastlabel_ver", a.work, "v2"), rep)
+    ok &= step("4d_physical_fixtures_v3", lambda: _sub("physical_ver", a.work, "v3"), rep)
+    ok &= step("4e_fastlabel_fixtures_v3", lambda: _sub("fastlabel_ver", a.work, "v3"), rep)
+    ok &= step("4f_gate_a_smoke_v3", lambda: _sub("gate_a_ver", a.work, "v3"), rep)
     ok &= step("5_node_run_and_validation", lambda: _sub("s_node", a.work, 0), rep)
     ok &= step("6_journal_recovery", lambda: s_journal(a.work), rep)
     rep["ok"] = bool(ok)
