@@ -36,7 +36,7 @@ import numpy as np
 import inputs  # noqa: F401  (installs pinned research paths)
 from envelopes import clearance_partition
 from ledger import decode, encode
-from poly import Poly, form, grid_pieces
+from poly import Poly, form, grid_pieces, primitive
 from raster import encoded
 from screen2 import check_ranges, scan_collect, scan_ids
 from poly import within
@@ -44,6 +44,50 @@ from solver import apply_pair, cone, subtract_many
 from kernel import SCALE, ceil_mass, cell_id, single_cell, wire_bound
 
 COLLECT_CAP = 1 << 21  # largest residual obligation list stored explicitly
+CELL_UNITS = SCALE // (128 ** 3)  # exact volume of one output cell in units of 2^-160
+
+
+def cell_box_rows(i, j, k, n=128):
+    rows = []
+    for axis, v in enumerate((i, j, k)):
+        e = [0, 0, 0]
+        e[axis] = n
+        rows.append((-e[0], -e[1], -e[2], v))
+        rows.append((e[0], e[1], e[2], -(v + 1)))
+    return rows
+
+
+def facet_rows(p):
+    """Outward facet rows (p on the <= 0 side) from the face cycles, validated exactly.
+
+    Each row is checked against every vertex (all <= 0) and must vanish on its own face;
+    a failure raises instead of producing a possibly wrong inside test.
+    """
+    out = []
+    for face in p.faces:
+        a = face[0]
+        def d(b):
+            return tuple(b[i] * a[3] - a[i] * b[3] for i in range(3))
+        u = d(face[1])
+        n = None
+        for b in face[2:]:
+            v = d(b)
+            n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+            if any(n):
+                break
+        if n is None or not any(n):
+            continue  # degenerate (collinear) face cycle carries no plane
+        row = primitive((*(x * a[3] for x in n), -sum(n[i] * a[i] for i in range(3))))
+        vals = [form(row, q) for q in p.vertices]
+        if max(vals) > 0:
+            row = tuple(-x for x in row)
+            vals = [-x for x in vals]
+        if max(vals) > 0 or any(form(row, q) != 0 for q in face):
+            raise ArithmeticError("inconsistent face structure")
+        out.append(row)
+    if len(out) < 4:
+        raise ArithmeticError("polytope with fewer than four facets")
+    return out
 
 
 @dataclass(frozen=True)
@@ -318,22 +362,64 @@ class Kernel:
 
     # ---------------------------------------------------------------- accounting
     def _grid_credit(self, parts):
+        """Exact per-cell credits of IN pieces (units 2^-160): floor for lower, ceiling for upper.
+
+        Adaptive octree over the piece's cell range. A block whose 8 corners satisfy every
+        (validated) facet row lies inside the convex piece and gets the exact cell volume
+        per cell; a block on the nonnegative side of one facet row misses the interior; a
+        boundary cell is clipped exactly. Conservation: floors of the clipped cells plus
+        the exact interior cells must lie in [vol*2^160 - count, vol*2^160].
+        """
         started = perf_counter()
         lo, hi = Counter(), Counter()
         try:
             for p in parts:
+                rows = facet_rows(p)
                 subtotal = count = 0
-                for xyz, small in grid_pieces(p, 128):
+                (i0, i1), (j0, j1), (k0, k1) = p.grid_bounds(128)
+                # Each stack entry carries q = p clipped exactly to its cell block.
+                stack = [((i0, i1, j0, j1, k0, k1), p)]
+                while stack:
                     self.budget.check()
-                    mass = small.volume * SCALE
-                    low = mass.numerator // mass.denominator
-                    c = cell_id(xyz)
-                    if low:
-                        lo[c] += low
-                    hi[c] += -(-mass.numerator // mass.denominator)
-                    subtotal += low
-                    count += 1
-                if not subtotal <= p.volume * SCALE < subtotal + count:
+                    (a0, a1, b0, b1, c0, c1), q = stack.pop()
+                    corners = [(x, y, z, 128) for x in (a0, a1 + 1) for y in (b0, b1 + 1) for z in (c0, c1 + 1)]
+                    if all(form(r, cq) <= 0 for r in rows for cq in corners):
+                        for x in range(a0, a1 + 1):
+                            for y in range(b0, b1 + 1):
+                                for z in range(c0, c1 + 1):
+                                    cid = cell_id((x, y, z))
+                                    lo[cid] += CELL_UNITS
+                                    hi[cid] += CELL_UNITS
+                                    subtotal += CELL_UNITS
+                        self.stats["cells_interior"] += (a1 - a0 + 1) * (b1 - b0 + 1) * (c1 - c0 + 1)
+                        continue
+                    if a0 == a1 and b0 == b1 and c0 == c1:
+                        mass = q.volume * SCALE
+                        low = mass.numerator // mass.denominator
+                        cid = cell_id((a0, b0, c0))
+                        if low:
+                            lo[cid] += low
+                        hi[cid] += -(-mass.numerator // mass.denominator)
+                        subtotal += low
+                        count += 1
+                        continue
+                    ext = (a1 - a0, b1 - b0, c1 - c0)
+                    ax = max(range(3), key=lambda t: ext[t])
+                    box = [a0, a1, b0, b1, c0, c1]
+                    mid = (box[2 * ax] + box[2 * ax + 1]) // 2
+                    plane = [0, 0, 0, -(mid + 1)]
+                    plane[ax] = 128
+                    left_q, right_q = q.split(tuple(plane))
+                    left, right = list(box), list(box)
+                    left[2 * ax + 1] = mid
+                    right[2 * ax] = mid + 1
+                    if left_q is not None:
+                        stack.append((tuple(left), left_q))
+                    if right_q is not None:
+                        stack.append((tuple(right), right_q))
+                total = p.volume * SCALE
+                ok = (subtotal <= total < subtotal + count) if count else (subtotal == total)
+                if not ok:
                     raise ArithmeticError("grid integration failed volume conservation")
                 self.stats["grid_intersections"] += count
             return lo, hi

@@ -14,9 +14,22 @@ def directions(body_geom,source):
     def floats(vs):
         return np.array([[v[j]/v[3] for j in range(3)] for v in vs])
     dif=(floats(k)[:,None,:]-floats(p)[None,:,:]).reshape(-1,3)
-    axis=dif.mean(axis=0)
-    scale=dif@axis
-    if not np.all(scale>0): return ()
+    # Projection axis (proposal only): any a with a.(k-p) > 0 for all vertex pairs. Try the
+    # mean difference, the centroid direction, then minus each facet normal of K (a facet
+    # of K that strictly separates P gives such an axis exactly). Validation below is exact.
+    candidates=[dif.mean(axis=0), floats(k).mean(axis=0)-floats(p).mean(axis=0)]
+    fk=floats(k)
+    for face in body_geom.faces:
+        q=floats(face[:3])
+        n=np.cross(q[1]-q[0],q[2]-q[0])
+        if not np.any(n): continue
+        if np.dot(n,fk.mean(axis=0)-q[0])>0: n=-n   # outward normal
+        candidates.append(-n)
+    for axis in candidates:
+        scale=dif@axis
+        if np.all(scale>0) and np.all(np.isfinite(scale)): break
+    else:
+        return ()
     # Silhouette candidates only. No decisions use these float coordinates.
     drop=np.argmax(np.abs(axis))
     proj=np.delete(dif,drop,axis=1)/scale[:,None]
