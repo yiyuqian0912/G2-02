@@ -240,3 +240,57 @@ def test_body_subset_screen_is_never_weaker():
             assert ns < 0 or set(ids_.tolist()) <= set(idf.tolist())
             compared += 1
     assert compared > 0
+
+
+def _pointwise_reference(obs, rows, offs):
+    """Classify every FREE receiver by direct int64 evaluation of every row (no scanlines)."""
+    L = obs.side
+    z, y, x = np.meshgrid(np.arange(L), np.arange(L), np.arange(L), indexing="ij")
+    X = np.stack([2 * (obs.origin[0] + x) + 1, 2 * (obs.origin[1] + y) + 1, 2 * (obs.origin[2] + z) + 1],
+                 axis=-1).reshape(-1, 3).astype(np.int64)
+    ng = len(offs) - 1
+    inside = np.zeros((ng, len(X)), bool)
+    for g in range(ng):
+        ok = np.ones(len(X), bool)
+        for a, b, c, d in rows[offs[g]:offs[g + 1]]:
+            ok &= (X[:, 0] * a + X[:, 1] * b + X[:, 2] * c + d * obs.denom) <= 0
+        inside[g] = ok
+    act = obs.scancls.reshape(-1)
+    c0 = inside[0::3].sum(0)
+    c1 = inside[1::3].sum(0)
+    free = act != 2
+    contra = free & (((act == 1) & (c0 > 0)) | ((act == 0) & (c1 == 0)))
+    proved = ((act == 1) & (c1 == 0)) | ((act == 0) & (c0 > 0))
+    amb = np.flatnonzero(free & ~proved & ~contra)
+    masks = np.zeros(len(amb), np.uint64)
+    for c in range(ng // 3):
+        masks |= inside[3 * c + 1][amb].astype(np.uint64) << np.uint64(c)
+    return bool(contra.any()), amb, masks
+
+
+def test_full_screen_matches_pointwise_reference():
+    obs, _ = load()
+    k = Kernel(obs, Budget(120, 10 ** 6))
+    for d, a in choose_pairs(obs.cls, 8, 1, "interface"):
+        k.condition_pair(d, a)
+    k.exclude_window()
+    polys = [k.poly(h) for h in k.handles()]
+    for _ in range(6):  # pieces after exact cuts too
+        h = max(k.open_handles(), key=k.volume)
+        r = k.screen(h)
+        if r["outcome"] == "open" and r["ids"] is not None and len(r["ids"]):
+            kids, _ = k.enforce(r["handle"], [int(i) for i in r["ids"][:16]])
+            polys.extend(k.poly(c) for c in kids)
+    checked = compared = 0
+    for p in polys[:16]:
+        rows, offs = encoded(obs, p)
+        n, ids, w, b, mk = scan_collect(obs.scancls, np.asarray(obs.origin, np.int64), obs.denom, rows, offs,
+                                        np.zeros(0, np.int64), 1 << 22)
+        contra, amb, masks = _pointwise_reference(obs, rows, offs)
+        if contra:
+            assert n == -1
+        else:
+            assert n == len(amb) and np.array_equal(ids, amb) and np.array_equal(mk, masks)
+            compared += 1
+        checked += 1
+    assert checked >= 8 and compared >= 3
