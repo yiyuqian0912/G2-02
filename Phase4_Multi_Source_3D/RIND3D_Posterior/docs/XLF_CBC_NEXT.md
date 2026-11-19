@@ -1,44 +1,66 @@
-# XLF CBC: next steps (prioritized, grounded in the measurements)
+# XLF CBC: next steps (evidence-based, v2.9)
 
-Production stays FastLabel v3.4 on `yushu/3d`. Nothing here is a production change. Any production use needs a
-separate readiness decision.
+Production stays FastLabel v3.4 on `yushu/3d`. Nothing here is a production change; any production use needs a
+separate readiness decision. Numbers refer to `XLF_CBC_RESULTS.md` (final build v2.9e, `067d746`).
 
-## State (v2.8, `70522ab`)
+## 1. Correctness obligations still open (ordered by risk × cost to close)
 
-* **Benchmark:** 84/90 tasks certified at 8 s and 88/90 at 20 s.
-* **Release canary:** 739/807 channels at 10 s (v2.7), all consistent with the production labels.
-* **References:** 0 inconsistencies against 86 exact-certified references.
-* **Speed:** certified median 1.6 s, on par with FastLabel's median where certified.
-* **Remaining gaps:**
-  * uncertified tails (8% of canary channels at 10 s);
-  * no machine-checked proof of the transitions;
-  * Python polytope code in the trusted base.
+1. **Machine-checked proofs of the closed-form geometry (≈ 300 lines).** These are `solver.cone`, `Envelope`,
+   `separators`, `Observation.cleared` and `clearance_covers`, plus the frontier theorem.
+   * Status: manual proofs (design §3–4h), the line-by-line review in IMPLEMENTATION §2, and exact differential
+     tests.
+   * Next: a Lean 4 (Mathlib) formalization of the elimination lemma for C_K(r), the separation lemma, Lemma O,
+     and the frontier TV bound over ℚ.
+   * The polytope arithmetic itself does not need this: it is certified per run (`CBC_VERIFY_SPLITS=1`).
+2. **Per-cell distribution inside an IN piece.** The octree's boundary-cell clips are certified only in total
+   (conservation), not per cell.
+   * Close by running `verify_split` on the octree's splits: in Python it costs the same as the kernel's splits;
+     in `cells.cpp` it would be nearly free.
+3. **Native per-split certificate.** `verify_split` in Python costs 1.1–2× wall time.
+   * A C++/GMP port (same two checks; the hex conversion is already in `cells.cpp`) would make the certified mode
+     cost ≈ 1.1× and remove the speed/assurance trade-off.
+4. **Numba trust.** The screen's integer semantics are proved at source level (z3).
+   * Close the compiler gap with a second, independent C++ screen and a byte-for-byte comparison of decisions in
+     CI, or with translation validation on the generated LLVM IR.
+5. **Pinned builds.** Pin Numba, LLVM, g++, GMP and the `.so` hash. Record the build hash in every label envelope.
 
-## 1. Close the certification gap on hard channels
+## 2. Performance: the remaining tail (v2.9e, 10 s budget)
 
-1. **Penumbra-dense pieces at L = 256.** These cover both remaining 20 s failures.
-   * In `000007_w09_s2`, 112 pieces each keep about 1.9M ambiguous receivers, 11% of the window, and 151 full
-     scans dominate a 40 s run. The feasible set is a blob of about 2 voxels seen through barrier edges.
-   * A residual bitmask would only avoid rescanning resolved receivers. Here the sets are dense, so the gain is
-     small.
-   * What should help: cuts aligned with the occluder edge, i.e. the pencil planes of the extreme penumbra
-     receivers, chosen by the angular-extreme rule from the earlier XLF work.
-2. **Native exact cuts and splits.** Exact enforcement and pair conditioning (about 15% of the time) still run
-   Python big-integer polytope code. `native/cells.cpp` already implements `split` in GMP; exposing it for
-   enforcement would follow the same differential-test and byte-identity protocol.
-3. **Fragmented frontiers next to obstacles** (all remaining failures). Make contact-layer refinement quantitative:
-   stop once the charged contact volume is below the tolerance slack.
+Remaining failure classes, with the measured cause:
 
-## 2. Assurance
+| class | examples | measured cause | candidate fix |
+|---|---|---|---|
+| huge spread posteriors | `000023_w07_s0/s1` (2 × 10⁵ cells, feasible volume 10% of the world) | exact octree integration (8 s of 10 s) | cheaper certified per-cell enclosures (sub-cell corner tests with a float filter) for interior-heavy pieces; these channels are trivial for FastLabel |
+| thin slabs L64/L128 | `000001_w02_s0/s3`, `000001_w05_s0/s3` | integration plus a large frontier of thin pieces | the same as above, plus contact refinement along slab faces |
+| L = 256 multi-blocker penumbra | `000008_w11_s2`, `000005_w11_s0`, `000006_w11_s0` | **measured:** of the ambiguous receivers in large screens, 93% (`000008_w11_s2`) and 63% (`000005_w11_s0`) are dark with ≥ 2 possible blockers. These are unions of cones, with no convexity shortcut; the hull step resolves only the single-blocker share | split the piece by planes separating the candidate blockers' cone families (on each side one blocker dominates, so the hull step applies), or a first-cover hull step per blocker after a pencil split |
 
-1. Finish the exact differential audit on all 90 tasks (L64/L128 running). L = 256 needs a faster oracle.
-2. Mechanize the frontier accounting theorem and the integer wire bound in a proof assistant, or keep the
-   300-instance exact property test. The screen's integer arithmetic is already mechanized (`smt_screen.py`, z3,
-   6/6).
-3. Pin the builds: Numba, g++, GMP.
+Current numbers to beat:
+* benchmark 8 s: 87/90 with verification off, 84/90 with it on;
+* canary 10 s: `XLF_CBC_RESULTS.md` §6.
 
-## 3. Deployment study (needs a separate decision)
+Ideas measured and **not** adopted (evidence):
+* Grid-aligned refinement of live pieces: the per-cell exact decomposition gives exactly the frontier bound on
+  all 54 tail tasks with positive mass (design §6).
+* A refined worst-case bound: gains at most 2×, and only for few-cell posteriors (design §6).
+* Residual bitmasks for overflowing obligation lists: obligation sets at L = 256 are dense (10⁶–10⁷), and the hull
+  step removed the need.
 
-A deterministic-first hybrid gives most channels a deterministic TV certificate at roughly FastLabel's median cost:
-CBC with a 10 s budget, then FastLabel for the rest. On the canary that is 91.6% deterministic labels. The open
-measurements are H20 throughput and the per-campaign cost of the remaining FastLabel fallbacks.
+## 3. Assurance campaigns to repeat on every kernel change
+
+* `pytest test_cbc.py test_wire.py test_poly_exact.py test_regression.py ../global_inverse/test_global.py
+  ../xlf_assurance/test_assurance.py`. The fixtures cover the 214-cell posterior, both legacy Tau-pencil defects,
+  the hull-only L256 case and the missing-sibling counterexample (Astra).
+* `chaos.py` over the exact-referenced tasks, with `CBC_VERIFY_SPLITS=1`.
+* `audit_exact.py` over the L64/L128 benchmark tasks and the newly certified hard tasks.
+* Byte identity of certified payloads for refactors that should not change decisions.
+
+## 4. Deployment study (needs a separate decision)
+
+A deterministic-first hybrid labels each channel with CBC under a fixed budget and falls back to FastLabel on
+INCOMPLETE. The certification semantics stay separate: a deterministic CERTIFIED envelope versus FastLabel's
+`certified_stat`.
+* Measured canary share of deterministic labels: `XLF_CBC_RESULTS.md` §6.
+* Open measurements: H20 throughput with long-lived workers (the 1–2 s per-process load and JIT is paid once),
+  memory at 6–16 workers, and the per-campaign cost of the FastLabel fallbacks.
+* A controlled canary of the hybrid on a fresh, unpublished scene set would be the next step. It is not a
+  replacement of FastLabel.
