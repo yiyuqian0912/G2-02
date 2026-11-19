@@ -1,48 +1,40 @@
 # XLF CBC: next steps (prioritized, grounded in the measurements)
 
-Production stays FastLabel v3.4 on `yushu/3d`. None of this is a production change.
+Production stays FastLabel v3.4 on `yushu/3d`. Nothing here is a production change. Any production use needs a
+separate readiness decision.
 
-## 1. Throughput of the exact kernel
+## State (v2.8, `70522ab`)
 
-This is the largest lever. Exact Python clipping of about 500-bit homogeneous polytopes dominates every remaining
-failure; screens are Numba integer code and already cheap.
+* **Benchmark:** 84/90 tasks certified at 8 s and 88/90 at 20 s.
+* **Release canary:** 739/807 channels at 10 s (v2.7), all consistent with the production labels.
+* **References:** 0 inconsistencies against 86 exact-certified references.
+* **Speed:** certified median 1.6 s, on par with FastLabel's median where certified.
+* **Remaining gaps:**
+  * uncertified tails (8% of canary channels at 10 s);
+  * no machine-checked proof of the transitions;
+  * Python polytope code in the trusted base.
 
-Options, in order of expected gain per effort:
+## 1. Close the certification gap on hard channels
 
-1. **Avoid fragmentation by receiver choice.**
-   * Enforcing a dark receiver with a single candidate body is one intersection.
-   * An active receiver splits the piece into up to one piece per cone row.
-   * Prefer single-candidate dark receivers. Implemented behind `--prefer-single-dark`; to be evaluated.
-2. **Compiled exact split.** C++ with GMP/boost cpp_int under the same face-cycle representation, keeping the
-   Python version as the differential reference. The byte-identity regression and the run-time volume-conservation
-   guards carry over unchanged.
-3. **Lazy H-representation of live pieces.** Append rows and enumerate vertices only at a screen. Many pieces are
-   cut several times between screens.
+1. **Residual bitmask for huge pieces.** A piece whose residual set exceeds the 2M-entry list cap rescans the whole
+   window; one L = 256 task ran 73 full scans. A per-piece bitmask (2 MB at L = 256) removes this. The scan already
+   supports a skip list; a masked variant is straightforward.
+2. **Native exact cuts and splits.** Exact enforcement and pair conditioning (about 15% of the time) still run
+   Python big-integer polytope code. `native/cells.cpp` already implements `split` in GMP; exposing it for
+   enforcement would follow the same differential-test and byte-identity protocol.
+3. **Fragmented frontiers next to obstacles** (all remaining failures). Make contact-layer refinement quantitative:
+   stop once the charged contact volume is below the tolerance slack.
 
-## 2. Broad fragmented frontiers (the 11 failures at 20 s)
+## 2. Assurance
 
-* Make contact-layer handling quantitative: stop refining contact layers once their charged volume is below the
-  tolerance slack, instead of the fixed 1/2000 parking rule.
-* Use a proper rational centroid as the search anchor. The homogeneous vertex sum is biased toward high-denominator
-  vertices.
-* A per-piece budget, so a breadth-first sweep over hundreds of equal pieces cannot starve the pieces that are
-  nearly resolved.
+1. Finish the exact differential audit on all 90 tasks (L64/L128 running). L = 256 needs a faster oracle.
+2. Mechanize the frontier accounting theorem and the integer wire bound in a proof assistant, or keep the
+   300-instance exact property test. The screen's integer arithmetic is already mechanized (`smt_screen.py`, z3,
+   6/6).
+3. Pin the builds: Numba, g++, GMP.
 
-## 3. Assurance
+## 3. Deployment study (needs a separate decision)
 
-1. Finish the exact differential audit on all 90 tasks. L = 256 needs a chunked GPU or Numba oracle to be
-   affordable.
-2. Mechanize the smallest proof targets where it pays:
-   * the frontier accounting theorem and the integer wire bound (a short Lean/Isabelle development, or keep the
-     300-instance exact property test);
-   * the directed-rounding lemma of the screen (an SMT bit-vector check of the interval endpoint formula over the
-     verified ranges).
-3. Pin the Numba build: compiler, flags, cache keys.
-
-## 4. Population evidence
-
-* Run the release-canary comparison with every informative channel (807), not a sample.
-* Measure H20 or server throughput only after the kernel speed-up.
-* A 10× FastLabel production target needs a certification rate close to FastLabel's 100%. Until then the realistic
-  deployment is a deterministic first pass with FastLabel as a fallback, which still yields deterministic labels
-  for most channels.
+A deterministic-first hybrid gives most channels a deterministic TV certificate at roughly FastLabel's median cost:
+CBC with a 10 s budget, then FastLabel for the rest. On the canary that is 91.6% deterministic labels. The open
+measurements are H20 throughput and the per-campaign cost of the remaining FastLabel fallbacks.
