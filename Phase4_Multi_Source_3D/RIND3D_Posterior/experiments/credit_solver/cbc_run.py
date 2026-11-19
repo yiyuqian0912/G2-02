@@ -37,13 +37,16 @@ def main():
     ap.add_argument("--pairs", type=int, default=24)
     ap.add_argument("--batch", type=int, default=96)
     ap.add_argument("--split-above", type=int, default=1500)
+    ap.add_argument("--prefer-single-dark", action="store_true")
+    ap.add_argument("--centroid-anchor", action="store_true")
     args = ap.parse_args()
     t, c = perf_counter(), process_time()
     warm = warm_jit()  # one-time per process; a long-lived worker pays it once
     obs, identity = inputs.load(args.container, args.window, args.channel)
     key = f"{identity['slot']:06d}_w{args.window:02d}_s{args.channel}"
     payload, details = solve(obs, key, args.tolerance, args.seconds, cap=args.cap, pairs=args.pairs,
-                             batch=args.batch, split_above=args.split_above)
+                             batch=args.batch, split_above=args.split_above,
+                             prefer_single_dark=args.prefer_single_dark, centroid_anchor=args.centroid_anchor)
     details["solver"] = "claude-cbc-v2"
     details["jit_warm_seconds"] = warm
     write_result(args.output, identity, args.tolerance, payload, details)

@@ -94,10 +94,11 @@ def elongation(poly):
 
 
 def solve(obs, key, tolerance, seconds, cap=4096, pairs=24, strategy="interface",
-          batch=96, split_above=1500, elongated=1e4, max_splits=4000, always_split=True, negligible=Fraction(1, 2000), shrink=0.8):
+          batch=96, split_above=1500, elongated=1e4, max_splits=4000, always_split=True, negligible=Fraction(1, 2000), shrink=0.8, prefer_single_dark=False, centroid_anchor=False):
     if seconds <= 0 or cap < 1 or pairs < 0 or not 0 <= tolerance <= 1:
         raise ValueError("invalid budget or tolerance")
     budget = Budget(seconds, cap)
+    obs.centroid_anchor = centroid_anchor
     kernel = Kernel(obs, budget)
     timings = {}
     payload = bound = None
@@ -159,6 +160,12 @@ def solve(obs, key, tolerance, seconds, cap=4096, pairs=24, strategy="interface"
                     continue
             ids, wrong, bnd = r["ids"], r["wrong"], r["boundary"]
             score = wrong.astype(np.int64) * 2 + bnd.astype(np.int64)
+            if prefer_single_dark and r.get("masks") is not None:
+                m = r["masks"]
+                single = (m != 0) & ((m & (m - np.uint64(1))) == 0)
+                dark = obs.scancls.ravel()[ids] == 0
+                # a dark receiver with one possible blocker is a pure intersection (no fragmentation)
+                score = score * 2 + (single & dark).astype(np.int64)
             order = np.argsort(-score, kind="stable")
             k = n if n <= 2 * batch else batch
             chosen = [int(ids[i]) for i in order[:k]]

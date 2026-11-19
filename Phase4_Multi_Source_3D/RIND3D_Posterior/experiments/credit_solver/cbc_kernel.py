@@ -70,7 +70,13 @@ def encoded_subset(obs, p, bodies):
     from raster import fixed
     from envelopes import Envelope
     from penumbra import directions
-    anchor = primitive(tuple(map(sum, zip(*p.vertices))))
+    if getattr(obs, "centroid_anchor", False):
+        # Hint only (never a decision): the binary64 vertex centroid snapped to 2^-60.
+        fv = p.fvertices
+        anchor = primitive(tuple(int(round(sum(v[i] for v in fv) / len(fv) * 2.0 ** 60)) for i in range(3))
+                           + (1 << 60,))
+    else:
+        anchor = primitive(tuple(map(sum, zip(*p.vertices))))
     rows, offsets = [], [0]
     if getattr(obs, "use_support", False) and not hasattr(obs, "obstacles"):
         obs.obstacles = [within(Poly.cube(), b) for b in obs.bodies]
@@ -304,7 +310,8 @@ class Kernel:
             masks = remap_masks(masks, rel)
         new = self._commit((h,), [Piece(p, np.ascontiguousarray(ids), frozenset(), False,
                                         np.ascontiguousarray(masks))])[0]
-        return dict(outcome="open", handle=new, ambiguous=n, ids=ids, wrong=wrong, boundary=bnd)
+        return dict(outcome="open", handle=new, ambiguous=n, ids=ids, wrong=wrong, boundary=bnd,
+                    masks=masks)  # masks: read-only hint copy for the search
 
     def _settle(self, h, piece):
         p = piece.poly

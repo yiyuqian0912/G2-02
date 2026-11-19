@@ -113,14 +113,42 @@ For a live piece P and an obstacle K (rows fᵢ ≤ 0), define two receiver regi
   ceiling division. `scan_collect` covers the full window; `scan_ids` covers a sorted residual list with identical
   arithmetic. Their agreement is a unit test.
 
+## 4b. Candidate-body masks and restricted screens (PROVEN)
+
+For each ambiguous receiver r of a screened piece P, the screen returns
+m(r) = {K : r ∈ rounded possible shadow of K over P}.
+
+* Rounding down only enlarges a possible shadow. Hence K ∉ m(r) implies that r lies outside the true union of
+  shadows of K over P, so no source of P, or of any P′ ⊆ P, has its segment to r blocked by K.
+* **Consequences, all exact:**
+  1. `enforce` restricts the exact inverse cones of r to the bodies in m(r). For an inactive r it takes the
+     first-cover union over m(r). For an active r it subtracts only those cones. The excluded cones miss P′ almost
+     everywhere.
+  2. A residual screen of P′ builds envelopes only for ⋃_{r ∈ R_P′} m(r). Decisions use these bodies plus the
+     established fact that excluded bodies neither block nor guarantee a block. Such a screen is never weaker than
+     an all-body screen; this is unit-tested.
+* Children inherit m together with R (I4).
+
+## 4c. Exact cell credits (PROVEN)
+
+An IN piece Q is integrated by an octree over its grid range, each node carrying the exact clip of Q to its block:
+
+* a block whose 8 corners satisfy every facet row of Q lies inside the convex Q and is credited at the exact cell
+  volume 2⁻²¹ (2¹³⁹ units);
+* a single boundary cell is credited with ⌊vol·2¹⁶⁰⌋ for the lower credit and ⌈vol·2¹⁶⁰⌉ for the upper credit;
+* the facet rows are validated: every vertex satisfies them, and each vanishes on its face.
+
+Conservation is exact: vol(Q)·2¹⁶⁰ − Σ lower ∈ [0, #boundary cells).
+
 ## 5. Search policy (untrusted)
 
 1. Condition on 24 maximin interface pairs (Astra's protocol), then exclude the window and the obstacles.
 2. Always work on the largest open piece, because it dominates the unknown term.
 3. Park pieces smaller than 1/2000 of the proved lower volume. They stay charged.
 4. After a screen with n ambiguous receivers:
-   * if the piece touches an obstacle and n > 1500, split it by a dyadic axis plane half way from the contact
-     vertex (apex isolation);
+   * if the piece touches an obstacle and n > 1500:
+     * if it lies outside one obstacle facet and touches its plane, split by a parallel plane at half its height;
+     * otherwise split by a dyadic axis plane half way from the contact vertex (apex isolation);
    * if the previous split shrank R by more than 20% and n > 1500, split at the long-axis midpoint;
    * otherwise enforce up to 96 ambiguous receivers exactly, those wrong at the anchor source first, then interface
      receivers.
