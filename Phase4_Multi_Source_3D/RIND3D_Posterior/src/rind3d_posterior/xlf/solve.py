@@ -101,11 +101,13 @@ class Slots:
 
 
 class Node:
-    __slots__ = ("slot", "rows", "depth", "box", "fine", "nid", "cell", "nbm", "npar")
+    __slots__ = ("slot", "rows", "depth", "box", "fine", "nid", "cell", "nbm", "npar", "stuck", "used", "inside")
 
     def __init__(self, slot, rows, depth, box, fine, nid, cell=-1):
         self.slot, self.rows, self.depth, self.box, self.fine, self.nid = slot, rows, depth, box, fine, nid
-        self.cell = cell; self.nbm = float("inf"); self.npar = float("inf")
+        self.cell = cell; self.nbm = float("inf"); self.npar = float("inf"); self.stuck = False
+        self.used = frozenset()          # facets (c, i) this node was already split by (never split by them again)
+        self.inside = {}                 # (c, i) -> plane id A with node subset {A <= 0} subset {f_i < 0} (by construction)
         if box is not None and cell < 0:
             a = np.floor(box[0] * NCELL).astype(np.int64); b = np.ceil(box[1] * NCELL).astype(np.int64) - 1
             if np.all(a == b):
@@ -122,6 +124,7 @@ class Solver:
     def __init__(self, prob, cap_fine=16384, cap_amb=1 << 16, max_depth=160, max_fine=48, delta_floor=2.0 ** -49, rcap=256,
                  mode="tree"):
         self.mode = mode; self.prepass = 3; self.fine_sample = 1 << 30; self.sentinel_min = 0; self.multires = True
+        self.stuck_splits = False        # pencil splits of stalled nodes: off (exploded on 000043_w02_s1; see XLF_RESULTS)
         if self.multires:
             self.prepass = 0
         self.p = prob; self.rcap = rcap; self.progress = 0; self.cap_fine = cap_fine; self.cap_amb = cap_amb; self.max_depth = max_depth
@@ -164,8 +167,10 @@ class Solver:
             if st == PY.EMPTY or a[7][s] == 0:
                 self.leaves.append((nid, "EMPTY", None)); self.sl.put(s); self.stats["empty"] += 1
                 continue
-            out.append(Node(s, rows, node.depth + 1, (box_lo[side], box_hi[side]) if box_lo is not None else None,
-                            node.fine, nid, node.cell))
+            ch = Node(s, rows, node.depth + 1, (box_lo[side], box_hi[side]) if box_lo is not None else None,
+                      node.fine, nid, node.cell)
+            ch.used = node.used; ch.inside = node.inside; ch.stuck = node.stuck
+            out.append(ch)
         self.sl.put(node.slot)
         return out
 
@@ -236,8 +241,17 @@ class Solver:
             bmark = np.zeros(nbk ** 3, np.int64)
         code, namb = PR.scan_tree(Vm, Vr, nv, node.rows, len(node.rows), p.lb, p.pyr, p.poff, p.q, p.cls, p.o, p.N, p.L,
                                   comps, nc, p.RM, p.RR, p.K, p.ADJ, self.amb, self.cap_amb, bmark, self.wit, self.rcap,
-                                  *prep, 0, self.cnt)
+                                  *prep, 0, self.cnt, self.cap_fine if (node.stuck and self.stuck_splits) else (1 << 62))
         self.stats["starts"] = self.stats.get("starts", 0) + len(node.rows)
+        if code == PR.SC_MANY:
+            # stalled node: the full ambiguous set is not needed to split it again by a pencil plane
+            self.stats["scan_s"] += time.perf_counter() - t0; self.stats["many"] = self.stats.get("many", 0) + 1
+            if node.depth >= self.max_depth:
+                return self._undet(node, "depth_many")
+            kids = self._stuck_split(node, node.rows, comps, namb)
+            if kids is not None:
+                return kids
+            return self._bisect(node, lo, hi, node.rows)
         if code == PR.SC_MANY:
             self.stats["scan_s"] += time.perf_counter() - t0; self.stats["many"] = self.stats.get("many", 0) + 1
             if node.depth >= self.max_depth:
@@ -261,7 +275,7 @@ class Solver:
             sp = self._solid_split(node, lo, hi, nst)
             if sp is not None:
                 return sp
-            if node.depth > 12 and namb > 0.7 * node.npar:
+            if self.stuck_splits and node.depth > 12 and namb > 0.7 * node.npar:
                 # bisection no longer shrinks the ambiguity (node close to an occluder edge or vertex, where the
                 # relevant coordinate is the pencil angle about the edge): split by a central pencil plane of an
                 # ambiguous receiver instead
@@ -494,9 +508,10 @@ class Solver:
 
     def _solid_split(self, node, lo, hi, nrows):
         """A node straddling an occluder's boundary keeps every receiver ambiguous at every scale (part of it is inside
-        the solid). OUT_SOLID if proven inside a component (all facets <= 0 at every vertex: node subset of closed
-        K_c, outside D); otherwise split by the most central straddling facet plane (binary64 rounding + delta slab:
-        the slab is UNDET, its volume tiny). None if the node straddles no component."""
+        the solid). OUT_SOLID if proven inside a component: every facet is either <= 0 at every vertex (rigorous range)
+        or holds by construction (the node lies in {A <= 0} for a split plane A with {A <= 0} subset {f_i < 0} on the
+        unit cube, see _plane_pair). Otherwise split by the most central straddling facet plane not used before on
+        this path (binary64 rounding + delta slab; the slab is processed as a node). None if nothing to do."""
         p = self.p
         Vm, Vr, nv = self._verts(node.slot)
         best = None
@@ -505,20 +520,23 @@ class Solver:
                 continue
             outside = False; inside = True; cand = None
             for i in range(int(p.K[c])):
+                if (c, i) in node.inside:
+                    continue
                 l, h = PR.range_on(p.RM[c, i], p.RR[c, i], Vm, Vr, nv)
                 if l > 0.0:
                     outside = True
                     break
                 if h > 0.0:
                     inside = False
-                    if l < 0.0:
+                    if l < 0.0 and (c, i) not in node.used:
                         sc = min(h, -l)
                         if cand is None or sc > cand[0]:
                             cand = (sc, c, i)
             if outside:
                 continue
             if inside:
-                self._leaf(node, "OUT_SOLID", (c,)); self.stats["out_solid"] = self.stats.get("out_solid", 0) + 1
+                by = [(int(i), int(a)) for (cc, i), a in node.inside.items() if cc == c]
+                self._leaf(node, "OUT_SOLID", (c, by)); self.stats["out_solid"] = self.stats.get("out_solid", 0) + 1
                 return []
             if cand is not None and (best is None or cand[0] > best[0]):
                 best = cand
@@ -527,16 +545,17 @@ class Solver:
         _, c, i = best
         self.stats["solid_split"] = self.stats.get("solid_split", 0) + 1
         A, B = self._plane_pair(p.RM[c, i].copy(), p.RR[c, i].copy())
+        used = node.used | {(c, i)}
         out = []
         for ch in self._split(node, A, rows=nrows):
-            if self.bsp_ref[ch.nid] == 2 * A:                  # {A <= 0}: inner side of the facet
+            ch.used = used
+            if self.bsp_ref[ch.nid] == 2 * A:                  # {A <= 0}: inside facet i by construction
+                ch.inside = dict(node.inside); ch.inside[(c, i)] = A
                 out.append(ch)
                 continue
             for g in self._split(ch, B, rows=nrows):
-                if self.bsp_ref[g.nid] == 2 * B:               # slab between the two planes
-                    self._undet(g, "solid_slab")
-                else:
-                    out.append(g)
+                g.used = used
+                out.append(g)                                  # outer piece and slab are processed as nodes
         return out
 
     # ------------------------------------------------------------------ coarse: bisection
@@ -637,7 +656,7 @@ class Solver:
                 self.stats["stuck_split"] = self.stats.get("stuck_split", 0) + 1
                 kids = self._pencil_split(node, (X, Y, t, self.hs_m[:nh].copy(), self.hs_r[:nh].copy()), nrows)
                 for ch in kids:
-                    ch.npar = namb
+                    ch.npar = namb; ch.stuck = True
                 return kids
         return None
 
@@ -753,9 +772,10 @@ class Solver:
         for nid, kind, data in self.leaves:
             kinds.append(kind); nodes.append(nid)
             wits.append(list(data)[:4] if kind == "OUT" else ([int(data[0]), 0, 0, 0] if kind == "OUT_SOLID" else [0, 0, 0, 0]))
+        solid_by = {int(nid): data[1] for nid, kind, data in self.leaves if kind == "OUT_SOLID"}
         return dict(PL=self.PLs.PL[:self.PLs.n].copy(), parent=np.array(self.bsp_parent, np.int64),
                     ref=np.array(self.bsp_ref, np.int64), leaf_kind=np.array(kinds), leaf_node=np.array(nodes, np.int64),
-                    leaf_wit=np.array(wits, np.int64).reshape(-1, 4), root_axes=self.root_axes)
+                    leaf_wit=np.array(wits, np.int64).reshape(-1, 4), root_axes=self.root_axes, solid_by=solid_by)
 
     # ------------------------------------------------------------------ result
     def result(self):

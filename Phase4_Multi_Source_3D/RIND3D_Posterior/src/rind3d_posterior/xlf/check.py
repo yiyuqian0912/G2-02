@@ -66,8 +66,16 @@ def check(prob, cert, rcap=1 << 20):
                 if code != PR.SC_OUT:
                     bad.append((nid, f"OUT witness {lwit[k][:3].tolist()} not re-proven"))
             elif kd == "OUT_SOLID":
-                c = int(lwit[k][0])
-                if not all(PR.range_on(p.RM[c, i], p.RR[c, i], Vm, Vr, nv)[1] <= 0.0 for i in range(int(p.K[c]))):
+                c = int(lwit[k][0]); by = dict(cert.get("solid_by", {}).get(nid, []))
+                ok = True
+                for i in range(int(p.K[c])):
+                    if PR.range_on(p.RM[c, i], p.RR[c, i], Vm, Vr, nv)[1] <= 0.0:
+                        continue
+                    a = by.get(i)                     # by construction: node in {A <= 0} and {A <= 0} in {f_i < 0}
+                    if a is None or not _inner_plane_ok(p, PL, A, s, a, c, i):
+                        ok = False
+                        break
+                if not ok:
                     bad.append((nid, "OUT_SOLID leaf not inside its component"))
             elif kd == "OUT_WINDOW":
                 if not _inside_window(p, PL, A, s):
@@ -104,6 +112,19 @@ def check(prob, cert, rcap=1 << 20):
     return dict(ok=not bad, failures=bad[:20], n_fail=len(bad), checked=nchk, tv=float(b) if b is not None else None,
                 Lt=float(np.sum(lo)), Ht=float(np.sum(hi) + pool), cells=int(np.sum(lo > 0)), seconds=time.perf_counter() - t0,
                 cert_cells=cells, cert_lo=lo, cert_hi=hi, pool=pool)
+
+
+def _inner_plane_ok(p, PL, A, s, a, c, i):
+    """Plane a has {a <= 0} subset {f_i < 0} on the unit cube (a = f_i / sc shifted by more than the coefficient
+    error E, as built by Solver._plane_pair), and the polytope in slot s lies in {a <= 0} (exact side test)."""
+    cm = p.RM[c, i]; cr = p.RR[c, i]; sc = float(np.max(np.abs(cm)))
+    h = cm / sc
+    if not np.all(PL[a, :3] == h[:3]):
+        return False
+    E = float(np.sum(np.abs(cm - sc * h) + cr)) * (1 + 2 ** -40) / sc
+    if not (PL[a, 3] - h[3] > E * (1 + 2 ** -30)):
+        return False
+    return _side(PL, A, s, a) == -1
 
 
 def _side(PL, A, s, pid):
