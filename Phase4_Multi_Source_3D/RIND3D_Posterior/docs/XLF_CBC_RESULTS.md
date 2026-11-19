@@ -53,7 +53,16 @@ By window size, v2.4 at 20 s: L64 28/30, L128 25/30, L256 26/30.
 Exact rational sample points are taken from every credited IN piece; each must be legal and reproduce every FREE
 receiver (exact oracle). Points discarded by each transition kind are sampled the same way; none may be feasible.
 
-PENDING: L64/L128 audit of v2.4 in progress (first 3 tasks: 87 IN checks, 62 discarded points, 0 violations).
+**v2.4, 7 tasks (L64/L128) so far:**
+
+* 126 exact points in IN pieces, all exactly feasible.
+* 150 exact discarded points, all infeasible:
+  * 78 discarded by pair conditioning;
+  * 60 discarded by exact cuts;
+  * 12 discarded by screens (contradictions and clearance settlement).
+* 0 violations; 57 receivers needed the exact fallback of the float filter.
+
+The full run was paused to keep timing runs clean. It will resume with a cap of 12 IN pieces per task.
 
 ## 4. Cost
 
@@ -82,5 +91,20 @@ v2.4) certifies 2 more of 5 such tasks at 20 s and reduces the bound of two othe
 
 ## 6. Representative workload: release canary (production contract v3)
 
-PENDING: 72 FastLabel-labelled channels sampled from the 36-scene release canary (24 per L, all families; seed
-20261118), CBC at a 16 s budget, consistency against the production FastLabel labels.
+72 FastLabel-labelled channels were sampled from the 36-scene release canary: 24 per L, all 9 families, seed
+20261118. Of the FastLabel labels, 48 are `certified_stat` and 24 `certified`. CBC (commit `73bc0ad`) ran with a 16 s
+budget, while two other 4–6 job runs shared the machine, so walls are inflated.
+
+| L | certified | wall median / p90 |
+|---|---|---|
+| 64 | 23/24 | 7.4 / 18.0 s |
+| 128 | 20/24 | 5.5 / 21.0 s |
+| 256 | 22/24 | 12.3 / 17.3 s |
+| **all** | **65/72 (90%)** | |
+
+* By family:
+  * convex polyhedra 3/3, corridors 7/7, prisms 4/4, rotated boxes 11/11;
+  * barriers 8/9, occluder clusters 8/9, thin slabs 11/12, wedges 9/10;
+  * multiscale 4/7.
+* **0 inconsistent with the production labels.** TV(p_CBC, q_FastLabel) has median 6.8e-4 and maximum 0.0444.
+* On the 24 channels where FastLabel's label is deterministic (`certified`), the CBC output is identical (TV 0).

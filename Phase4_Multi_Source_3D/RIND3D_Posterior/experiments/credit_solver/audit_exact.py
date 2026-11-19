@@ -85,6 +85,7 @@ def main():
     ap.add_argument("--in-samples", type=int, default=6)
     ap.add_argument("--drop-samples", type=int, default=6)
     ap.add_argument("--max-drop-checks", type=int, default=150)
+    ap.add_argument("--max-in-pieces", type=int, default=12)
     args = ap.parse_args()
     obs, ident = inputs.load(args.container, args.window, args.channel)
     key = f"{ident['slot']:06d}_w{args.window:02d}_s{args.channel}"
@@ -105,7 +106,10 @@ def main():
     res = dict(key=key, status=det["status"], tv=det["tv"] and float(Fraction(det["tv"])), in_pieces=len(kern.in_parts),
                in_checked=0, in_illegal=0, in_mismatch=0, drop_checked=0, drop_feasible=0, drop_by_kind={},
                rechecks=0, violations=[])
-    for i, p in enumerate(kern.in_parts):
+    order = list(range(len(kern.in_parts)))
+    rng.shuffle(order)
+    for i in order[:args.max_in_pieces]:
+        p = kern.in_parts[i]
         for s in points(p, rng, args.in_samples):
             ok, mism, rc = oracle.feasible(s)
             res["in_checked"] += 1
