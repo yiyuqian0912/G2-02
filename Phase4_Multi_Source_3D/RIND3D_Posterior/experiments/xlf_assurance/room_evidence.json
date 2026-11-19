@@ -1,0 +1,17 @@
+{
+  "status": "CERTIFIED",
+  "inner_region": "IN",
+  "upper": "0",
+  "decoded": {
+    "1056832": "1"
+  },
+  "positive_lower": "1/2251799813685248",
+  "point_proposals": 608,
+  "receivers": 262144,
+  "active": 21,
+  "inactive_free": 262046,
+  "solid": 77,
+  "direct_free_interface_edges_inside_room": 15,
+  "observation_sha256": "3cc2769f6b6dbb089ff0f1ba506a63116b3dacc7588673c397082f81519dbb74",
+  "solve_seconds": 0.25781666099828726
+}

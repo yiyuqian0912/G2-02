@@ -1,0 +1,65 @@
+# Correct-by-construction XLF
+
+**PROVEN in the abstract transition system.** The solver can omit a second physical pass if its only way to earn volume is through sound, disjoint, in-domain transitions. **TESTED ONLY in executable code.** A small reference realizes this protocol for exact rational boxes and a restricted physical input. The optimized XLF renderer and polyhedral volume implementation have not been proved by this experiment. [Theorem and definitions](XLF_PROOF_FOUNDATIONS.md) · [Executable reference](../experiments/xlf_assurance/ledger.py)
+
+## State and ownership
+
+The trusted input is one immutable problem identity containing the canonical geometry, origin, resolution, axis and bit ordering, closed window, complete source-specific FREE observations, source-domain policy and output-grid measure. One kernel instance owns its root Ω. Every live region has a unique token scoped to this instance, with its defining halfspaces (or a sound representation) and its outstanding receiver obligations. The scheduler can propose a token, plane, early contradiction, separator or receiver cover. It cannot supply the truth value that earns a credit.
+
+Conceptually Ω has disjoint feasible, infeasible and unresolved pieces up to null faces. Implementation can use **default unresolved volume**. Each output cell already has a known capacity k. Subtract only a proven lower credit for infeasible volume from k to obtain an upper bound; add only proven lower credits for feasible volume to obtain a lower bound. A piece forgotten by the search is still charged in k. Stopping early never creates a more optimistic certificate by dropping the remaining queue. Completeness of a proof-search traversal is unnecessary. Prevention of **overlap between same-kind credits** is essential. Two proof tokens for the identical source volume are not two credits.
+
+## Trusted transitions and preservation
+
+| Operation | Kernel action and preservation argument |
+|---|---|
+| Start | Derive the root and grid from the versioned contract. Set all credits to zero. The lower-bound inequalities hold for every cell. |
+| Propose or defer | Modify only search priority or compute scratch data. No change to evidence. A lost queue hint can delay the search without reducing remaining possible mass. |
+| Split | Consume one live token once. Construct both complementary halves from the same parent and nonconstant signed plane. Create two fresh tokens with explicit boundary ownership or a proved null overlap. A child inherits only obligations already proved over its entire parent. Commit both tokens and retire the parent atomically. A failed clip retains the parent unresolved. If an acceleration constructs **inner** children only, explicitly leave the rest uncredited and prevent any overlapping later credits. |
+| Prove a receiver obligation | Check the exact identities of region, blockers, receiver set, observed class and scope. A block proof covers every relevant receiver in its indicated subset. Scans on descendants can reuse this fact by containment. An empty residual set is valid only if it was obtained by covering the original complete indexed receiver set. Samples can suggest witnesses; agreement on sampled points cannot remove unseen receiver obligations. |
+| Settle IN | Require legality and agreement for every FREE receiver, almost everywhere in the region under an explicit null-face convention. Intersect with certified output cells. Credit only a lower bound on each corresponding volume. Consume the token once. Disjointness and inclusion in F prove additivity of the credits. |
+| Settle OUT | Prove illegality throughout, or one in-domain observed receiver contradicted everywhere, or another validated necessary condition excluding the whole piece. Credit its lower volume as infeasible. A failure of a sufficient clearance, shadow or separation test yields unresolved. |
+| Settle partially | Certify only disjoint subpieces or retain less volume than proved. The balance remains possible. No plane tolerance, queue capacity or overflow status can be converted into physical evidence. |
+| Snapshot | Read one consistent generation of the ledger; compute a bound and threshold using exact or outward-enclosed arithmetic. Publish only the bytes bound to that result. Abstention may expose research diagnostics separately. |
+
+**Induction.** At initialization the credits are valid. Split replaces one region by pieces with disjoint interiors and no duplicate authority to spend its parent volume. Deferral, proposals and receiver proofs change no credits. For settlement, each new credit is below the volume of a proven subset disjoint from previously credited subsets of that kind. Summing inside each cell preserves both inequalities of the global theorem. An unvisited region, a discarded tentative computation and a deliberately uncredited remainder are all covered by the initial capacity. Therefore every committed prefix of the execution satisfies the theorem. Recovery may use a previous intact prefix; combining its parent credits with children from a later generation would break the induction. Stale handles, duplicate settlements, cross-scene tokens and old snapshots must be rejected at the authority boundary.
+
+This proof discharges the old missing-child case for a stronger reason than structural replay. Even if one sibling is never evaluated or never put back on the work queue, no OUT credit was earned there. Its possible mass remains present. Conversely, simply checking that the sum of reported leaf volumes equals one is insufficient: duplicate one piece and omit another of equal volume and the global scalar sum still passes.
+
+## Two practical ways of bounding mass
+
+**Complement accounting** gives per-cell upper k−oᵢ and global upper 1−Σoᵢ. For an output cell i, the outside upper used by the theorem is (1−k)−(Σoⱼ−oᵢ). Compute these differences in exact credit units, or with the correct directed bounds including correlations. OUT credits that span many cells can be retained as certified geometric pieces with additive volume; the reference computes their intersections only for emitted cells. **OPEN for performance:** rescanning all OUT pieces for each supported cell costs O(number of OUT pieces × support). A production implementation should batch at settlement, use exact dyadic range updates for boxes, or use the existing per-cell integration if cheaper. A lower bound for one whole OUT piece alone cannot be prorated among its cells.
+
+**Frontier accounting** fits the current BSP more closely. Each unresolved region owns an upper allowance. After both children and their allowances are available, atomically replace its allowance; conservative overlapping upper allowances may lose sharpness but never cover a missing volume with zero. IN fragments contribute lower and upper mass and every unresolved fragment retains an upper, possibly in an unassigned pool. Cover identity is mandatory for this route. Cell-local bounds or pooled upper mass can be combined with complement accounting by taking the smaller of two *independently valid* upper bounds for the same quantity. If the complement route is too loose, retain the existing tighter TV functional after justifying its inputs and wire-rounding step.
+
+The complement variant has a real numerical cost. For a feasible volume around 10⁻¹⁸, even a 10⁻¹⁶ total underestimate of rejected volume can dominate the posterior tolerance. Exact integer accumulation avoids summation loss but cannot restore slack already present in each fragment's enclosure. Tight local frontier bounds may be essential for these tasks. As an illustration, a fixed 2⁻¹⁶⁰ volume unit rounded down once for each of 10⁶ fragments loses less than 10⁶·2⁻¹⁶⁰ in the aggregate, **in addition to** upstream geometric enclosure errors. This is an arithmetic example, not an empirical performance forecast.
+
+## From credits to bytes
+
+The reference proposes a distribution proportional to l over cells with positive credits. It apportions 2⁵² integer ticks by exact quotas: take floors, then add one tick to the cells with the largest remainders until all ticks are assigned, breaking ties by cell ID. The sum is exactly 2⁵². Each nonzero tick count divided by 2⁵² is exactly representable as binary64. Each probability differs from its ideal quota by less than one tick (zero if the quota is integral). With m supported cells the encoding-only TV against the ideal distribution is at most m/2⁵³. The final certificate uses the **actual decoded probabilities**, so even tiny cells that round to zero are accounted for. This preserves the possibility of using the current float64-array schema. The reference uses a separate little-endian record stream solely for testing.
+
+Reject duplicate, unsorted or out-of-grid IDs, mismatched lengths, nonfinite, negative or non-normalized probabilities, and inconsistent schema or problem identity. Implicit cells have probability zero. Recompute the bound on the emitted payload (or on bytes proved identical to it). Compare exact error to the exact tolerance. If recording binary64 ε, round it upward and require the **stored** ε to meet the declared threshold, or publish its exact rational value. Bind checked bytes and problem identity to a versioned manifest and publish atomically. A hash detects later mutation under an integrity assumption; it supplies no geometric proof. The reference returns an in-memory pair of immutable bytes and an exact Fraction bound. Persistent scientific artifact identity, transactions and crash recovery are production obligations.
+
+## Executable scope and reproduction
+
+### A complete restricted physical example
+
+In voxel coordinates the solid shell is the closed outer cube [513,519]³ minus the open cavity (514,518)³, exactly representable by six closed boxes. A seventh closed box inside casts a shadow. The 64³ window at (516,512,512) intersects the cavity. The source domain remains the entire legal world; the example imposes no cavity prior.
+
+The solver reads the observations and validates the entire exterior as shadowed FREE or the correct SOLID class. It finds an active receiver inside the cavity. Every ray from outside the cavity to that receiver must cross a wall; thus all six pieces of world outside posterior cell (64,64,64) can be credited OUT. A bounded search using the observations suggests a small rational source box inside the cavity and outside the window. Exact inverse-shadow inequalities then establish all interior FREE responses for the entire box, including the shadows of the post. The boundary-crossing theorem covers the exterior receivers. Strict clearance and source exclusion hold throughout the witness box. The positive credited volume is 2⁻⁵¹. The rest of the cavity can remain unresolved. As no mass is possible outside the one cell, its decoded probability is exactly one and TV is exactly zero.
+
+The window contained 21 active, 262,046 inactive FREE and 77 SOLID receivers, with 15 direct FREE interfaces inside the room. No hidden source was an argument to the solver. Finalization required no further physical predicate calls. The test suite separately checks the shell as six literal boxes with an independent exact segment clipper on selected receivers. The closed-shell shortcut is proved for this fixed construction; no general cavity detector or claim about how often these rooms occur is implied. [Restricted solver](../experiments/xlf_assurance/room.py) · [Artifact and counts](../experiments/xlf_assurance/room_evidence.json)
+
+### Running the three checks
+
+From the posterior project directory run
+
+```sh
+cd experiments/xlf_assurance
+python3 -B -m unittest -v test_assurance
+python3 -B experiment.py
+python3 -B room.py
+```
+
+The reference uses exact boxes, axis-plane splits and a classifier fixed by the trusted caller. The physical test uses rational halfspace elimination on a complete small window of an axis-box world. The API's exactness claim assumes the chosen classifier and standard Python arithmetic are sound. Synthetic feasible sets exercise schedules for which an independent exact posterior is known. This is a single-owner semantic model; Python private attributes do not enforce hostile-code isolation. Published geometry, the production archive and XLF's hot loop are separate from this experiment.
+
+**TESTED ONLY.** Exercised scenarios include 56 combinations of truth and visited cells, 500 exact point comparisons against a separate closed-segment clipper, a two-blocker midpoint counterexample, strict clearance equality, a stale parent, a failed predicate, an unanswered sibling, a valid but altered payload, malformed payloads and zero TV with unresolved volume inside one grid cell. The thick-box interface regression uses a complete 2³ window on the 1024 lattice. The earlier 64³ example used the same geometry. The restricted ledger proves the retained corner legal and feasible, yet returns ABSTAIN at 1/20 because the unvisited siblings remain possible. [Tests](../experiments/xlf_assurance/test_assurance.py) · [Recorded output](../experiments/xlf_assurance/evidence.json)
