@@ -44,6 +44,15 @@ from solver import apply_pair, cone, subtract_many
 from kernel import SCALE, ceil_mass, cell_id, single_cell, wire_bound
 
 COLLECT_CAP = 1 << 21  # largest residual obligation list stored explicitly
+
+try:  # optional exact GMP helper (native/build.sh); CBC_NATIVE=0 forces the Python path
+    import os as _os
+    import sys as _sys
+    from pathlib import Path as _Path
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent / "native"))
+    NATIVE = None if _os.environ.get("CBC_NATIVE") == "0" else __import__("cbc_cells")
+except ImportError:
+    NATIVE = None
 CELL_UNITS = SCALE // (128 ** 3)  # exact volume of one output cell in units of 2^-160
 
 
@@ -440,6 +449,37 @@ class Kernel:
 
     # ---------------------------------------------------------------- accounting
     def _grid_credit(self, parts):
+        if NATIVE is not None:
+            return self._grid_credit_native(parts)
+        return self._grid_credit_python(parts)
+
+    def _grid_credit_native(self, parts):
+        """GMP octree (native/cells.cpp), same algorithm as _grid_credit_python and exactly
+        equal per-cell credits (differential test). Conservation is re-checked here against
+        the independent Python rational volume of each piece."""
+        started = perf_counter()
+        lo, hi = Counter(), Counter()
+        try:
+            for p in parts:
+                self.budget.check()
+                credits, boundary, interior = NATIVE.grid_credit(p.faces, 128, 160)
+                subtotal = 0
+                for cid, low, high in credits:
+                    if low:
+                        lo[cid] += low
+                    hi[cid] += high
+                    subtotal += low
+                total = p.volume * SCALE
+                ok = (subtotal <= total < subtotal + boundary) if boundary else (subtotal == total)
+                if not ok:
+                    raise ArithmeticError("native grid integration failed volume conservation")
+                self.stats["grid_intersections"] += boundary
+                self.stats["cells_interior"] += interior
+            return lo, hi
+        finally:
+            self.stats["integration_seconds"] += perf_counter() - started
+
+    def _grid_credit_python(self, parts):
         """Exact per-cell credits of IN pieces (units 2^-160): floor for lower, ceiling for upper.
 
         Adaptive octree over the piece's cell range. A block whose 8 corners satisfy every

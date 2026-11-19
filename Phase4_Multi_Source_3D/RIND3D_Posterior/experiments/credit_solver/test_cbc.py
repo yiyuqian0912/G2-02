@@ -294,3 +294,32 @@ def test_full_screen_matches_pointwise_reference():
             compared += 1
         checked += 1
     assert checked >= 8 and compared >= 3
+
+
+def test_native_cell_credit_equals_python():
+    """GMP octree credits equal the Python octree exactly (per cell floor/ceil, volume)."""
+    if cbc_kernel.NATIVE is None:
+        pytest.skip("native/cells.cpp not built (run native/build.sh)")
+    from collections import Counter
+    obs, _ = load()
+    parts = []
+    orig = Kernel._grid_credit
+
+    def rec(self, ps):
+        parts.extend(ps)
+        return orig(self, ps)
+    Kernel._grid_credit = rec
+    try:
+        solve(obs, "000030_w01_s0", Fraction(1, 20), 20)
+    finally:
+        Kernel._grid_credit = orig
+    assert parts
+    k = Kernel.__new__(Kernel)
+    k.stats = Counter()
+    k.budget = Budget(600, 10 ** 9)
+    for p in parts:
+        a = k._grid_credit_python([p])
+        b = k._grid_credit_native([p])
+        assert dict(a[0]) == dict(b[0]) and dict(a[1]) == dict(b[1])
+        num, den = cbc_kernel.NATIVE.volume(p.faces)
+        assert Fraction(num, den) == p.volume
