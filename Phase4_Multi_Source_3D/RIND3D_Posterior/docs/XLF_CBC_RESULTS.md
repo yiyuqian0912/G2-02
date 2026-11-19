@@ -106,4 +106,37 @@ none may be feasible.
 * On the 24 channels with deterministic FastLabel labels, the CBC output is identical (TV 0).
 * By family, all channels certify in every family except barriers (8/9).
 
-PENDING: the full canary population (807 FastLabel-labelled channels) at 10 s.
+**Full canary population.** All 807 FastLabel-labelled channels (512 `certified_stat`, 295 `certified`) were run
+with v2.7 at a **10 s** budget, 6 parallel jobs.
+
+| L | certified | wall median / p90 |
+|---|---|---|
+| 64 | 184/202 | 3.3 / 11.0 s |
+| 128 | 226/256 | 2.2 / 11.4 s |
+| 256 | 329/349 | 4.7 / 8.1 s |
+| **all** | **739/807 (91.6%)** | certified runs: median 4.4 s, p90 6.3 s, p99 10.7 s |
+
+* By family:
+
+  | family | certified |
+  |---|---|
+  | convex polyhedra | 62/62 |
+  | prisms | 85/86 |
+  | wedges | 71/73 |
+  | rotated boxes | 106/111 |
+  | thin slabs | 104/116 |
+  | occluder clusters | 96/108 |
+  | barriers | 72/81 |
+  | corridors | 79/91 |
+  | multiscale | 64/79 |
+
+* **0 inconsistent with the production labels.**
+  * TV(p_CBC, q_FastLabel): median 3.6e-4, maximum 0.0585 (`000001_w06_s3`, CBC bound 0.0496, statistical FastLabel
+    label).
+  * On all **295** channels where FastLabel's label is deterministic, the CBC output is identical (TV 0).
+* CBC bounds: median 5.6e-4; 294 of 739 are exactly 0.
+* All 68 uncertified channels are ones where FastLabel had to use its statistical path. They stay INCOMPLETE, with
+  no certificate.
+* A certified bound near the tolerance means a truncated support. Example: 4,120 cells against FastLabel's 5,060 at
+  bound 0.0496. The certificate accounts for the omitted mass.
+
