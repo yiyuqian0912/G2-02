@@ -20,6 +20,11 @@ from validated_input import integer
 import evidence
 
 
+def _adjacent_response(classes, axis):
+    v = np.moveaxis(classes, axis, 0)
+    return bool(np.any((v[:-1] == 0) & (v[1:] == 1)) or np.any((v[:-1] == 1) & (v[1:] == 0)))
+
+
 def load(path, window, channel):
     window, channel = integer(window), integer(channel)
     with np.load(path, allow_pickle=False) as container:
@@ -50,15 +55,21 @@ def load(path, window, channel):
             packed = zstandard.ZstdDecompressor().decompress(blob[start:start+size],max_output_size=width)
             if len(packed) != width:
                 raise ValueError("incorrect crop length")
-            return np.unpackbits(np.frombuffer(packed,np.uint8)).reshape((side,)*3).T
+            return np.unpackbits(np.frombuffer(packed,np.uint8)).reshape((side,)*3)
         geometry = container["geometry"].tobytes()
         cls = bits(channel)
         solid = bits(-1).astype(bool)
         if np.any(cls[solid]):
             raise ValueError("active solid")
         cls[solid] = 2
-    bodies = tuple(tuple(integer_row(r) for r in c.rows)
-                   for c in decode_convex(load_geometry(io.BytesIO(geometry))))
+        # Scan the contiguous storage before exposing the canonical XYZ view.
+        if not any(_adjacent_response(cls, axis) for axis in range(3)):
+            raise ValueError("crop lacks a direct FREE response interface")
+        cls = cls.T
+    bundle = load_geometry(io.BytesIO(geometry))
+    if len(bundle.geometries) != 1:
+        raise ValueError("expected exactly one canonical world geometry")
+    bodies = tuple(tuple(integer_row(r) for r in c.rows) for c in decode_convex(bundle))
     cls.flags.writeable = False
     obs = Observation(bodies,cls,origin,1024)
     identity = evidence.problem(obs)

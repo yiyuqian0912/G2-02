@@ -105,3 +105,43 @@ def test_gmp_boundary_leaf():
         p,_=p.split(tuple(256*int(j==i) for j in range(3))+(-1,))
     assert Q(*native.volume(p.faces))==Q(1,256**3)
     assert native.grid_credit(p.faces,128,160)==([(0,1<<136,1<<136)],1,0)
+
+
+def test_extracted_artifact_and_invalid_receiver_ids(tmp_path):
+    from run import write_result
+    obs, identity = archive()
+    k = cbc_kernel.Kernel(obs,Budget(10,1000))
+    for bad in (-1, 1 << 64, True, Q(1,2), np.inf):
+        with pytest.raises(ValueError):
+            k.enforce(0, [bad])
+    pos = tuple(map(int, np.argwhere(k._obs.cls != 2)[0]))
+    assert k._receiver(list(pos)) == obs.world(pos)
+    payload, d = solve(obs,"000004_w00_s0",Q(1,20),15)
+    path = tmp_path/"posterior.json"
+    write_result(path, identity, Q(1,20), payload, d)
+    result = json.loads(path.read_bytes())
+    assert evidence.check_artifact(result,identity) == decode(payload)
+    for key,value in (("channel",3),("slot",-1),("geometry_sha256","0"*64)):
+        tampered = copy.deepcopy(result)
+        tampered["problem"][key] = value
+        with pytest.raises(ValueError):
+            evidence.check_artifact(tampered,identity)
+        with pytest.raises(ArithmeticError):
+            evidence.check_artifact(tampered,tampered["problem"])
+    d.pop("certificate")
+    with pytest.raises(KeyError):
+        write_result(path, identity, Q(1,20), payload, d)
+    assert json.loads(path.read_bytes()) == result
+
+
+def test_crop_hash_layout_and_interface_eligibility():
+    from hashlib import sha256
+    original = np.arange(17*19*23,dtype=np.uint16).astype(np.uint8).reshape((17,19,23))
+    for arr in (original, original.T, original[::-2,::3,::-1], np.asfortranarray(original)):
+        assert evidence.crop_digest(arr) == sha256(arr.tobytes(order="C")).hexdigest()
+        detached = cbc_kernel._view(arr)
+        assert not np.shares_memory(arr,detached) and np.array_equal(arr,detached)
+    labels = np.array([0,2,1], dtype=np.uint8)[:,None,None]
+    assert not any(inputs._adjacent_response(labels,axis) for axis in range(3))
+    labels[1] = 1
+    assert inputs._adjacent_response(labels,0)

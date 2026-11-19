@@ -25,11 +25,26 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def crop_digest(cls):
+    """Same XYZ byte stream for C/Fortran/strided crops, with bounded transpose storage."""
+    if cls.flags.c_contiguous:
+        return hashlib.sha256(cls).hexdigest()
+    size = cls.shape[0]
+    chunk = np.empty((min(8,size), *cls.shape[1:]), dtype=cls.dtype)
+    h = hashlib.sha256()
+    for x in range(0,size,8):
+        out = chunk[:min(8,size-x)]
+        for z in range(0,cls.shape[2],8):
+            out[:,:,z:z+8] = cls[x:x+8,:,z:z+8]
+        h.update(out)
+    return h.hexdigest()
+
+
 def problem(obs):
     # Hex encodes unbounded integers without CPython's decimal conversion limit.
     rows = [[[hex(v) for v in r] for r in b] for b in obs.bodies]
     return dict(halfspaces_sha256=digest(canonical(rows)), origin=list(obs.origin),
-                side=obs.side, resolution=1024, observation_xyz_sha256=digest(obs.cls.tobytes()))
+                side=obs.side, resolution=1024, observation_xyz_sha256=crop_digest(obs.cls))
 
 
 @lru_cache(maxsize=1)

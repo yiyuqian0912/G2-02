@@ -78,7 +78,7 @@ def _readonly(a, dtype):
 def _view(a):
     if a is None:
         return None
-    v = a.copy()
+    v = a.copy(order="K")
     v.flags.writeable = False
     return v
 

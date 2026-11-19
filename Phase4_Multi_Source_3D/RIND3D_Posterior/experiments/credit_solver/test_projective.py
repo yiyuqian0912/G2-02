@@ -70,3 +70,45 @@ def test_closed_room_cbc():
     wire,d=solve(obs,"room-positive",Q(1,20),30,patch_depth=1)
     assert d["status"]=="CERTIFIED", d
     assert decode(wire)=={(64*128+64)*128+64:Q(1)} and Q(d["tv"])==0
+
+
+def cyclic_hinges():
+    """Exact structural control in affine world units. All coordinates can be rescaled into (0,1)^3."""
+    from interface_chart import extend_rank
+    from poly import Poly, within
+    def rot(v,k):
+        return v[k:]+v[:k]
+    def verts(lo, hi):
+        return [(*v,1) for v in product(*zip(lo,hi))]
+    cube = Poly.cube()
+    lo, hi = (4,2,-1), (6,3,2)
+    bodies = [rows(rot(lo,i),rot(hi,i)) for i in range(3)]
+    piece, volumes, rank, hinges = cube, [], [], []
+    for i in range(3):
+        rec = verts(rot((10,4,0),i),rot((11,11,1),i))
+        kind,hinge = interface_chart(bodies,cube.vertices,rec)
+        assert kind == "pencil" and hinge[0]==i
+        hinges.append(hinge)
+        body,f,b,reverse = hinge
+        assert not reverse
+        front,back = bodies[body][f],bodies[body][b]
+        projected = []
+        for y,label in [(7,0),(8,1)]:
+            r=(*rot((10,y,0),i),1)
+            signed=tuple(form(back,r)*c-form(front,r)*d for c,d in zip(front,back))
+            projected.append(tuple((1 if label==0 else -1)*v for v in signed))
+            for x in product((Q(1,4),Q(1,2),Q(3,4)),repeat=3):
+                hit=any(segment_hits(k,x,r[:3],1) for k in bodies)
+                assert hit == (form(signed,(*x,1))<=0)
+        extend_rank(rank, projected[0][:3])
+        piece=within(piece, projected)
+        volumes.append(piece.volume)
+        assert within(piece,projected).volume == piece.volume
+    extra=rows((4,2,-2),(6,3,2))  # distinct geometry, both explanations remain possible
+    assert interface_chart([bodies[0],extra],cube.vertices,verts((10,4,0),(11,11,1)))[0]=="unknown"
+    return volumes,len(rank)
+
+
+def test_separate_and_redundant_projective_constraints():
+    volumes,rank=cyclic_hinges()
+    assert 0<volumes[2]<volumes[1]<volumes[0]<1 and rank==3
