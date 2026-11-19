@@ -96,10 +96,10 @@ def main():
         def __init__(self, *a, **k):
             super().__init__(*a, **k)
             holder["k"] = self
-    cbc_search.Kernel = K
+    cbc_kernel.Kernel = K  # the trusted driver cbc_kernel.certify constructs the kernel
     t0 = perf_counter()
     payload, det = cbc_search.solve(obs, key, Fraction(1, 20), args.seconds)
-    cbc_search.Kernel = orig
+    cbc_kernel.Kernel = orig
     kern = holder["k"]
     oracle = Oracle(obs.bodies, obs.cls, obs.origin)
     rng = random.Random(7)

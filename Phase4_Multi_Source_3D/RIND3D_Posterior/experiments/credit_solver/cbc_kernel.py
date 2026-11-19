@@ -25,11 +25,22 @@ Transitions
                             some pending             -> pending := ambiguous ones  (I4)
   enforce(h, receivers)   exact cone cuts; children's pending excludes them          (I1),(I4)
   snapshot()              payload + exact upper TV bound on the decoded payload
+  release(tolerance)      the kernel's own CERTIFIED / INCOMPLETE / ERROR decision
+
+Release discipline: the kernel records every (payload, bound) it computes and only
+release() turns the best of them into a CERTIFIED result; the search never decides a
+status. Any ArithmeticError inside a transition (a failed exactness guard, a structural
+check, an overflow) taints the kernel: no further transitions, release() returns ERROR.
+Arrays stored in pieces are read-only and the search receives read-only views and
+polytope copies, so a (buggy, non-malicious) search cannot alter kernel evidence.
 """
+import copy
 from collections import Counter
 from dataclasses import dataclass
 from fractions import Fraction
+from functools import wraps
 from time import perf_counter
+import weakref
 
 import numpy as np
 
@@ -40,8 +51,9 @@ from poly import Poly, form, grid_pieces, primitive
 from raster import encoded
 from screen2 import check_ranges, scan_collect, scan_ids
 from poly import within
-from solver import apply_pair, cone, subtract_many
+from solver import Budget, Limit, apply_pair, cone, subtract_many
 from kernel import SCALE, ceil_mass, cell_id, single_cell, wire_bound
+import polycheck
 
 COLLECT_CAP = 1 << 21  # largest residual obligation list stored explicitly
 
@@ -54,6 +66,45 @@ try:  # optional exact GMP helper (native/build.sh); CBC_NATIVE=0 forces the Pyt
 except ImportError:
     NATIVE = None
 CELL_UNITS = SCALE // (128 ** 3)  # exact volume of one output cell in units of 2^-160
+CHECK_LIVE = True  # structural certificate (polycheck) for every live piece charged in a snapshot
+
+
+def _readonly(a, dtype):
+    """Kernel-owned copy that nobody can write through."""
+    out = np.array(a, dtype=dtype, copy=True)
+    out.flags.writeable = False
+    return out
+
+
+def _view(a):
+    if a is None:
+        return None
+    v = a.view()
+    v.flags.writeable = False
+    return v
+
+
+@dataclass(frozen=True)
+class Release:
+    status: str          # CERTIFIED, INCOMPLETE or ERROR
+    payload: object      # bytes iff CERTIFIED
+    bound: object        # Fraction: exact upper TV bound of payload (best recorded), or None
+    tolerance: Fraction
+    reason: str
+
+
+def _transition(fn):
+    """Refuse work after a failed guard; taint the kernel on any ArithmeticError."""
+    @wraps(fn)
+    def run(self, *args, **kwargs):
+        if self._tainted is not None:
+            raise RuntimeError("kernel tainted by a failed guard: " + self._tainted)
+        try:
+            return fn(self, *args, **kwargs)
+        except ArithmeticError as exc:
+            self._tainted = f"{fn.__name__}: {type(exc).__name__}: {exc}"
+            raise
+    return run
 
 
 def cell_box_rows(i, j, k, n=128):
@@ -107,6 +158,8 @@ def encoded_subset(obs, p, bodies):
     rows, offsets = [], [0]
     if getattr(obs, "use_support", False) and not hasattr(obs, "obstacles"):
         obs.obstacles = [within(Poly.cube(), b) for b in obs.bodies]
+        if any(k is None for k in obs.obstacles):
+            raise ValueError("expected full-dimensional body in world")
     for j in bodies:
         b = obs.bodies[j]
         e = Envelope(b, p.vertices)
@@ -186,6 +239,9 @@ class Kernel:
         # (penumbra.directions: float proposals, exact integer validation; see design doc).
         self.obs.use_support = True
         self._origin = np.asarray(self.obs.origin, np.int64)
+        self._tainted = None
+        self._best = None  # (bound, payload) with the smallest bound computed so far
+        self._checked = weakref.WeakSet()  # polytopes that passed polycheck.check
 
     # ---------------------------------------------------------------- read-only views
     def handles(self):
@@ -206,8 +262,8 @@ class Kernel:
         return None if p.pending is None else len(p.pending)
 
     def poly(self, h):
-        """The polytope (immutable). Exposed for proposal heuristics only."""
-        return self._state.live[h].poly
+        """A copy of the polytope, for proposal heuristics only (the kernel keeps its own)."""
+        return copy.copy(self._state.live[h].poly)
 
     def contact(self, h):
         """Hint: does a vertex of the piece lie in a closed obstacle? (search hint, untrusted use)"""
@@ -254,6 +310,7 @@ class Kernel:
         return (x, y, z)
 
     # ---------------------------------------------------------------- transitions
+    @_transition
     def exclude_window(self):
         """Drop the closed window box and every closed obstacle from all live pieces.
 
@@ -271,6 +328,7 @@ class Kernel:
             self.budget.check(len(children))
         self._commit(self.handles(), children, exclude=True)
 
+    @_transition
     def condition_pair(self, dark, lit):
         t_pair = perf_counter()
         d, a = self._receiver(dark, 0), self._receiver(lit, 1)
@@ -285,6 +343,7 @@ class Kernel:
         self.stats["pairs"] += 1
         self.stats["pair_seconds"] += perf_counter() - t_pair
 
+    @_transition
     def split(self, h, row):
         """Any integer affine row. Both closed halves stay live; null overlap on the plane."""
         if len(row) != 4 or not all(type(v) is int for v in row) or not any(row[:3]):
@@ -299,6 +358,7 @@ class Kernel:
         return self._commit((h,), [Piece(neg, piece.pending, piece.done, piece.deferred, piece.masks),
                                     Piece(pos, piece.pending, piece.done, piece.deferred, piece.masks)])
 
+    @_transition
     def screen(self, h):
         """Classify pending receivers on the piece. Returns a dict; the piece may be consumed."""
         if not self._state.outside_window:
@@ -343,10 +403,10 @@ class Kernel:
             return dict(outcome="open", handle=h, ambiguous=n, ids=None, wrong=None, boundary=None)
         if rel is not None:
             masks = remap_masks(masks, rel)
-        new = self._commit((h,), [Piece(p, np.ascontiguousarray(ids), frozenset(), False,
-                                        np.ascontiguousarray(masks))])[0]
-        return dict(outcome="open", handle=new, ambiguous=n, ids=ids, wrong=wrong, boundary=bnd,
-                    masks=masks)  # masks: read-only hint copy for the search
+        ids, masks = _readonly(ids, np.int64), _readonly(masks, np.uint64)
+        new = self._commit((h,), [Piece(p, ids, frozenset(), False, masks)])[0]
+        return dict(outcome="open", handle=new, ambiguous=n, ids=_view(ids), wrong=wrong, boundary=bnd,
+                    masks=_view(masks))  # read-only views: hints for the search
 
     def _settle(self, h, piece):
         p = piece.poly
@@ -354,15 +414,18 @@ class Kernel:
             legal, shell = [p], []
         else:
             legal, shell = clearance_partition(self.obs, p, self.budget)
+        empty = _readonly(np.zeros(0), np.int64)
         if not legal and len(shell) == 1 and shell[0] is p:
-            new = self._commit((h,), [Piece(p, np.zeros(0, np.int64), frozenset(), True)])
+            new = self._commit((h,), [Piece(p, empty, frozenset(), True)])
             return dict(outcome="shell", handle=new[0])
+        for q in legal:
+            self._certify_structure(q)  # the credit below is exact only for a valid face structure
         lo, hi = self._grid_credit(legal)
-        empty = np.zeros(0, np.int64)
         self._commit((h,), [Piece(q, empty, frozenset(), True) for q in shell], lo, hi)
         self.stats["whole_in"] += len(legal)
         return dict(outcome="in", legal=len(legal), shell=len(shell))
 
+    @_transition
     def enforce(self, h, receiver_ids):
         """Exact inverse-cone cuts for the given FREE receivers (any order, any subset)."""
         piece = self._state.live[h]
@@ -391,8 +454,8 @@ class Kernel:
             ok = pos < len(piece.pending)
             pos, drop = pos[ok], drop[ok]
             pos = pos[piece.pending[pos] == drop]
-            rest = np.delete(piece.pending, pos)
-            rmask = None if piece.masks is None else np.delete(piece.masks, pos)
+            rest = _readonly(np.delete(piece.pending, pos), np.int64)
+            rmask = None if piece.masks is None else _readonly(np.delete(piece.masks, pos), np.uint64)
             children = [Piece(q, rest, frozenset(), False, rmask) for q in parts]
         self.stats["receiver_cuts"] += len(sel)
         self.stats["cuts_no_change" if same else "cuts_changed"] += 1
@@ -544,6 +607,15 @@ class Kernel:
         finally:
             self.stats["integration_seconds"] += perf_counter() - started
 
+    @_transition
+    def _certify_structure(self, q):
+        if q not in self._checked:
+            t = perf_counter()
+            polycheck.check(q)  # raises ArithmeticError (taints the kernel) on failure
+            self._checked.add(q)
+            self.stats["structure_checks"] += 1
+            self.stats["structure_seconds"] += perf_counter() - t
+
     def snapshot(self):
         state = self._state
         if not state.lower:
@@ -551,13 +623,35 @@ class Kernel:
         unknown_total = 0
         unknown_in = Counter()
         for piece in state.live.values():
+            if CHECK_LIVE:
+                self._certify_structure(piece.poly)  # its charge ceil(vol) is exact only then
             amount = ceil_mass(piece.poly)
             unknown_total += amount
             cid = single_cell(piece.poly)
             if cid is not None:
                 unknown_in[cid] += amount
         payload = encode_int(state.lower)
-        return payload, wire_bound(payload, state.lower, state.upper_in, unknown_total, unknown_in)
+        bound = wire_bound(payload, state.lower, state.upper_in, unknown_total, unknown_in)
+        if self._best is None or bound < self._best[0]:
+            self._best = (bound, payload)
+        return payload, bound
+
+    def release(self, tolerance):
+        """The only source of a CERTIFIED status: the best bound the kernel itself computed."""
+        if type(tolerance) is not Fraction or not 0 <= tolerance <= 1:
+            raise ValueError("exact tolerance in [0, 1] required")
+        if self._tainted is not None:
+            return Release("ERROR", None, None, tolerance, self._tainted)
+        try:
+            self.snapshot()  # the final state is a valid checkpoint too
+        except ArithmeticError:
+            return Release("ERROR", None, None, tolerance, self._tainted)
+        if self._best is None:
+            return Release("INCOMPLETE", None, None, tolerance, "no positive feasible mass")
+        bound, payload = self._best
+        if bound <= tolerance:
+            return Release("CERTIFIED", payload, bound, tolerance, "tv_target")
+        return Release("INCOMPLETE", None, bound, tolerance, "bound above tolerance")
 
     def unknown_volume(self):
         """Search hint: total live volume (binary64; exact Fraction sums over hundreds of
@@ -573,3 +667,27 @@ class Kernel:
         unk = sum((p.poly.volume for p in st.live.values()), Fraction(0))
         lo = Fraction(sum(st.lower.values()), SCALE)
         return unk, lo
+
+
+def certify(obs, tolerance, seconds, cap, search):
+    """Trusted driver: owns the budget and the kernel, runs the untrusted search, releases.
+
+    search(kernel, budget) may return a diagnostics dict, run out of time (Limit) or fail
+    with any exception: all three are abstentions of the search. Only kernel.release()
+    decides the status, payload and bound of the result; diagnostics cannot override them.
+    """
+    if type(tolerance) is not Fraction or not 0 <= tolerance <= 1 or seconds <= 0 or cap < 1:
+        raise ValueError("invalid budget or tolerance")
+    budget = Budget(seconds, cap)
+    kernel = Kernel(obs, budget)
+    try:
+        details = dict(search(kernel, budget) or {})
+    except Limit as exc:
+        details = dict(search_reason=str(exc))
+    except Exception as exc:  # noqa: BLE001  (a failed search abstains; the kernel state stays valid)
+        details = dict(search_reason="search_error", search_error=f"{type(exc).__name__}: {exc}")
+    rel = kernel.release(tolerance)
+    details.update(status=rel.status, tv=None if rel.bound is None else str(rel.bound), reason=rel.reason,
+                   live=len(kernel.handles()), positive=kernel.positive, stats=dict(kernel.stats))
+    return rel.payload, details
+

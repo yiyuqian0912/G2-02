@@ -36,6 +36,9 @@ def _fsign_terms(row, fv):
     return 0
 
 
+_NORMAL_MIN = 2.2250738585072014e-308  # smallest positive normal binary64
+
+
 def _frow(row):
     try:
         return tuple(float(x) for x in row)
@@ -91,6 +94,22 @@ class Poly:
         # Correctly rounded int/int division; no overflow for these magnitudes.
         return tuple((p[0] / p[3], p[1] / p[3], p[2] / p[3]) for p in self.vertices)
 
+    @cached_property
+    def filter_vertices(self):
+        """Float coordinates where the filter's relative-error model holds, else None.
+
+        A subnormal coordinate (0 < |x| < 2^-1022) has only an absolute error bound, so
+        the 3u-per-term analysis of _fsign_terms does not apply; such vertices are always
+        evaluated exactly. (Unreachable with the search's dyadic planes, possible with
+        arbitrary integer split rows.)
+        """
+        out = []
+        for p, fv in zip(self.vertices, self.fvertices):
+            # exact zero is exact; a nonzero coordinate must round to a normal number
+            ok = all(p[i] == 0 or abs(fv[i]) >= _NORMAL_MIN for i in range(3))
+            out.append(fv if ok else None)
+        return tuple(out)
+
     def side(self, row, frow=None):
         """Exact classification: -1 if all vertex values <= 0, +1 if all >= 0, else 0.
 
@@ -98,8 +117,8 @@ class Poly:
         """
         fr = _frow(row) if frow is None else frow
         neg = pos = False
-        for p, fv in zip(self.vertices, self.fvertices):
-            s = _fsign_terms(fr, fv) if fr is not None else 0
+        for p, fv in zip(self.vertices, self.filter_vertices):
+            s = _fsign_terms(fr, fv) if fr is not None and fv is not None else 0
             if s == 0:
                 v = form(row, p)
                 s = (v > 0) - (v < 0)

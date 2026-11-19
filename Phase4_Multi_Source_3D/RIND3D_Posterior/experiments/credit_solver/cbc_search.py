@@ -19,8 +19,8 @@ from time import perf_counter
 
 import numpy as np
 
-from cbc_kernel import Kernel
-from solver import Budget, Limit, choose_pairs
+from cbc_kernel import certify
+from solver import Limit, choose_pairs
 
 
 def dyadic_between(lo, hi, target):
@@ -94,15 +94,20 @@ def elongation(poly):
     return ext[2] ** 3 / max(vol, 1e-300)
 
 
-def solve(obs, key, tolerance, seconds, cap=4096, pairs=24, strategy="interface",
-          batch=96, split_above=1500, elongated=1e4, max_splits=4000, always_split=True, negligible=Fraction(1, 2000), shrink=0.8, prefer_single_dark=True, centroid_anchor=True, park_share=0.25):
-    if seconds <= 0 or cap < 1 or pairs < 0 or not 0 <= tolerance <= 1:
-        raise ValueError("invalid budget or tolerance")
-    budget = Budget(seconds, cap)
-    obs.centroid_anchor = centroid_anchor
-    kernel = Kernel(obs, budget)
+def solve(obs, key, tolerance, seconds, cap=4096, **policy):
+    """Label one channel: the trusted driver cbc_kernel.certify runs this search policy."""
+    return certify(obs, tolerance, seconds, cap, lambda kernel, budget: search(kernel, budget, obs, key, tolerance,
+                                                                                 **policy))
+
+
+def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
+           batch=96, split_above=1500, elongated=1e4, max_splits=4000, always_split=True, negligible=Fraction(1, 2000),
+           shrink=0.8, prefer_single_dark=True, centroid_anchor=True, park_share=0.25):
+    """Untrusted policy. Returns diagnostics only; the status comes from kernel.release()."""
+    if pairs < 0:
+        raise ValueError("invalid pair count")
+    obs.centroid_anchor = centroid_anchor  # anchor hint for the screens' `wrong` flags
     timings = {}
-    payload = bound = None
     parked = set()
     reason = "unresolved_frontier"
     trace = []
@@ -198,12 +203,5 @@ def solve(obs, key, tolerance, seconds, cap=4096, pairs=24, strategy="interface"
             push(kids)
     except Limit as exc:
         reason = str(exc)
-    if reason != "tv_target":
-        payload, bound = checkpoint()
-    accepted = bound is not None and bound <= tolerance
     unk, lo = kernel.unknown_volume(), kernel.lower_total_float()
-    return (payload if accepted else None), dict(
-        status="CERTIFIED" if accepted else "INCOMPLETE", reason=reason,
-        tv=None if bound is None else str(bound), live=len(kernel.handles()),
-        positive=kernel.positive, unknown_volume=float(unk), lower_volume=float(lo),
-        stats=dict(kernel.stats), trace=trace[-20:], **timings)
+    return dict(search_reason=reason, unknown_volume=float(unk), lower_volume=float(lo), trace=trace[-20:], **timings)
