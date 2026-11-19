@@ -75,12 +75,23 @@ def apply_pair(poly, dark, active, budget):
 def choose_pairs(cls, count, seed, strategy):
     """No source positions or posterior labels. Deterministic receiver inputs only."""
     rng = np.random.default_rng(seed)
+    # The [x,y,z] class array is usually a transposed view of a contiguous [z,y,x] array;
+    # C-order traversals of it miss cache on every element (~0.8 s at L=256). Detect the
+    # interfaces on the contiguous array and rebuild exactly the ascending flat indices that
+    # np.flatnonzero would return on the [x,y,z] slices, so all random choices are unchanged.
+    zyx = np.ascontiguousarray(cls.T)
+    L = cls.shape[0]
     pools = []
     for axis in range(3):
         a,b = [slice(None)]*3,[slice(None)]*3
         a[axis],b[axis] = slice(None,-1),slice(1,None)
         x,y = cls[tuple(a)],cls[tuple(b)]
-        ix = np.flatnonzero(((x==0)&(y==1))|((x==1)&(y==0)))
+        za,zb = [slice(None)]*3,[slice(None)]*3
+        za[2-axis],zb[2-axis] = slice(None,-1),slice(1,None)
+        u,v = zyx[tuple(za)],zyx[tuple(zb)]
+        zz,yy,xx = np.nonzero(((u==0)&(v==1))|((u==1)&(v==0)))
+        shape = x.shape
+        ix = np.sort((xx.astype(np.int64)*shape[1] + yy)*shape[2] + zz)
         if len(ix):
             ix = ix[rng.choice(len(ix),min(256,len(ix)),replace=False)]
             loc = np.column_stack(np.unravel_index(ix,x.shape))
