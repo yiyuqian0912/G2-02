@@ -16,9 +16,13 @@ separate readiness decision.
 
 ## 1. Close the certification gap on hard channels
 
-1. **Residual bitmask for huge pieces.** A piece whose residual set exceeds the 2M-entry list cap rescans the whole
-   window; one L = 256 task ran 73 full scans. A per-piece bitmask (2 MB at L = 256) removes this. The scan already
-   supports a skip list; a masked variant is straightforward.
+1. **Penumbra-dense pieces at L = 256.** These cover both remaining 20 s failures.
+   * In `000007_w09_s2`, 112 pieces each keep about 1.9M ambiguous receivers, 11% of the window, and 151 full
+     scans dominate a 40 s run. The feasible set is a blob of about 2 voxels seen through barrier edges.
+   * A residual bitmask would only avoid rescanning resolved receivers. Here the sets are dense, so the gain is
+     small.
+   * What should help: cuts aligned with the occluder edge, i.e. the pencil planes of the extreme penumbra
+     receivers, chosen by the angular-extreme rule from the earlier XLF work.
 2. **Native exact cuts and splits.** Exact enforcement and pair conditioning (about 15% of the time) still run
    Python big-integer polytope code. `native/cells.cpp` already implements `split` in GMP; exposing it for
    enforcement would follow the same differential-test and byte-identity protocol.
