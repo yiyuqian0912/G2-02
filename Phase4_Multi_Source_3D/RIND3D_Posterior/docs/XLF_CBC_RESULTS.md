@@ -89,7 +89,12 @@ none may be feasible.
 
 * 417 receiver decisions needed the oracle's exact rational fallback.
 * An earlier partial audit of v2.4 (7 tasks: 126 + 150 points) also found 0 violations.
-* L = 256 is not audited yet: the exact oracle costs about 12 s per point there.
+* **L = 256 spot check:** `000007_w08_s2` at a 20 s budget (certified, bound 0.049):
+  * 48 points from 16 of its 30 IN pieces, all feasible;
+  * 29 discarded points, all infeasible: 8 from pair conditioning, 9 from cuts, 12 from screens;
+  * 0 violations, after 40 minutes of exact oracle work.
+
+  The other L = 256 tasks are not audited; the exact oracle costs about 12 s per point there.
 
 This is sampled differential evidence, independent of the kernel's code. It does not prove the transitions.
 
