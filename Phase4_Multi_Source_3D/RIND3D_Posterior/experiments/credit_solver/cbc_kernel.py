@@ -275,7 +275,7 @@ def private_problem(observation, centroid_anchor=True):
     if any(len(r) != 4 for b in bodies for r in b):
         raise ValueError("obstacle rows must be homogeneous 4-vectors")
     cls = np.array(observation.cls, dtype=np.uint8, copy=True)
-    if cls.shape != (side,) * 3 or not np.isin(cls, (0, 1, 2)).all():
+    if cls.shape != (side,) * 3 or (cls.size and int(cls.max()) > 2):  # uint8: values in {0, 1, 2}
         raise ValueError("class array must be (L, L, L) with values 0, 1, 2")
     cls.flags.writeable = False
     obs = Observation(bodies, cls, origin, 1024)

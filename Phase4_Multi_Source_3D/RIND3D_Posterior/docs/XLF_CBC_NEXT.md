@@ -1,29 +1,31 @@
-# XLF CBC: next steps (evidence-based, v2.9)
+# XLF CBC: next steps (evidence-based, v3.0)
 
 Production stays FastLabel v3.4 on `yushu/3d`. Nothing here is a production change; any production use needs a
-separate readiness decision. Numbers refer to `XLF_CBC_RESULTS.md` (final build v2.9e, `067d746`).
+separate readiness decision.
+
+Numbers refer to `XLF_CBC_RESULTS.md` (unified build v3.0, `a648358`; reference build v2.9e, `067d746`). v3.0 has
+one certification path. The items below strengthen that single path; none of them introduces a mode.
 
 ## 1. Correctness obligations still open (ordered by risk × cost to close)
 
-1. **Machine-checked proofs of the closed-form geometry (≈ 300 lines).** These are `solver.cone`, `Envelope`,
-   `separators`, `Observation.cleared` and `clearance_covers`, plus the frontier theorem.
-   * Status: manual proofs (design §3–4h), the line-by-line review in IMPLEMENTATION §2, and exact differential
-     tests.
-   * Next: a Lean 4 (Mathlib) formalization of the elimination lemma for C_K(r), the separation lemma, Lemma O,
-     and the frontier TV bound over ℚ.
-   * The polytope arithmetic itself does not need this: it is certified per run (`CBC_VERIFY_SPLITS=1`).
-2. **Per-cell distribution inside an IN piece.** The octree's boundary-cell clips are certified only in total
-   (conservation), not per cell.
-   * Close by running `verify_split` on the octree's splits: in Python it costs the same as the kernel's splits;
-     in `cells.cpp` it would be nearly free.
-3. **Native per-split certificate.** `verify_split` in Python costs +23% wall time over the canary, and up to
-   2× on cut-dominated runs, and it costs 10 canary certifications at 10 s.
-   * A C++/GMP port (same two checks; the hex conversion is already in `cells.cpp`) would make the certified mode
-     cost ≈ 1.1× and remove the speed/assurance trade-off.
-4. **Numba trust.** The screen's integer semantics are proved at source level (z3).
-   * Close the compiler gap with a second, independent C++ screen and a byte-for-byte comparison of decisions in
-     CI, or with translation validation on the generated LLVM IR.
-5. **Pinned builds.** Pin Numba, LLVM, g++, GMP and the `.so` hash. Record the build hash in every label envelope.
+1. **Machine-check the code-level proofs (design §8).**
+   * Status: manual statement-by-statement proofs; z3 for the arithmetic cores (`smt_kernel.py`, 16 lemmas).
+   * Next:
+     * a Lean 4 model of `Poly.split` over ℤ (FS precondition, Theorem P);
+     * the 1-D Helly step of `cone`;
+     * the frontier theorem over ℚ.
+   * The split model is about 35 lines of control flow on finite lists; Mathlib's convexity library is not
+     needed if FS is stated combinatorially.
+2. **Numba compiler trust.** The screen's integer semantics are proved at source level.
+   * Close the compiler gap with translation validation of the generated LLVM IR for `_intervals`, or with a
+     second independent screen (C) compared decision-for-decision in CI.
+3. **Process isolation of the search.** This removes the "not malicious at the interpreter level" assumption.
+   * Run the kernel in its own process with a message API (handles, rows, receiver ids in; hints out).
+   * The design already allows it: every kernel input is plain integers.
+4. **Pinned builds.** Pin Numba, LLVM, g++, GMP and the `.so` hash, and record the build hash in every envelope.
+5. **Input decoding** (shared with every labeller). It is a CONDITIONAL dependency.
+   * An independent decoder cross-check in CI.
+   * Decoding once per scene rather than per channel; this also saves ≈ 1.7 s per L = 256 channel.
 
 ## 2. Performance: the remaining tail (v2.9e, 10 s budget)
 
@@ -48,20 +50,23 @@ Ideas measured and **not** adopted (evidence):
 
 ## 3. Assurance campaigns to repeat on every kernel change
 
-* `pytest test_cbc.py test_wire.py test_poly_exact.py test_regression.py ../global_inverse/test_global.py
-  ../xlf_assurance/test_assurance.py`. The fixtures cover the 214-cell posterior, both legacy Tau-pencil defects,
-  the hull-only L256 case and the missing-sibling counterexample (Astra).
-* `chaos.py` over the exact-referenced tasks, with `CBC_VERIFY_SPLITS=1`.
-* `audit_exact.py` over the L64/L128 benchmark tasks and the newly certified hard tasks.
+* The test suite:
+
+  ```
+  pytest test_cbc.py test_wire.py test_poly_exact.py test_adversarial.py test_regression.py \
+      ../global_inverse/test_global.py ../xlf_assurance/test_assurance.py
+  ```
+
+  Its fixtures cover the 214-cell posterior, both legacy Tau-pencil defects, the hull-only L256 case, the
+  missing-sibling counterexample and the closed 64³ room (both Astra's), plus the adversarial cases.
+* `python smt_screen.py && python smt_kernel.py` (z3).
+* `chaos.py` over the exact-referenced tasks. It certifies every split with the external oracle by default.
+* `audit_exact.py` over the L64/L128 benchmark tasks and the hard tasks.
 * Byte identity of certified payloads for refactors that should not change decisions.
 
-## 4. Deployment study (needs a separate decision)
+## 4. Relation to FastLabel (outside XLF-CBC)
 
-A deterministic-first hybrid labels each channel with CBC under a fixed budget and falls back to FastLabel on
-INCOMPLETE. The certification semantics stay separate: a deterministic CERTIFIED envelope versus FastLabel's
-`certified_stat`.
-* Measured canary share of deterministic labels: 97.4% (certified mode) and 98.6% (speed mode) at about 2× and 1.65× FastLabel's total compute (`XLF_CBC_RESULTS.md` §5).
-* Open measurements: H20 throughput with long-lived workers (the 1–2 s per-process load and JIT is paid once),
-  memory at 6–16 workers, and the per-campaign cost of the FastLabel fallbacks.
-* A controlled canary of the hybrid on a fresh, unpublished scene set would be the next step. It is not a
-  replacement of FastLabel.
+XLF-CBC never falls back to FastLabel. It returns CERTIFIED (with a deterministic bound on its own bytes) or
+INCOMPLETE. Whether a production pipeline labels INCOMPLETE channels with FastLabel (`certified_stat`, a different
+assurance model) is a separate pipeline decision. It must keep the two semantics distinct in the label envelope.
+For that decision, the measured canary share of deterministic labels is in `XLF_CBC_RESULTS.md` §6.

@@ -239,9 +239,6 @@ structure checks 0.5%. Per-split certification sits inside the pair-conditioning
 * Versus the exact Tau-pencil labeller plus verifier on the benchmark (v2.8 measurement): about 30× faster by
   median and 64× by total.
 
-**Fallback policy (recommendation, not deployed).**
-* Run CBC in certified mode with a 10 s budget; on INCOMPLETE, fall back to FastLabel and record `certified_stat`.
-* On the canary this gives 97.4% deterministic labels (98.6% in speed mode), at about 2× FastLabel's compute in
-  total, within the 10× target.
-* The two semantics stay separate in the envelope. Tail latency is bounded by the budget: process max 13.5 s,
-  then the FastLabel fallback.
+**Relation to FastLabel.** XLF-CBC does not fall back to FastLabel; INCOMPLETE is its only non-certified
+outcome. A pipeline that labels INCOMPLETE channels with FastLabel would be a separate decision, with the two
+assurance models kept distinct in the envelope.

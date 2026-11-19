@@ -1,20 +1,35 @@
-# XLF correct-by-construction labeller: design (kernel v2)
+# XLF correct-by-construction labeller: unified specification and design (v3.0)
 
-Branch `claude/xlf-correct-by-construction`. Builds on Astra's theorem (`XLF_PROOF_FOUNDATIONS.md`), Astra's
-transition design (`XLF_CORRECT_BY_CONSTRUCTION.md`) and Astra's exact geometry (`experiments/global_inverse/`).
-Code: `experiments/credit_solver/cbc_kernel.py` and `screen2.py` (trusted), `cbc_search.py` (untrusted).
+Branch `claude/xlf-correct-by-construction`. This design builds on:
+* Astra's theorem (`XLF_PROOF_FOUNDATIONS.md`);
+* Astra's transition design (`XLF_CORRECT_BY_CONSTRUCTION.md`);
+* Astra's exact geometry (`experiments/global_inverse/`).
+
+Code: `experiments/credit_solver/cbc_kernel.py`, `screen2.py`, `polycheck.py` (trusted); `cbc_search.py`,
+`shadow_facets.py`, `hull_proposals.py` (untrusted).
+
+**v3.0 has one solver, one trusted configuration and one certification contract.** There is no certified or speed
+mode: the per-split re-verification of v2.9e is replaced by a code-level proof of the split primitive (§8), and it
+survives only as an external test oracle.
 
 Assurance labels (used in all XLF_CBC documents):
 
 | label | meaning |
 |---|---|
-| **MATHEMATICALLY PROVEN** | a complete argument is written here or in Astra's documents; not machine-checked |
-| **IMPLEMENTATION-VERIFIED** | the property of the code itself is mechanically proved (z3) over the stated ranges |
-| **EXACT-DIFFERENTIAL-TESTED** | the code agrees with an independent exact (rational or integer) reference on the stated test population; not a proof |
-| **RUNTIME-CERTIFIED** | an exact check runs inside every labelling run and aborts (no certificate) on failure |
-| **EMPIRICALLY TESTED** | agreement with references or audits on real tasks; not a proof over continuous regions |
+| **PROVEN** | a complete manual argument: mathematical (about the abstract operation) or code-level (about the actual source, statement by statement); not machine-checked |
+| **IMPLEMENTATION-VERIFIED** | the exact expression evaluated by the code is mechanically proved (z3: `smt_screen.py`, `smt_kernel.py`) over the stated domain |
+| **EXACT-TESTED** | the code agrees with an independent exact (rational or integer) reference on the stated test population; not a proof |
+| **EMPIRICALLY TESTED** | agreement with references, audits or chaos campaigns on real tasks; not a proof over continuous regions |
 | **CONDITIONAL** | holds if a stated, unverified assumption holds |
 | **OPEN** | not established |
+
+## 0. Three kinds of correctness
+
+| kind | statement | how it is established |
+|---|---|---|
+| **A. Conceptual** | The continuous problem is well posed, and the frontier posterior theorem holds. The problem: legal sources, closed-segment visibility, the target as the push-forward of uniform volume on F onto 128³ cells. The theorem: for sound credits, every decoded normalized payload p satisfies TV(p, q) ≤ 1 − Σ min(p_c, a_c) (§1). | PROVEN (Astra; restated in §1). The per-cell inequality and the integer rounding are IMPLEMENTATION-VERIFIED (`smt_kernel.py` T1–T3). |
+| **B. Algorithmic** | An abstract solver whose state changes only through the transitions of §2a never violates I1–I6. A release from any reachable state is a valid certificate for its own bytes, whatever the search does. | PROVEN (§2a–§4h): each transition preserves the invariants, the release reads only invariant-protected quantities, and the search cannot call anything else. |
+| **C. Implementation** | The Python/Numba/C++ routines realize those transitions exactly. | Mixed, per primitive: code-level proofs (§8), z3 lemmas for the arithmetic cores, exact differential tests, and a few retained cheap runtime guards. `XLF_CBC_IMPLEMENTATION.md` §1–§3 lists exactly what is proven and what is assumed. |
 
 ## 1. Target and certificate
 
@@ -62,6 +77,42 @@ holds its closed convex polytope, its residual obligation set R_P (or "all FREE 
 
 All transitions are atomic. Results are computed into scratch values and published by one `_commit`. A `Limit`
 or arithmetic exception before the commit leaves the state unchanged. A stale handle raises before any change.
+
+## 2a. The trusted state and the only allowed transitions (unified specification)
+
+**Trusted state** (owned by one `Kernel` object; nothing else holds a reference to any mutable part of it):
+
+* **Problem** (`private_problem`, immutable after construction): obstacle rows as tuples of Python ints, the class
+  array (a read-only copy), the window origin and side, and the derived caches (obstacles clipped to the cube,
+  their facet geometry, the clearance covers).
+* **`State`** (immutable dataclass, replaced atomically by `_commit`): live pieces (polytope, residual obligations
+  R_P as a read-only array or "all but `done`", read-only candidate masks, `deferred`), `lower`, `upper_in`, the
+  next handle and the window-excluded flag.
+* **Release record:** the best (bound, payload) pair computed by `snapshot`, plus the taint flag.
+
+**Allowed transitions** (public kernel methods; arguments are validated; each commits once or raises with the
+state unchanged):
+
+| transition | argument the search may choose | effect |
+|---|---|---|
+| `condition_pair(d, a)` | one dark and one lit receiver | every piece P ↦ P ∩ ⋃C(d) ∖ ⋃C(a) |
+| `exclude_window()` | — | every piece minus the closed window box and the closed obstacles |
+| `split(h, row)` | integer row (non-constant, \|coef\| ≤ 2⁴⁰⁹⁶) | P ↦ (P ∩ {row ≤ 0}, P ∩ {row ≥ 0}); both halves kept |
+| `screen(h)` | — | classify R_P: drop P (contradiction), settle P (credit + shell), or shrink R_P |
+| `enforce(h, ids)` | integer receiver ids (FREE, in the window) | exact cone cuts; children with R_P minus ids |
+| `snapshot()` | — | payload + exact bound on the decoded payload; the best pair is recorded |
+| `release(tol)` | exact rational tolerance | CERTIFIED iff the best recorded bound ≤ tol, else INCOMPLETE; ERROR if tainted |
+
+Read-only queries (`handles`, `is_open`, `open_handles`, `volume`, `pending_count`, `poly` (a copy), `contact`,
+`receiver_classes`, `envelope_rows` (copies), `positive`, `lower_total_float`, `unknown_volume`) return immutable
+values or copies.
+
+**Invariants** I1–I6 are as in §2. **Theorem B (algorithmic soundness).** Every state reachable from the initial
+state (one live piece, the unit cube) by any sequence of allowed transitions satisfies I1–I6. Every release from
+such a state is either INCOMPLETE/ERROR or CERTIFIED with TV(decode(payload), q) ≤ bound ≤ tol.
+*Proof.* By induction over transitions, using the preservation table of §3 and the lemmas of §4–§4h; the release
+evaluates the frontier theorem (§1) on its own bytes. The search only chooses the arguments in the table above, and
+every argument is validated before use, so the search policy does not appear in the proof. ∎
 
 ## 3. Transitions and preservation (PROVEN)
 
@@ -149,7 +200,7 @@ An IN piece Q is integrated by an octree over its grid range, each node carrying
 
 Conservation is exact: vol(Q)·2¹⁶⁰ − Σ lower ∈ [0, #boundary cells).
 
-## 4d. The exact possible shadow (MATHEMATICALLY PROVEN; v2.9b)
+## 4d. The exact possible shadow (PROVEN; v2.9b)
 
 **Lemma O.** Let K, P be compact convex sets with disjoint interiors and U = ⋃_{s∈P} S_K(s) the
 set of receivers blocked by K for some source of P. Then U is convex and its closure is the
@@ -184,7 +235,7 @@ max_{v ∈ vert(K ∩ cube)} h(v) ≤ 0 ≤ min_{v ∈ vert P} h(v) in exact int
 candidate proposed, the possible shadow equals O up to the directed rounding of §4.
 Effect: ambiguous receivers on stuck pieces 10⁵ → 10¹–10² (§XLF_CBC_RESULTS).
 
-## 4e. Receiver convexity (MATHEMATICALLY PROVEN; used by the search, v2.9c)
+## 4e. Receiver convexity (PROVEN; used by the search, v2.9c)
 
 **Lemma H.** For a source s outside a convex body K, the shadow S_K(s) = {s + λ(k − s) : k ∈ K,
 λ ≥ 1} is convex (same argument as for C_K(r)). Hence for any receiver set R,
@@ -201,7 +252,7 @@ receivers by 50–80 exact cuts. The lemma is used only for efficiency: the kern
 each proposed receiver exactly and re-proves everything in later screens, so a wrong hull
 can only cost time.
 
-## 4f. Contact vertices in the guaranteed shadow (MATHEMATICALLY PROVEN; v2.9c)
+## 4f. Contact vertices in the guaranteed shadow (PROVEN; v2.9c)
 
 For a vertex v of P inside the closed body K, every segment [v, r] meets K, so S_K(v) is all
 of space. The guaranteed shadow is therefore computed from the vertices outside K only:
@@ -210,7 +261,7 @@ r ∈ ⋂_{v ∉ K} S_K(v) puts every vertex (those in K trivially) into C_K(r),
 the whole window. (Envelope evaluated the rows of contact vertices, which over-constrained:
 sound, but it left dark receivers behind obstacle contacts ambiguous.)
 
-## 4g. Polytope arithmetic certificates (MATHEMATICALLY PROVEN; RUNTIME-CERTIFIED)
+## 4g. Polytope arithmetic: FS, Lemma V and the split primitive (PROVEN; code-level proof in §8)
 
 **FS (face-structure invariant).** The face cycles of a polytope Q tile the boundary of
 conv(vert Q) exactly once, each as a strictly convex polygon. `polycheck.check` verifies:
@@ -245,7 +296,7 @@ strictly convex face cycle, and the cap as the strict convex hull of the plane p
 injective projection. Cap points never lie inside a cap edge, so no T-junctions arise. FS is
 preserved (distinct planes, because a face plane would put P on one side of it).
 
-**Per-split certificate (`polycheck.verify_split`, `CBC_VERIFY_SPLITS=1`).** For every split
+**Per-split certificate (v2.9d–e; since v3.0 a test oracle, `polycheck.instrument_splits`).** For every split
 inside every transition, the vertex sets of both halves must equal the two sets of Lemma V,
 computed independently from the parent's (FS-certified) edges, and both halves must pass
 `check`. Inductively from the cube, every polytope the kernel ever creates is then FS-valid,
@@ -254,8 +305,14 @@ exact volumes. This certifies the cover invariant I1 for the polytope arithmetic
 without a physical replay. It is on by default. Cost in pure Python: +23% wall time over the canary, and up to
 about 2× on cut-dominated runs (XLF_CBC_RESULTS §5).
 
-Independently of `CBC_VERIFY_SPLITS`, every polytope that receives an IN credit, and every
-live polytope charged in a snapshot, passes `check` (RUNTIME-CERTIFIED since v2.9a).
+v3.0 replaces this per-split runtime check by Theorem P (§8), a code-level proof that `Poly.split` satisfies
+Lemma V and preserves FS. The check is kept as an independent oracle: in the test suite, in the chaos campaigns,
+and as `polycheck.instrument_splits()` for audits. It never failed on the 494,099 canary splits or the 1,009 chaos
+splits of v2.9e (EMPIRICALLY TESTED), consistent with the proof.
+
+Every polytope that receives an IN credit, and every live polytope charged in a snapshot, still passes `check`.
+This is a cheap guard (0.5% of wall time) on the only two places where volumes enter the bound; see
+IMPLEMENTATION §3 for why it is retained.
 
 ## 4h. Release discipline (by construction; v2.9a)
 
@@ -334,12 +391,165 @@ consequences were examined.
 The productive direction was instead to reduce the geometric work that determines U: exact possible shadows (§4d),
 receiver convexity (§4e) and contact vertices (§4f).
 
-## 7. What the design does not claim
+## 8. Code-level proofs of the trusted primitives (PROVEN, manual; v3.0)
+
+These arguments are about the actual source as of v3.0 (`global_inverse/poly.py`, `solver.py`, `envelopes.py`,
+`raster.py`, `credit_solver/cbc_kernel.py`, `polycheck.py`, `kernel.py`, `xlf_assurance/ledger.py`). Python
+integers and `Fraction` are exact, and `tuple`/`dict`/`set` operations have their documented semantics.
+Arithmetic steps marked [z3 X] are mechanized in `smt_kernel.py` (lemma X).
+
+### 8.1 `Poly.split(row)` (Theorem P)
+
+**Precondition.** P satisfies FS (§4g) with pairwise distinct face planes, and all vertices are primitive with w > 0.
+`Poly.cube()` satisfies this by inspection, and `polycheck.check(Poly.cube())` passes.
+
+**Theorem P.** `split` returns (P, None) iff every vertex has row ≤ 0, (None, P) iff every vertex has row ≥ 0 and
+some vertex has row > 0, and otherwise (N, Q) with:
+* vert N = {v : row(v) ≤ 0} ∪ X and vert Q = {v : row(v) ≥ 0} ∪ X, where X is the set of crossing points of the
+  edges with strictly opposite end signs (Lemma V);
+* N and Q both satisfy FS with distinct face planes.
+
+Hence conv N = P ∩ {row ≤ 0} and conv Q = P ∩ {row ≥ 0}.
+
+*Proof, following the code.*
+1. `side(row)` returns −1 iff every vertex value is ≤ 0, and +1 iff all are ≥ 0 and one is > 0. Each per-vertex
+   sign is exact: the filter decides only when \|v\| > 10⁻¹²·Σ\|terms\| with normal coordinates (error ≤ 6u·Σ\|terms\|,
+   §IMPLEMENTATION 3), and the exact integer value decides otherwise. So the two early returns are exactly the
+   first two cases. `signs` is then computed exactly for every vertex; the repeated max/min tests are redundant and
+   consistent. In the main path both a strictly negative and a strictly positive vertex exist.
+2. **Crossing points.** For consecutive cycle entries (last, p) with u = s(last) and v = s(p) of strictly opposite
+   sign, the code builds h = primitive(\|v\|·last + \|u\|·p). Then row(h) = 0 [z3 S1a], h lies strictly inside
+   the segment with w > 0 [z3 S1b], and `primitive` divides by the positive gcd. The value is symmetric in the two
+   endpoints, so both faces sharing that edge (FS) obtain the identical canonical tuple. The `cut` cache only
+   avoids recomputation.
+3. **Clipping one face** f = (q₀ … q_{k−1}), which is strictly convex and cyclic. The loop appends, for each edge
+   (q_{i−1}, q_i), the crossing point if the signs are strictly opposite, then q_i if s(q_i) ≤ 0. This is
+   Sutherland–Hodgman.
+   * The vertex signs along a strictly convex cycle change from − to + and back at most once each (a line meets
+     the boundary of a strictly convex polygon in at most two points, or along one edge).
+   * If all s ≤ 0, then a = f.
+   * If all s ≥ 0, then a holds at most two zero vertices, because three zero vertices of a strictly convex
+     polygon cannot lie on one line. Such a face is dropped by `len(a) >= 3`. A face with all s = 0 would lie in the
+     cut plane, which supports P; then every vertex of P is on one side, so this cannot occur in the main path.
+   * Otherwise a = (entry, negatives…, exit), where entry and exit are crossing points or zero vertices. This is
+     the cycle of f ∩ {row ≤ 0}: a strictly convex polygon with ≥ 3 corners. A crossing point is a corner because
+     the edge crosses the line transversally. At a zero vertex the polygon turns from an edge leaving the line to
+     the chord on the line.
+   * The same holds for b with {row ≥ 0}.
+4. **Faces of N.** The facets of N = P ∩ {row ≤ 0} are the 2-dimensional f ∩ {row ≤ 0}, plus the cap
+   P ∩ {row = 0}. The code emits exactly the first kind (`len(a) >= 3` iff 2-dimensional, by step 3) and the cap.
+   The planes stay distinct: the face planes are distinct by hypothesis, and the cut plane differs from each
+   because both signs occur.
+5. **The cap.** `cap` collects every crossing point and every zero vertex.
+   * These are exactly the vertices of the cap polygon C. A zero vertex is extreme in P, hence in C. A crossing
+     point is the transversal intersection of an edge with the plane, a 0-face of C. Every vertex of C is of one
+     of these two kinds (Lemma V).
+   * All cap points are therefore in strictly convex position, and none lies inside an edge of C: an edge of C
+     is f ∩ {row = 0} for a face f, and its interior meets ∂f in no vertex because f is strictly convex.
+   * `cap_hull` drops the coordinate with the largest \|row\| component. That projection is injective on the plane.
+     It sorts exactly (Fraction keys) and runs Andrew's monotone chain with the exact homogeneous orientation
+     [z3 S2a, S3], keeping strict left turns. On points in strictly convex position this returns all of them in
+     cyclic order. C is 2-dimensional (the plane meets int P), so it has ≥ 3 vertices.
+6. **Edge pairing of N.** An edge of N is one of two kinds.
+   * A portion of an edge of P. The two incident faces of P are both clipped, and the portion's endpoints (vertex
+     or crossing point) are canonical, so it appears in both cycles.
+   * A chord f ∩ {row = 0}, shared by the clipped f and the cap. If f ∩ {row ≤ 0} is only that chord (f touches the
+     plane along an edge e and lies in {row ≥ 0}), the other face at e has negative vertices and supplies the
+     clipped face. If both faces at e were in {row ≥ 0}, C would contain e but no 2-dimensional neighbourhood of
+     its midpoint, contradicting that C is 2-dimensional with e on its boundary.
+
+   Connectivity, single vertex links and Euler characteristic 2 hold because the face list is exactly the boundary
+   complex of the convex polytope N.
+7. `Poly(...)` sets the vertices to the union of face vertices, which is vert N. The argument for Q is symmetric. ∎
+
+**Consequences.** By induction from the cube, every polytope the kernel creates satisfies FS. Every split preserves
+the cover: conv N ∪ conv Q = P, with overlap only on the plane. The fan volume of each polytope is exact.
+`native/cells.cpp` `split` is a statement-by-statement transliteration of steps 1–6 in GMP integers (exact signs,
+the same crossing formula, the same clipping loop, the same monotone chain with exact cross-multiplied
+comparisons). It is EXACT-TESTED against the Python path: per-cell credits are identical.
+
+**Evidence beyond the proof** (not a substitute for it):
+* EXACT-TESTED: independent half-space vertex enumeration on degenerate random cuts and real cones, and FS checks
+  (`test_poly_exact.py`).
+* EMPIRICALLY TESTED: 494,099 canary splits and all chaos splits passed `verify_split`; certified-mode and
+  speed-mode outputs are byte-identical on all 786 channels both certified.
+
+### 8.2 Set algebra built from `split`
+
+* `within(P, rows)`. Loop invariant: `poly` = P ∩ {r₁ … r_t ≤ 0}, or None once it has empty interior (split's
+  positive-only case). Result: P ∩ ⋂{rᵢ ≤ 0}.
+* `without(P, rows)`.
+  * If some row has `side > 0`, P lies in {r ≥ 0}, its intersection with the closed convex set has empty
+    interior, and [P] is returned.
+  * Otherwise, loop invariant: `result` = {P ∩ {r₁ … r_{t−1} ≤ 0} ∩ {r_t ≥ 0}}, pairwise interior-disjoint, and
+    `poly` = P ∩ {r₁ … r_t ≤ 0}. The final `poly` (the removed part) is discarded. The union of the result is P
+    minus the closed set, up to null sets.
+* `subtract_many(parts, sets)` iterates `without`. `apply_pair` computes ⋃ⱼ (P ∩ C_j(d) ∖ ⋃_{k<j} C_k(d))
+  ∖ ⋃ₖ C_k(a): for each hit j, `pieces` = (P ∩ C_j(d)) ∖ C_j(a), then the other lit cones and the previous dark
+  cones are subtracted. Previous dark cones that missed P (not in `hits`) are null on P, so they need not be
+  subtracted. The pieces are disjoint (first cover).
+* `Kernel._exact_cut`: subtraction for lit receivers; first cover over the candidate cones for dark receivers (the
+  same argument). Candidate masks are justified in §4b.
+* `exclude_window`: `subtract_many` with the six window rows (u = n·e_axis: x_axis ≥ o/n, x_axis ≤ (o + L)/n) and
+  then with each closed obstacle.
+* `clearance_partition`: `outside` = P minus each enlarged body (without), and `possible` = the parts inside some
+  enlarged body (within, first cover). So outside ∪ possible = P, disjointly. The shell is `possible` minus K and
+  its six 2⁻²⁶ translates. `cleared(p)` holds when one facet row puts every vertex at distance > 2⁻²⁶ [z3 Q2], so
+  the whole convex piece is at that distance. The offset rows use the directed square root [z3 Q1, Q2].
+
+### 8.3 Cones, envelopes and separators
+
+* `cone(body, r)`:
+  * The rows are the facets with h = f(r) ≥ 0, plus hᵢ f_j − h_j fᵢ for front i (hᵢ > 0) and back j (h_j < 0).
+    By [z3 C1, C2] the segment from r meets {fᵢ ≤ 0, f_j ≤ 0, tangent ≤ 0} exactly when these rows hold, for one
+    front, one back and one tangent facet.
+  * For several facets the feasible t form an intersection of intervals [lbᵢ, 1] and [0, ub_j]. In one
+    dimension such a family intersects iff every pair does (Helly), so the pairwise rows suffice.
+  * A receiver with no front facet is inside K; the code raises (abstain).
+  * Dropping all-zero rows drops the trivially true 0 ≤ 0.
+* `Envelope`:
+  * inner keeps, per pair (i, j), the row of maximal h_j/hᵢ, which implies the others given fᵢ(r) ≤ 0 [z3 E1].
+    That facet row is present because some vertex has fᵢ ≥ 0.
+  * outer keeps the facet rows where every vertex has fᵢ ≥ 0, and per all-vertex pair the row of minimal h_j/hᵢ
+    [z3 E2]. The ratio is quasi-linear on P, so its extremes are at vertices.
+  * `extreme_pair` compares ratios by cross-multiplication with positive denominators [z3 S3 analogue].
+  * Since v2.9c, inner uses only vertices outside K (§4f).
+* `separators`: exact check max over vert(K ∩ cube) ≤ 0 ≤ min over vert P, then [z3 E3]. `penumbra.directions`
+  performs the same exact check internally.
+* `raster.fixed` and the scanline arithmetic: IMPLEMENTATION-VERIFIED (`smt_screen.py`).
+
+### 8.4 Accounting, serialization and release
+
+* `_commit`:
+  * It deletes every removed handle before inserting children, so a stale or duplicate handle raises KeyError
+    before any change.
+  * Children receive fresh handles, and the new State is built completely before one assignment.
+  * Credits are added only through its `lower` and `upper` arguments, which only `_settle` supplies, from
+    `_grid_credit` of the legal parts of the piece being removed in the same commit. A piece can therefore be
+    credited at most once, and only when it leaves the live set (no double counting).
+* `_grid_credit`:
+  * Interior blocks are those whose eight corners satisfy every validated facet row; by convexity they lie in Q and
+    receive exact cell volumes.
+  * Boundary cells receive floor/ceil of the exact volume of the clip, with clips by Theorem P.
+  * Conservation against the exact Q volume is checked.
+* `snapshot`:
+  * The unknown charge sums ⌈vol⌉ over every live piece, deferred ones included.
+  * `single_cell` uses exact integer grid bounds of the vertices.
+  * `wire_bound` evaluates the frontier bound on `decode(payload)` with integer floors [z3 T1–T3].
+* `encode_int`:
+  * It assigns exact ticks summing to 2⁵² (largest remainder via integer `divmod`).
+  * Each value n/2⁵² is an exact binary64.
+  * `decode` checks sorted ids, finite values in (0, 1] and an exact sum of 1.
+* `release`: it returns the payload of the best recorded snapshot only if that bound is ≤ the exact tolerance.
+  `certify` writes status, payload and bound only from the release.
+
+## 9. What the design does not claim
 
 * Termination or a latency bound for every input. Abstention (INCOMPLETE) is always available.
 * Exact recovery of F. Only the TV certificate is claimed.
 * Protection against hostile code in the same process. This is a single-owner research model: the search is
   assumed buggy at worst, not malicious at the interpreter level.
-* Machine-checked proofs of the geometric lemmas. The arguments above are manual; the integer arithmetic of the
-  screens is mechanized (z3), and the polytope arithmetic is runtime-certified when `CBC_VERIFY_SPLITS=1`.
-  `XLF_CBC_IMPLEMENTATION.md` lists the code-path review, the tests and the remaining gaps.
+* Machine-checked proofs of the geometric lemmas or of the control flow of the code. The arguments are manual
+  (mathematical and code-level, §8). The arithmetic cores are mechanized: z3 proves the screen arithmetic
+  (`smt_screen.py`) and 16 kernel lemmas (`smt_kernel.py`). `XLF_CBC_IMPLEMENTATION.md` lists exactly what is
+  proven, tested and assumed.

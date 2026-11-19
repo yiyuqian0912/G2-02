@@ -1,161 +1,179 @@
-# XLF CBC labeller: implementation assurance (v2.9)
+# XLF CBC labeller: implementation assurance (v3.0, unified)
 
 Code in `experiments/credit_solver/`, plus the exact geometry it reuses from `experiments/global_inverse/` and
-`experiments/xlf_assurance/`. Labels as defined in `XLF_CBC_DESIGN.md` (MATHEMATICALLY PROVEN, IMPLEMENTATION-VERIFIED,
-EXACT-DIFFERENTIAL-TESTED, RUNTIME-CERTIFIED, EMPIRICALLY TESTED, CONDITIONAL, OPEN).
+`experiments/xlf_assurance/`. Labels (PROVEN, IMPLEMENTATION-VERIFIED, EXACT-TESTED, EMPIRICALLY TESTED, CONDITIONAL,
+OPEN) are defined in `XLF_CBC_DESIGN.md`; the code-level proofs are in its §8.
 
 ```sh
 cd Phase4_Multi_Source_3D/RIND3D_Posterior/experiments/credit_solver
 export PYTHONPATH=".:../../src:../../../RIND3D_Generator/src:../../../RIND3D_Dataset1K" OMP_NUM_THREADS=1
-native/build.sh "$(which python)"                                         # optional GMP helper
-python cbc_run.py CONTAINER.npz WINDOW CHANNEL OUT.json --seconds 10      # one label
-CBC_VERIFY_SPLITS=1 python cbc_run.py ...                                 # with per-split certificates
-python batch.py OUTDIR ../global_inverse/tasks.json:holdout ... --runner cbc_run.py   # benchmark
-python compare.py OUTDIR                                                  # reference comparison
-python chaos.py ROOT KEY --seeds 3 --seconds 20                           # search-independence test
-python audit_exact.py CONTAINER.npz W S OUT.json --seconds 8              # exact point audit
-python smt_screen.py                                                      # z3 proofs
-python -m pytest -q test_cbc.py test_wire.py test_poly_exact.py ../global_inverse/test_global.py \
-    ../xlf_assurance/test_assurance.py
+native/build.sh "$(which python)"                                    # optional GMP octree helper
+python cbc_run.py CONTAINER.npz WINDOW CHANNEL OUT.json --seconds 10 # the single certification path
+python -m pytest -q test_cbc.py test_wire.py test_poly_exact.py test_adversarial.py test_regression.py \
+    ../global_inverse/test_global.py ../xlf_assurance/test_assurance.py
+python smt_screen.py && python smt_kernel.py                         # z3: 6 + 16 lemmas
+python chaos.py ROOT KEY --seeds 3 --seconds 20                      # search independence, split oracle on
+python audit_exact.py CONTAINER.npz W S OUT.json --seconds 8         # exact point audit
+python batch.py OUTDIR MANIFEST:SPLIT --runner cbc_run.py && python compare.py OUTDIR
 ```
 
-## 1. Trusted computing base
+## 0. Mode-difference audit (v2.9e) and its resolution
 
-| module | role | trusted? |
+**What differed.** A source search (`grep VERIFY_SPLITS|SPLIT_HOOK|CBC_` over the trusted modules) finds exactly
+one difference between v2.9e certified mode and speed mode. With `CBC_VERIFY_SPLITS=1`, `Kernel.__init__`
+installed `polycheck.verify_split` as `poly.SPLIT_HOOK`, and `Poly.split` called it after constructing both halves.
+Nothing else differed:
+* the structure checks of credited and charged polytopes;
+* the release discipline;
+* the exact cones, screens and credits.
+
+(`CBC_NATIVE` selects between two implementations of the same octree, and `CBC_MIXED` only removed validated rows;
+neither changes the trust model.)
+
+| question | answer |
+|---|---|
+| 1. operation present in one mode only | `verify_split(parent, row, neg, pos)` on every split inside every transition: Lemma V vertex-set equality, plus `polycheck.check` of both halves |
+| 2. invariant protected | I1 (cover: no feasible volume lost by a split) and FS (exact volumes, exact facet rows, correct edges) for every polytope, including the intermediate ones inside cut chains that no other check sees |
+| 3. needed for soundness? | Only if `Poly.split` can deviate from Lemma V or break FS. It cannot: Theorem P (design §8.1), a code-level proof. The mathematics (Lemma V, FS) was already proven; the check compensated for the *implementation* not being proven |
+| 4. compensating for untrusted code? | Yes. It re-proved, at run time, a property of the split implementation that had only been tested |
+| 5. correct by construction instead? | Yes: the split primitive is proven (Theorem P) from an FS precondition that holds inductively from the cube, since every polytope the kernel holds comes from `Poly.cube()` or `split` |
+| 6. redundancy under the actual representation | Exact Python integers everywhere in `split`. The binary64 filter decides only the early exits, with a proved margin and exact fallback. Theorem P therefore applies to the executed code, and the check is redundant |
+| 7. cheap intrinsic replacement | Not needed for splits. The one place where volumes enter the bound keeps a cheap guard (§3) |
+| 8. performance of the unified implementation | Equals speed mode: certified mode cost +23% wall time over the canary and 10 certifications at 10 s (XLF_CBC_RESULTS §5–6) |
+
+**Behavioural evidence** (EMPIRICALLY TESTED, consistent with the proof): on all 786 canary channels that both
+v2.9e modes certified, the payload bytes and bounds are identical. The check never changed a decision; it never
+failed on 494,099 canary splits or in the chaos campaigns.
+
+**What each mode guaranteed in v2.9e.** Both modes shared one algorithmic proof (design §2a), and both trusted the
+same cone, envelope, screen, octree and serialization code.
+* Certified mode additionally re-established Theorem P's conclusion for every split at run time.
+* Speed mode relied on Theorem P's conclusion without a written code-level proof (tests only).
+
+v3.0 writes that proof, removes the switch and the hook from production code, and keeps `verify_split` as an
+external oracle (`polycheck.instrument_splits()`, used by `chaos.py` by default and by the tests).
+
+## 1. Trusted computing base (v3.0)
+
+| module (trusted part) | role | lines incl. docstrings |
 |---|---|---|
-| `inputs.py` (Astra) | decode one v3 channel: canonical integer obstacle rows, [x,y,z] class array, origin, identity | yes (input) |
-| `cbc_kernel.py` | state, transitions, release, `certify` driver, envelope assembly, `separators`, octree credits, encoder, snapshot | **yes** |
-| `polycheck.py` | structural certificate `check`, per-split certificate `verify_split` (`check_reference` = test oracle) | **yes** (a checker) |
-| `screen2.py` | Numba integer screens, candidate masks, range guard | **yes** |
-| `native/cells.cpp` (optional; `CBC_NATIVE=0` disables) | GMP octree cell credits, the same algorithm as `_grid_credit_python` | yes when enabled |
-| `global_inverse/poly.py` (Astra + filter, subnormal guard, split hook) | exact homogeneous-integer polytopes | **yes** |
-| `global_inverse/solver.py`: `cone`, `apply_pair`, `subtract_many`, `Observation.cleared`, `exclude_window` (Astra) | exact inverse cones, pair conditioning, exclusions | **yes** |
-| `global_inverse/envelopes.py`: `Envelope`, `clearance_partition` (Astra) | guaranteed and possible shadows; clearance | **yes** |
-| `global_inverse/raster.py`: `fixed` (Astra) | directed fixed-point rounding | **yes** |
-| `global_inverse/penumbra.py` (Astra + axis fallbacks) | cone-facet proposals, with exact validation inside | validation only |
-| `xlf_assurance/ledger.py` `encode`/`decode`, `kernel.py` `wire_bound`, `ceil_mass`, `single_cell` (Astra) | exact quotas, strict decoding, integer TV bound | **yes** |
-| `shadow_facets.py`, `hull_proposals.py`, `cbc_search.py`, `solver.choose_pairs` | proposals and policy | **no** (outputs are validated or re-proved) |
-| `run.py` writer, `cbc_run.py`, `batch.py` | atomic writer that re-reads the bytes; CLI | writer re-checks |
-| `chaos.py`, `exactcheck.py`, `audit_exact.py`, `compare*.py`, `diag.py`, `hunt.py`, `smt_screen.py` | independent instruments | no (not in the certificate path) |
+| `cbc_kernel.py` | private problem, state, transitions, release, `certify`, envelope assembly, `separators`, octree credits, encoder, snapshot | ≈ 660 |
+| `polycheck.py` `check`, `_topology`, `_sign_matrix` | structural certificate used by the two retained guards (§3) | ≈ 190 |
+| `screen2.py` | Numba integer screens, masks, range guard | ≈ 175 |
+| `global_inverse/poly.py` | exact polytopes (split, volume, side, filter) | ≈ 190 |
+| `global_inverse/solver.py` (cone, apply_pair, subtract_many, Observation.world/exclude_window/cleared) | exact cones and set algebra | ≈ 90 |
+| `global_inverse/envelopes.py` (Envelope, clearance_covers, clearance_partition) | shadows, clearance | ≈ 80 |
+| `global_inverse/raster.py` (`fixed`), `penumbra.py` (exact validation part) | directed rounding; cone-facet validation | ≈ 30 |
+| `xlf_assurance/ledger.py` (encode, decode), `kernel.py` (wire_bound, ceil_mass, single_cell, cell_id) | wire format, integer bound | ≈ 70 |
+| `inputs.py` | container decoding (shared input path) | ≈ 60 |
+| `native/cells.cpp` (optional) | GMP octree, a transliteration of the Python path | ≈ 340 C++ |
 
-The trusted base is about 1,600 lines of Python and Numba including docstrings (plus 340 lines of optional C++). Search code (about 400
-lines) can change freely without affecting soundness.
+**Not trusted** (may change freely):
+* proposal and search code: `cbc_search.py`, `shadow_facets.py`, `hull_proposals.py`, `solver.choose_pairs`,
+  `penumbra.directions` proposals;
+* the CLI and batch tools;
+* instruments: `polycheck.verify_split`/`instrument_splits`, `check_reference`, `chaos.py`, `audit_exact.py`,
+  `exactcheck.py`, `compare*.py`.
 
-## 2. Code-path review: every operation that can create credit or discard mass
+**Boundary enforcement** (program structure; Python cannot stop deliberate reflection, see §5):
+* The kernel builds its own problem copy at construction. The search never holds a reference to any mutable
+  trusted object: evidence arrays are read-only and private to the kernel, the search receives read-only views
+  and polytope copies, and the State is immutable and replaced atomically.
+* A static test (`test_adversarial.py::test_untrusted_modules_never_touch_kernel_private_state`, AST) requires
+  that the untrusted modules never access `_`-prefixed attributes, never assign attributes on the kernel, and
+  import only `certify` from the kernel module.
+* **Gap found and closed in v3.0.** Through v2.9e the kernel cached its obstacle polytopes, facet geometry and
+  clearance covers on the observation object it shared with the search. A search that overwrote
+  `obs.obstacles` would have made the separating-plane validation check the wrong vertices. This was never
+  exercised, but it was a real channel; `private_problem` removes it.
 
-This review was done in full for v2.9 (all files above). For each operation, it says why the operation cannot
-create unjustified feasible mass or discard unresolved feasible mass.
+## 2. Primitive-by-primitive assurance (what is proven, what is assumed)
 
-| # | operation | code | justification | status |
+| # | primitive | code | assurance |
+|---|---|---|---|
+| 1 | input decoding | `inputs.load` | CONDITIONAL on the container decoder and canonical geometry, which are shared with FastLabel and the exact verifier. Astra's re-render agrees on 229 M voxels (EMPIRICALLY TESTED) |
+| 2 | obstacle rows | `certificates.integer_row` | exact rationals of the binary64 parameters (reviewed) |
+| 3 | split, within, without, subtract_many, apply_pair, exact cuts, window exclusion, clearance partition | `poly.py`, `solver.py`, `envelopes.py`, `cbc_kernel._exact_cut` | **PROVEN, code-level** (Theorem P and §8.2); arithmetic cores IMPLEMENTATION-VERIFIED (z3 S1–S3, Q1–Q2); EXACT-TESTED (`test_poly_exact`: independent vertex enumeration, degenerate cuts, real cones); EMPIRICALLY TESTED (494,099 canary splits and all chaos splits pass the external oracle) |
+| 4 | sign filter | `Poly.side`, `_fsign_terms`, `filter_vertices` | PROVEN (error analysis ≤ 6u Σ\|terms\| ≪ 10⁻¹² margin; subnormals and non-finite values exact) |
+| 5 | polytope structure and volume | FS, fan volume | PROVEN (Lemma FS, Theorem P); checked at the two guards of §3 |
+| 6 | inverse cone | `solver.cone` | PROVEN, code-level (§8.3); elimination core IMPLEMENTATION-VERIFIED (z3 C1–C2); EXACT-TESTED (segment tests) |
+| 7 | guaranteed and possible shadows, separators | `Envelope`, `encoded_subset`, `separators`, `penumbra` validation | PROVEN (§4, §4d, §4f, §8.3); pair-row rules and separation IMPLEMENTATION-VERIFIED (z3 E1–E3) |
+| 8 | directed rounding and screens | `raster.fixed`, `screen2` | IMPLEMENTATION-VERIFIED at source level (z3, `smt_screen.py`); EXACT-TESTED against a pointwise int64 reference; CONDITIONAL on Numba compiling int64 `//` as floor division and the loops as written |
+| 9 | masks, subset screens, inheritance | `_mask`, `remap_masks`, `Piece` | PROVEN (§4b, §4) |
+| 10 | per-cell credits | `_grid_credit_python` / `cells.cpp` | PROVEN (octree argument, with clips by Theorem P); native ≡ Python EXACT-TESTED; total conservation checked at run time |
+| 11 | accounting, non-overlap | `_commit`, `_settle`, `snapshot` | PROVEN, code-level (§8.4); EMPIRICALLY TESTED (chaos misuse, `test_adversarial`) |
+| 12 | posterior theorem, integer bound | `kernel.wire_bound` | PROVEN (Astra); per-cell inequality and floors IMPLEMENTATION-VERIFIED (z3 T1–T3); EXACT-TESTED (300 random instances) |
+| 13 | serialization | `encode_int`, `ledger.decode`, `run.write_result` | PROVEN (§8.4); EXACT-TESTED (byte-identical to `ledger.encode` on 200 instances; tampering rejected) |
+| 14 | release | `Kernel.release`, `certify` | PROVEN by construction (§4h, §8.4); EMPIRICALLY TESTED (forged results, search exceptions, chaos) |
+
+**The ≈ 300 lines of closed-form algebra** (cone, Envelope, separators, clearance) are now PROVEN at code level, and
+their arithmetic cores are IMPLEMENTATION-VERIFIED. What is not mechanized is the correspondence between each z3
+formula and its source line: it is a direct transcription, reviewed in §8. A transcription error would show up
+in the exact differential tests, which detect it but do not prove its absence.
+
+## 3. Runtime checks that remain, and why
+
+| check | invariant | needed by the proof? | why kept | cost |
 |---|---|---|---|---|
-| 1 | input decoding | `inputs.load` | SOLID ∧ active rejected; window/channel eligibility checked; class array read-only | CONDITIONAL on the container decoder and canonical geometry (Astra's re-render: 229 M voxels agree) |
-| 2 | obstacle rows | `certificates.integer_row` | exact rationals of the canonical binary64 parameters | reviewed (Astra); exact |
-| 3 | window and obstacle exclusion | `Kernel.exclude_window` → `Observation.exclude_window`, `subtract_many` | F misses the closed window and closed obstacles; exact closed differences | MATHEMATICALLY PROVEN |
-| 4 | inverse cone C_K(r) | `solver.cone` | elimination of t ∈ [0, 1]: facets with f(r) ≥ 0 and the pair rows f_i(r) f_j + \|f_j(r)\| f_i (re-derived in this review); a receiver in or on K raises (abstain) | MATHEMATICALLY PROVEN; EXACT-DIFFERENTIAL-TESTED (`test_cone_cuts_match_reference`, exact segment tests in `test_cbc`) |
-| 5 | pair conditioning | `apply_pair` | equals P ∩ ⋃C(d) ∖ ⋃C(a) as a first-cover disjoint union | MATHEMATICALLY PROVEN; EMPIRICALLY TESTED (exact audit of discarded points) |
-| 6 | polytope split, `within`, `without` | `Poly.split` | Lemma V + FS (design §4g); children's vertices lie in the parent, on the correct side, by construction | MATHEMATICALLY PROVEN; EXACT-DIFFERENTIAL-TESTED (`test_poly_exact`: independent half-space vertex enumeration); RUNTIME-CERTIFIED per split with `CBC_VERIFY_SPLITS=1` |
-| 7 | sign filter | `Poly.side`, `_fsign_terms`, `polycheck._sign_matrix` | error ≤ 6u Σ\|terms\| ≪ margin 10⁻¹²; subnormal coordinates, non-finite or tiny sums fall back to exact (v2.9a fix: subnormal vertices previously had no relative error bound; reachable only with split rows ≳ 2¹⁰⁰⁰) | MATHEMATICALLY PROVEN (error analysis); payload byte-identity with the filter off |
-| 8 | guaranteed shadow | `Envelope.inner`, from non-contact vertices only | intersection of S_K(v); tightest-pair pruning exact given f_i(r) ≤ 0; vertices in K impose nothing (design §4f) | MATHEMATICALLY PROVEN |
-| 9 | possible shadow | `Envelope.outer` + `penumbra.directions` + `separators(mixed_candidates)` | facet/pair rows (design §4); every row that separates K∩cube from P is valid (blocking point lies in the cube); mixed facets complete O = K + cone(K−P) (Lemma O) | MATHEMATICALLY PROVEN; validation exact in the kernel |
-| 10 | directed fixed point | `raster.fixed` | rounding up shrinks guaranteed, down grows possible, for positive receiver coordinates | IMPLEMENTATION-VERIFIED (z3) |
-| 11 | screens | `screen2._intervals`, `scan_collect`, `scan_ids` | exact scanline endpoints, int64 range, range guard `check_ranges` | IMPLEMENTATION-VERIFIED (z3: endpoints, int64 range) at source level; EXACT-DIFFERENTIAL-TESTED (pointwise int64 reference); CONDITIONAL on Numba compiling int64 `//` as floor division |
-| 12 | candidate masks, subset screens | `_mask`, `remap_masks`, `encoded_subset(rel)` | a body outside m(r) cannot block r on the piece or any subset | MATHEMATICALLY PROVEN; tested |
-| 13 | inherited obligations | `Piece.pending/done/masks` | monotonicity of both shadows in P; arrays read-only (v2.9a) | MATHEMATICALLY PROVEN |
-| 14 | exact enforcement | `Kernel.enforce`, `_exact_cut` | exact cones over the candidate bodies; dark: first-cover union; lit: subtraction; "no volume created" guard | MATHEMATICALLY PROVEN; EXACT-DIFFERENTIAL-TESTED |
-| 15 | clearance | `Observation.cleared`, `clearance_partition` | outward offsets with a directed integer sqrt; inward 2⁻²⁶ translates lie within 2⁻²⁶ of K | MATHEMATICALLY PROVEN (reviewed) |
-| 16 | settlement (IN credit) | `Kernel._settle` | no pending receivers + I4 + I5 + clearance ⇒ legal parts ⊆ F; every credited polytope passes `polycheck.check` first (v2.9a) | MATHEMATICALLY PROVEN; RUNTIME-CERTIFIED (structure) |
-| 17 | volume | `Poly.volume` (fan, \|det\|) | exact for FS-valid polytopes (Lemma FS) | MATHEMATICALLY PROVEN given FS; FS RUNTIME-CERTIFIED for credited and charged polytopes |
-| 18 | per-cell credits | `_grid_credit_native` / `_python` | octree with validated facet rows; interior blocks exact; boundary cells floor/ceil of the exact clip; conservation against the exact piece volume | MATHEMATICALLY PROVEN; EXACT-DIFFERENTIAL-TESTED (native ≡ Python); RUNTIME-CERTIFIED (total conservation; the per-cell distribution relies on the octree's own splits) |
-| 19 | unknown charges | `snapshot`: `ceil_mass`, `single_cell` | every live piece (deferred shells included) charged ⌈vol⌉; exact grid bounds; FS of each charged polytope checked | MATHEMATICALLY PROVEN; RUNTIME-CERTIFIED (structure) |
-| 20 | non-overlap | `_commit` | parents removed before children are added; a stale or duplicate handle raises before any change; children are disjoint by construction (split halves, first-cover, subtraction chains) | by construction; EMPIRICALLY TESTED (chaos misuse) |
-| 21 | TV bound | `kernel.wire_bound` | Astra's frontier theorem; integer floors at 2⁻⁹⁶ round the bound outward | MATHEMATICALLY PROVEN; EXACT-DIFFERENTIAL-TESTED (300 random instances: exact bound ≤ wire bound ≤ exact + m·2⁻⁹⁶, true TV ≤ bound) |
-| 22 | normalization and serialization | `encode_int`, `ledger.decode` | 2⁵² exact ticks, largest remainder; strict decoding (sorted ids, finite, 0 < p ≤ 1, exact sum 1) | MATHEMATICALLY PROVEN; tested (byte-identical to `ledger.encode` on 200 instances) |
-| 23 | status decision | `Kernel.release`, `certify` | only kernel-recorded (payload, bound) pairs; best bound; taint ⇒ ERROR | by construction; EMPIRICALLY TESTED (chaos) |
-| 24 | writing | `run.write_result` | re-reads the file; wire bytes, sha256, bound ≤ tolerance, cell count must match; an INCOMPLETE record cannot carry a wire | tested |
-| 25 | timeouts, caps | `Budget`, `Limit`, atomic `_commit` | an interrupted transition leaves the state unchanged; any valid state is a valid checkpoint | by construction |
-| 26 | overflow and resource limits | `check_ranges`; Python big integers; split rows ≤ 2⁴⁰⁹⁶; native hex vertex keys (v2.9b: the decimal key broke on > 4300-digit integers); `COLLECT_CAP` overflow keeps the full obligation | an exception aborts the run (no certificate); an ArithmeticError taints | by construction |
+| `polycheck.check` of every IN-credited polytope (in `_settle`) and every charged live polytope (in `snapshot`) | FS of the polytopes whose volumes enter the bound | no (Theorem P) | It is the only place where probability mass is created or charged, so a cheap guard there makes a future defect in the split code or its proof fail closed instead of silently. It is the single defence in depth on the credit path | 0.5% of wall |
+| exact volume conservation in `Kernel.split` and the octree (Python and native) | exactness of a search split / of the cell distribution total | no | free with cached volumes; fail-closed against a native-build mismatch | < 0.1% |
+| "a cut cannot create volume" in `enforce` | subset property of cut children | no | volumes are needed anyway by the scheduler (cached) | < 0.1% |
+| `check_ranges` before every screen | int64 range of the z3 proof | **yes**: the z3 proof assumes \|coef\| ≤ 2⁴⁵ and coordinates ≤ 2¹¹ | it is the proof's precondition | negligible |
+| argument validation (receivers, rows ≤ 2⁴⁰⁹⁶, handles, exact tolerance) | the transition preconditions of §2a | **yes** | the search is untrusted | negligible |
+| taint on ArithmeticError | no certificate after any failed guard | **yes** (fail-closed semantics) | — | none |
 
-**Defects found and fixed in this review (v2.9a–b).** None of them was ever observed to produce a wrong
-certificate. Each was either a latent soundness gap reachable only by a search outside the current policy, or a
-robustness failure.
+Removed: the per-split certificate (moved to the test oracle).
 
-1. The untrusted search decided CERTIFIED and held the payload/bound pairing. **Fixed:** release discipline, design
-   §4h.
-2. The kernel's obligation and mask arrays were shared mutably with the search: an in-place write would have
-   silently weakened I4 or the masks. **Fixed:** read-only arrays and views, polytope copies.
-3. Subnormal vertex coordinates broke the float filter's error model: with a coordinate near 2⁻¹⁰⁷⁴ and a row
-   coefficient near 2¹⁰²⁰, the filter could report a wrong sign. **Fixed:** exact fallback.
-4. The native helper keyed vertices by decimal `str()`, which fails above 4300 digits. Found by the chaos search.
-   **Fixed:** hex keys and the split-row bound.
-5. No structural certificate existed for the face structure that volume, octree and split all rely on.
-   **Fixed:** `polycheck`, run on every credited and charged polytope, and per split on request.
+## 4. Tests and checks (v3.0)
 
-## 3. Numerical model
-
-| computation | representation | why it is exact or outward |
+| suite | scope | result |
 |---|---|---|
-| obstacles | integer rows from the canonical binary64 parameters | exact |
-| receivers | homogeneous integers (2(o+i)+1, …, 2048) | exact |
-| polytopes | primitive homogeneous integer vertices (≈ 360 bits typical); exact plane intersections | exact; FS runtime-certified (§2 rows 6, 16, 19) |
-| sign tests | binary64 filter certain iff \|v\| > 10⁻¹²·Σ\|terms\|, normal coordinates only; exact integers otherwise | exact decision (row 7) |
-| receiver screens | rows normalized to 2⁴⁵, directed rounding; int64 with \|value\| < 2⁵⁸ | z3-proved (rows 10, 11) |
-| volumes, credits | rationals; floor/ceiling at 2⁻¹⁶⁰; interior cells exactly 2¹³⁹ units | exact + outward integer conversion |
-| clearance | outward offsets with a directed integer sqrt; inward rational translates | exact |
-| TV bound | integer arithmetic at 2⁻⁹⁶ | outward |
-| output | 2⁵² exact ticks, binary64 values summing exactly to 1 | exact |
+| `test_cbc.py` | scan equivalences, pointwise int64 reference, masks, subset screens, split partition, exact segments, exclusion, decoded certificate, unvisited mass | 12 pass |
+| `test_wire.py` | bound instances, tampering, encoder identity | 501 pass |
+| `test_poly_exact.py` | split vs independent vertex enumeration; FS corruptions rejected; fast vs reference check; split oracle accepts/rejects; subnormals | 17 pass |
+| `test_adversarial.py` | the 16 tests listed in its docstring, including forged certificates, double settlement, input mutation after construction, injected structure failure, timeouts and the static boundary check | 16 pass |
+| `test_regression.py` | 214-cell posterior, both legacy Tau-pencil defects, hull-only L256 case, wedges task (exact references) | 5 pass |
+| Astra's `test_assurance.py`, `test_global.py` | missing-sibling counterexample, closed 64³ room, ledger, cones, envelopes | 13 + 25 pass |
+| `smt_screen.py`, `smt_kernel.py` | z3 lemmas | 6/6 + 16/16 PROVED |
 
-Floating point appears only in (i) the sign filter (proved margin, exact fallback) and (ii) proposals (support
-planes, mixed facets, hull receivers, split planes), all of which are validated exactly or re-proved.
+## 5. Final proof and risk report
 
-## 4. Tests and checks (v2.9d)
+**PROVEN (manual).**
+* The frontier posterior theorem.
+* Every transition lemma (design §3–§4h).
+* Theorem B (algorithmic soundness).
+* The code-level proofs of the split primitive, set algebra, cones, envelopes, separators, clearance, accounting,
+  serialization and release (§8).
 
-| check | scope | result |
-|---|---|---|
-| Astra's assurance and geometry tests (`xlf_assurance/test_assurance.py`, `global_inverse/test_global.py`) | ledger, missing sibling, wire, cones, envelopes, clearance | 13 + 25 pass |
-| `test_cbc.py` | scan equivalences, pointwise int64 reference, masks, subset screens, split partition, enforced children (exact segments), window exclusion, end-to-end decoded certificate, unvisited mass charged | 12 pass |
-| `test_wire.py` | 300 random exact bound instances, tampering, 200 encoder byte-identity instances | 501 pass |
-| `test_poly_exact.py` | Poly.split vs independent half-space vertex enumeration (degenerate small rows, dyadic planes, 60-bit random planes, real inverse cones); FS check rejects 4 corruption types; `check` ≡ `check_reference` on valid and corrupted structures; `verify_split` accepts exact halves and rejects swapped or wrong-plane halves; subnormal coordinates use exact signs | 17 pass |
-| `smt_screen.py` (z3) | interval endpoints exact, no int64 overflow, directed rounding monotone | 6/6 PROVED |
-| byte identity | v2.9a vs v2.8 on the 90-task benchmark (structure checks, release refactor) | 84/84 certified payloads identical |
-| chaos search (`chaos.py`) | random legal API sequences + misuse; every snapshot vs exact-certified references | see `XLF_CBC_RESULTS.md` §3 |
-| exact differential audit (`audit_exact.py`) | sampled exact points of IN pieces feasible; discarded points infeasible | see `XLF_CBC_RESULTS.md` §3 |
-| run-time guards | structure of credited and charged polytopes; split conservation; no volume creation by cuts; octree conservation; facet-row validation; screen ranges; per-split certificate (optional) | abort on violation (never observed) |
+**IMPLEMENTATION-VERIFIED (z3).**
+* The screen interval arithmetic, int64 range and directed rounding.
+* The split crossing point and the orientation and lexicographic tests.
+* The cone elimination core.
+* The envelope pair-row rules and the separation lemma.
+* The clearance square root and distance.
+* The per-cell posterior inequality and the integer TV floors.
 
-## 5. Can per-label physical replay be dropped?
+**EXACT-TESTED.**
+* Split vs independent vertex enumeration.
+* Native ≡ Python octree.
+* Screens vs the pointwise reference.
+* Bound and encoder property tests.
+* Regression fixtures against exact references.
 
-A replay re-checks, after the fact, that the credited regions are feasible and the discarded ones infeasible. In CBC,
-the same facts follow from the transition lemmas (design §3–4h), provided the code implements them. The table below
-lists the remaining obligations between "the lemmas hold" and "this run's certificate is correct", narrowest first,
-with how each is discharged per label.
+**EMPIRICALLY TESTED.**
+* 0 inconsistencies against 86 exact references and 786–796 canary labels.
+* Chaos campaigns: 0 violations.
+* Exact point audits: 0 violations.
+* The external split oracle: 0 failures.
 
-| obligation | discharged per label by | residual trust |
-|---|---|---|
-| polytope arithmetic (split, within, without, volumes, faces) | `CBC_VERIFY_SPLITS=1`: every split certified (Lemma V + FS); credited and charged polytopes always FS-checked | the checker `polycheck` (≈ 230 lines; independent of the producer, differential-tested against an O(k²) reference) |
-| TV bound, encoding, decoding | exact integer computation on the output bytes in every run | `wire_bound`, `encode_int`, `decode` (≈ 60 lines; property-tested) |
-| status, overlap, failure handling | release discipline, atomic commits, taint | ≈ 80 lines of kernel bookkeeping (reviewed; chaos-tested) |
-| receiver screens | z3 proofs of the integer arithmetic | Numba compilation of ≈ 100 lines; CPython big integers |
-| cone and envelope formulas | MATHEMATICALLY PROVEN algebra | ≈ 120 lines (`cone`, `Envelope`, `separators`, `cleared`, `clearance_covers`), reviewed in §2 |
-| per-cell octree | conservation against the exact (FS-checked) piece volume | the octree's own splits (native GMP or Python) for the distribution among cells |
-| inputs | — | container decoding and canonical geometry (shared with every labeller) |
+**CONDITIONAL.**
+* Numba compiles the screen loops faithfully.
+* CPython's integer, `Fraction` and container semantics.
+* The input decoder and canonical geometry.
+* For the native octree: g++/GMP correctness and the transliteration review.
+* The search is not malicious at the interpreter level (no reflection into the kernel).
 
-**Answer.** With `CBC_VERIFY_SPLITS=1`, no per-label physical replay is needed for the polytope arithmetic, the
-accounting, the bound or the serialization: these are certified inside the run. The remaining trust is in about
-300 lines of closed-form algebra (cones, envelopes, clearance), the Numba compiler and the input decoder. None of
-these is per-label data-dependent search code. A machine-checked proof of the algebra (Lean or Coq; no proof
-assistant was available in this environment) and a pinned build would close the gap. The independent exact audit
-remains a development tool: it found no violation, and it is not needed for each label.
-
-## 6. Remaining gaps (OPEN)
-
-1. **No machine-checked proof** of the cone, envelope, clearance and frontier lemmas. They are manual proofs, and
-   the code is reviewed and tested against them.
-2. **Per-split certification costs wall time in Python:** +23% in total on the canary, and up to about 2× on runs
-   dominated by cuts. It is the default (certified mode); speed mode (`CBC_VERIFY_SPLITS=0`) certifies 10 more
-   canary channels at 10 s. A native checker would remove the trade-off.
-3. **Per-cell distribution inside one IN piece.** The octree's clipped volumes are not individually certified,
-   only their total. A native `verify_split` inside the octree would close this.
-4. **Build identity.** Numba `cache=True`, g++ and GMP are unpinned.
-5. **Interpreter isolation.** The search runs in the kernel's process. Read-only arrays and copies prevent
-   accidental interference, not a malicious search.
-6. **Inputs.** The decoder and the canonical geometry are trusted inputs (shared with FastLabel and the exact
-   verifier).
+**OPEN.**
+* No machine-checked proof of the control flow (Lean/Coq; no proof assistant here).
+* Pinned and reproducible builds (Numba cache, LLVM, g++, GMP) and a build hash recorded in the envelope.
+* Process-level isolation of the search, which would remove the reflection assumption.
