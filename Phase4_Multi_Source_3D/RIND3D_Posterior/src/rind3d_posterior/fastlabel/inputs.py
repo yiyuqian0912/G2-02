@@ -96,6 +96,8 @@ def window_from_100k(container, w, s, scene_index=None):
 
     def make():
         with np.load(container, allow_pickle=False) as z:
+            if "balls" in z.files and z["balls"].size:
+                raise ValueError(f"FastLabel supports polyhedral solids only; {container} has curved occluders (balls)")
             meta = json.loads(z["meta"].tobytes().decode())
             W = z["windows"]; idx = z["obs_index"]; blob = z["obs"].tobytes()
             P, K, src = z["P"], z["K"], z["sources_hex"]; geo = z["geometry"].tobytes()
