@@ -188,6 +188,8 @@ def search(kernel, budget, obs, key, tolerance, pairs=24, strategy="interface",
                     lo_v, unk_v = kernel.lower_total_float(), kernel.unknown_volume()
                     if unk_v > 2 * float(tolerance) * (lo_v + unk_v):
                         continue  # hint: the bound cannot be near the target yet; skip the snapshot
+                    if not kernel.checkpoint_worthwhile(tolerance):
+                        continue
                     payload, bound = checkpoint()
                     trace.append([round(perf_counter() - t0, 3), float(bound)])
                     if bound <= tolerance:

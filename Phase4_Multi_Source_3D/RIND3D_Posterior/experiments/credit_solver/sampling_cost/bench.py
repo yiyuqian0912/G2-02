@@ -13,6 +13,8 @@ p.add_argument("kernel_dir",type=Path)
 p.add_argument("work",type=Path)
 p.add_argument("output",type=Path)
 p.add_argument("--cases",nargs="+",required=True,help="slot_wNN_sN:soft_seconds")
+p.add_argument("--cap",type=int,default=4096)
+p.add_argument("--artifacts",type=Path,help="Retain verified research labels outside the source tree.")
 a=p.parse_args()
 sys.path.insert(0,str(a.kernel_dir.resolve()))
 import inputs
@@ -44,14 +46,18 @@ with a.output.open("x") as out,tempfile.TemporaryDirectory() as tmp:
         slot,w,j=key.split("_")
         t,cpu=perf_counter(),process_time()
         obs,ident=inputs.load(a.work/"sampling_impact/v3/scenes/0000"/(slot+".npz"),int(w[1:]),int(j[1:]))
-        raw,details=solve(obs,key,tol,int(budget))
+        raw,details=solve(obs,key,tol,int(budget),a.cap)
         path=Path(tmp)/"label.json"
         write_result(path,ident,tol,raw,details)
         r=json.loads(path.read_bytes())
         if raw is not None:
             import evidence
             evidence.check_artifact(r,ident)
-        print(json.dumps(dict(key=key,budget=int(budget),wall=perf_counter()-t,cpu=process_time()-cpu,
+            if a.artifacts is not None:
+                a.artifacts.mkdir(parents=True,exist_ok=True)
+                with (a.artifacts/(key+".json")).open("xb") as dst:
+                    dst.write(path.read_bytes())
+        print(json.dumps(dict(key=key,budget=int(budget),cap=a.cap,reason=details["search_reason"],wall=perf_counter()-t,cpu=process_time()-cpu,
               warmup=warm,status=r["status"],tv=float(Fraction(r["tv"])) if r.get("tv") else None,
               cells=r.get("cells",0),wire=r.get("wire_sha256"),stats=details["stats"],trace=details.get("trace"),
               lower=details.get("lower_volume"),unknown=details.get("unknown_volume"),

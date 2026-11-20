@@ -257,6 +257,7 @@ class State:
     upper_in: Counter
     next_id: int
     outside_window: bool
+    lower_units: int = 0
 
 
 def private_problem(observation, centroid_anchor=True):
@@ -342,7 +343,7 @@ class Kernel:
         return bool(self._state.lower)
 
     def lower_total(self):
-        return Fraction(sum(self._state.lower.values()), SCALE)
+        return Fraction(self._state.lower_units, SCALE)
 
     # ---------------------------------------------------------------- commit
     def _commit(self, remove, children, lower=None, upper=None, exclude=False):
@@ -360,7 +361,8 @@ class Kernel:
         if upper:
             hi = hi.copy()
             hi.update(upper)
-        self._state = State(live, lo, hi, old.next_id + len(children), old.outside_window or exclude)
+        lower_units = old.lower_units + (sum(lower.values()) if lower else 0)
+        self._state = State(live, lo, hi, old.next_id + len(children), old.outside_window or exclude, lower_units)
         self.stats["transitions"] += 1
         self.stats["peak_live"] = max(self.stats["peak_live"], len(live))
         return new_ids
@@ -715,6 +717,20 @@ class Kernel:
             self.stats["structure_checks"] += 1
             self.stats["structure_seconds"] += perf_counter() - t
 
+    def checkpoint_worthwhile(self, tolerance):
+        """Scheduling only. Never issues a label; release always takes a final snapshot."""
+        st = self._state
+        if len(st.lower) < 4096:
+            return True
+        # Single-cell live pieces have disjoint interiors. Each ceiling adds <1 unit.
+        # Every overlap denominator is >= L + max(0, U - CELL_UNITS - n_live).
+        u = sum(ceil_mass(piece.poly) for piece in st.live.values())
+        extra = max(0, u - CELL_UNITS - len(st.live))
+        possible = extra*tolerance.denominator <= tolerance.numerator*(st.lower_units+extra)
+        if not possible:
+            self.stats["deferred_snapshots"] += 1
+        return possible
+
     def snapshot(self):
         state = self._state
         if not state.lower:
@@ -759,7 +775,7 @@ class Kernel:
         return sum(float(p.poly.volume) for p in self._state.live.values())
 
     def lower_total_float(self):
-        return sum(self._state.lower.values()) / float(SCALE)
+        return self._state.lower_units / float(SCALE)
 
     def unknown_fraction(self):
         """Search hint: live volume relative to proved IN volume."""
@@ -772,7 +788,7 @@ class Kernel:
 class ProposalAccess:
     """Public operations for a same-process, non-reflective proposal policy."""
     __slots__ = ("_kernel",)
-    _operations = frozenset(("condition_pair", "contact", "enforce", "envelope_rows",
+    _operations = frozenset(("checkpoint_worthwhile", "condition_pair", "contact", "enforce", "envelope_rows",
         "exclude_window", "handles", "is_open", "lower_total_float", "open_handles",
         "pending_count", "poly", "positive", "proposal_problem", "receiver_classes",
         "screen", "snapshot", "split", "unknown_volume", "volume", "projective_patch"))
