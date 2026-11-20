@@ -58,7 +58,7 @@ def _build_bytes():
     from numba import _helperlib
     from numpy._core import _multiarray_umath
     files = {name: HERE/name for name in (
-        "evidence.py","cbc_kernel.py","screen2.py","polycheck.py","validated_input.py","inputs.py",
+        "evidence.py","grid_accounting.py","cbc_kernel.py","screen2.py","polycheck.py","validated_input.py","inputs.py",
         "cbc_search.py","cbc_run.py","run.py","shadow_facets.py","hull_proposals.py")}
     for module in (storage,contracts,geometry,polyhedra,certificates,envelopes,interface_chart,kernel,ledger,penumbra,poly,raster,solver,whole):
         files[module.__name__] = Path(module.__file__)

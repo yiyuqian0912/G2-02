@@ -56,6 +56,7 @@ from poly import within
 from solver import Budget, Limit, Observation, apply_pair, cone, subtract_many
 from kernel import SCALE, ceil_mass, cell_id, single_cell, wire_bound
 import polycheck
+import grid_accounting
 
 COLLECT_CAP = 1 << 21  # largest residual obligation list stored explicitly
 
@@ -352,8 +353,13 @@ class Kernel:
             del live[key]  # a stale or duplicate handle raises KeyError before any change
         new_ids = list(range(old.next_id, old.next_id + len(children)))
         live.update(zip(new_ids, children))
-        lo = old.lower if lower is None else old.lower + lower
-        hi = old.upper_in if upper is None else old.upper_in + upper
+        lo,hi = old.lower,old.upper_in
+        if lower:
+            lo = lo.copy()
+            lo.update(lower)
+        if upper:
+            hi = hi.copy()
+            hi.update(upper)
         self._state = State(live, lo, hi, old.next_id + len(children), old.outside_window or exclude)
         self.stats["transitions"] += 1
         self.stats["peak_live"] = max(self.stats["peak_live"], len(live))
@@ -643,20 +649,29 @@ class Kernel:
                 subtotal = count = 0
                 (i0, i1), (j0, j1), (k0, k1) = p.grid_bounds(128)
                 # Each stack entry carries q = p clipped exactly to its cell block.
-                stack = [((i0, i1, j0, j1, k0, k1), p)]
+                stack = [((i0, i1, j0, j1, k0, k1), p, rows)]
                 while stack:
                     self.budget.check()
-                    (a0, a1, b0, b1, c0, c1), q = stack.pop()
-                    corners = [(x, y, z, 128) for x in (a0, a1 + 1) for y in (b0, b1 + 1) for z in (c0, c1 + 1)]
-                    if all(form(r, cq) <= 0 for r in rows for cq in corners):
+                    box, q, parent_rows = stack.pop()
+                    a0, a1, b0, b1, c0, c1 = box
+                    active = grid_accounting.intersecting(parent_rows,box)
+                    if active is None:
+                        continue
+                    if len(active) <= 1:
                         for x in range(a0, a1 + 1):
                             for y in range(b0, b1 + 1):
+                                self.budget.check()
                                 for z in range(c0, c1 + 1):
+                                    low, high = (grid_accounting.half_cell(active[0],x,y,z)
+                                                 if active else (CELL_UNITS,CELL_UNITS))
                                     cid = cell_id((x, y, z))
-                                    lo[cid] += CELL_UNITS
-                                    hi[cid] += CELL_UNITS
-                                    subtotal += CELL_UNITS
-                        self.stats["cells_interior"] += (a1 - a0 + 1) * (b1 - b0 + 1) * (c1 - c0 + 1)
+                                    if low:
+                                        lo[cid] += low
+                                    if high:
+                                        hi[cid] += high
+                                    subtotal += low
+                                    count += high != low
+                        self.stats["single_facet_blocks" if active else "interior_blocks"] += 1
                         continue
                     if a0 == a1 and b0 == b1 and c0 == c1:
                         mass = q.volume * SCALE
@@ -679,9 +694,9 @@ class Kernel:
                     left[2 * ax + 1] = mid
                     right[2 * ax] = mid + 1
                     if left_q is not None:
-                        stack.append((tuple(left), left_q))
+                        stack.append((tuple(left), left_q, active))
                     if right_q is not None:
-                        stack.append((tuple(right), right_q))
+                        stack.append((tuple(right), right_q, active))
                 total = p.volume * SCALE
                 ok = (subtotal <= total < subtotal + count) if count else (subtotal == total)
                 if not ok:
@@ -715,7 +730,7 @@ class Kernel:
             if cid is not None:
                 unknown_in[cid] += amount
         payload = encode_int(state.lower)
-        bound = wire_bound(payload, state.lower, state.upper_in, unknown_total, unknown_in)
+        bound = grid_accounting.dyadic_bound(payload, state.lower, state.upper_in, unknown_total, unknown_in)
         if self._best is None or bound < self._best[0]:
             self._best = (bound, payload)
         return payload, bound
