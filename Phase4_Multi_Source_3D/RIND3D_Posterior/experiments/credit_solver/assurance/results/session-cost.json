@@ -1,0 +1,36 @@
+{
+  "physical_manifest_sha": "0f1fa5c3df22f32085cd25f44a73db66dc475d9af8490830c0bea657be833f3d",
+  "clean_manifest_identical": true,
+  "exact_references_and_wires_identical": 14,
+  "measured_interval_seconds": 612.2383079528809,
+  "interval_origin": "first owner lock creation through independent verifier process exit (filesystem timestamps)",
+  "initial_manifest_seconds": 21.414750576019287,
+  "clean_plan": {
+    "wall_s": 27.30530109599931,
+    "user_s": 26.496195,
+    "sys_s": 0.8045519999999999,
+    "max_single_process_rss_kib": 867680,
+    "returncode": 0
+  },
+  "retry45": {
+    "wall_s": 129.38878107399796,
+    "user_s": 344.443074,
+    "sys_s": 8.715928,
+    "max_single_process_rss_kib": 2014464,
+    "returncode": 0
+  },
+  "retry360": {
+    "wall_s": 266.4142020100044,
+    "user_s": 502.446949,
+    "sys_s": 9.916204,
+    "max_single_process_rss_kib": 1544580,
+    "returncode": 0
+  },
+  "verify": {
+    "wall_s": 2.704917518996808,
+    "user_s": 2.439146,
+    "sys_s": 0.26561799999999997,
+    "max_single_process_rss_kib": 421776,
+    "returncode": 0
+  }
+}

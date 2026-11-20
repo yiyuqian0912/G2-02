@@ -55,3 +55,157 @@ def test_problem_binding_and_release_ceiling():
     with pytest.raises(ArithmeticError):
         evidence.check_seal(binding,b"","0",Q(1,20),{})
     assert type(coefficients((2,0,1))[-1]) is tuple
+
+
+def test_training_conversion_requires_new_bound():
+    from assurance.training_conversion import audit
+    from ledger import TICKS,RECORD
+    raw=RECORD.pack(0,(TICKS//2+1)/TICKS)+RECORD.pack(1,(TICKS//2-1)/TICKS)
+    r=audit(raw,Q(1,20))
+    assert r['raw_sum']==1 and r['renormalized_tv_change']==Q(1,TICKS)
+    assert r['renormalized_tv_upper']>Q(1,20)
+
+
+def test_resealed_and_truncated_artifacts(tmp_path):
+    import json
+    from test_validated import archive
+    from cbc_search import solve
+    from run import write_result
+    obs, ident=archive()
+    wire,d=solve(obs,"000004_w00_s0",Q(1,20),20)
+    path=tmp_path/"a"
+    write_result(path,ident,Q(1,20),wire,d)
+    raw=path.read_bytes()
+    digest=evidence.digest(raw)
+    build=json.loads(evidence._build_bytes())
+    rec=evidence.read_issued(path,ident,build,digest)
+    assert Q(rec['tv'])>0
+    rec['tv']="0"
+    cert=rec['certificate']
+    cert['statement']['tv']="0"
+    cert['statement_sha256']=evidence.digest(evidence.canonical(cert['statement']))
+    rec['artifact_sha256']=evidence.artifact_digest(ident,cert)
+    # Internal consistency is insufficient for issuer authentication.
+    evidence.check_artifact(rec,ident,expected_build=build,materialize=False)
+    for bad in (evidence.canonical(rec),raw[:-8]):
+        path.write_bytes(bad)
+        with pytest.raises(ValueError,match="issuance digest"):
+            evidence.read_issued(path,ident,build,digest)
+
+
+def test_credit_update_cancellation_and_cached_snapshot(monkeypatch):
+    from test_validated import archive
+    from dataclasses import replace
+    obs,_=archive()
+    kr=ck.Kernel(obs,Budget(30,5000))
+    old=kr._state
+    with monkeypatch.context() as m:
+        def interrupt(*a):
+            raise KeyboardInterrupt()
+        m.setattr(ck,"State",interrupt)
+        with pytest.raises(KeyboardInterrupt):
+            kr.split(0,(2,0,0,-1))
+    assert kr._state is old and kr.handles()==(0,)
+    # Fault injection into the private cache simulates an implementation bug.
+    kr._state=replace(old,lower=Counter({0:1}),upper_in=Counter({0:1}),lower_units=1,live_units=0)
+    assert kr.release(Q(1,20)).status=="ERROR"
+    assert kr._best is None
+
+
+def test_noncanonical_geometry_dtype_rejected():
+    import io,numpy as np
+    from test_validated import SCENE
+    if not SCENE.exists():
+        pytest.skip('requires installed fixture')
+    with np.load(SCENE,allow_pickle=False) as scene:
+        raw=scene["geometry"].tobytes()
+    with np.load(io.BytesIO(raw),allow_pickle=False) as geom:
+        arrays={k:geom[k] for k in geom.files}
+    key=next(k for k,v in arrays.items() if v.dtype.kind=='u' and v.dtype.itemsize<=2 and v.size)
+    arrays[key]=arrays[key].astype(np.int64)
+    stream=io.BytesIO()
+    np.savez(stream,**arrays)
+    with pytest.raises((ValueError,TypeError)):
+        inputs._geometry_rows(stream.getvalue())
+
+
+def test_diffuse_allocation_end_to_end_small_exact_measure():
+    from ledger import decode
+    from grid_accounting import dyadic_bound
+    # Analogue of the ledger after all receiver and clearance obligations passed.
+    # Source body has a skew cut, a mixture of empty/full/partial grid cells, and
+    # an unresolved slab with unknown feasible subset (specified only to the reference).
+    rows=[(-128,0,0,4),(128,0,0,-7),(0,-128,0,4),(0,128,0,-7),
+          (0,0,-128,4),(0,0,128,-7),(128,256,128,-23)]
+    cut=(777,0,0,-36)
+    p=within(Poly.cube(),rows)
+    settled,live=p.split(cut)
+    assert settled is not None and live is not None
+    k=ck.Kernel.__new__(ck.Kernel)
+    k.stats=Counter()
+    k.budget=Budget(30,4096)
+    lo,hi=k._grid_credit([settled])
+    charge=ck.ceil_mass(live)
+    wire=ck.encode_int(lo)
+    bound=dyadic_bound(wire,lo,hi,charge,{})
+    exact={}
+    for x in range(4,7):
+        for y in range(4,7):
+            for z in range(4,7):
+                box=ck.cell_box_rows(x,y,z)
+                cid=ck.cell_id((x,y,z))
+                mass=volume(rows+[cut]+box)*SCALE
+                assert lo[cid]<=mass<=hi[cid] and hi[cid]-lo[cid]<=1
+                # Only part of the live slab is truly feasible.
+                exact[cid]=volume(rows+[(1554,0,0,-73)]+box)
+    norm=sum(exact.values())
+    dist=decode(wire)
+    actual=sum(abs(dist.get(i,0)-m/norm) for i,m in exact.items())/2
+    assert sum(dist.values())==1 and 0<actual<=bound<1
+
+
+def test_write_interruption_preserves_committed_bytes(tmp_path,monkeypatch):
+    import run
+    from test_validated import archive
+    from cbc_search import solve
+    obs,ident=archive()
+    wire,detail=solve(obs,"000004_w00_s0",Q(1,20),10)
+    out=tmp_path/"posterior"
+    run.write_result(out,ident,Q(1,20),wire,detail)
+    before=out.read_bytes()
+    def stop(*args):
+        raise OSError("injected before atomic replacement")
+    monkeypatch.setattr(run.os,"replace",stop)
+    with pytest.raises(OSError):
+        run.write_result(out,ident,Q(1,20),wire,detail)
+    assert out.read_bytes()==before and list(tmp_path.iterdir())==[out]
+
+
+def test_population_verification_fails_on_missing_or_duplicate_issuance(tmp_path):
+    import json
+    from assurance.verify_release import verify
+    from test_validated import archive
+    from cbc_search import solve
+    from run import write_result
+    obs,identity=archive()
+    key="000004_w00_s0"
+    plan=dict(tasks={key:identity},build=json.loads(evidence._build_bytes()))
+    pin=evidence.digest(evidence.canonical(plan))
+    task=tmp_path/"tasks"/key
+    folder=task/"001"
+    folder.mkdir(parents=True)
+    wire,details=solve(obs,key,Q(1,20),12)
+    write_result(folder/"label.json",identity,Q(1,20),wire,details)
+    sha=evidence.digest((folder/"label.json").read_bytes())
+    (folder/"start.json").write_text(json.dumps(dict(key=key,manifest_sha=pin)))
+    receipt=dict(status='CERTIFIED',sha256=sha)
+    (folder/"receipt.json").write_text(json.dumps(receipt))
+    assert verify(tmp_path,plan,{key:sha},pin)==1
+    with pytest.raises(ValueError,match='population'):
+        verify(tmp_path,plan,{},pin)
+    later=task/"002"
+    later.mkdir()
+    (later/"start.json").write_bytes((folder/"start.json").read_bytes())
+    (later/"receipt.json").write_bytes((folder/"receipt.json").read_bytes())
+    with pytest.raises(ValueError,match='duplicate'):
+        verify(tmp_path,plan,{key:sha},pin)

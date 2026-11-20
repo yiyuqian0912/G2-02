@@ -1,0 +1,82 @@
+{
+  "PyYAML": {
+    "copied": 26,
+    "record_sha256": "7d0856221a182f5b25fde9bb976af79b4883090f54680d86a42b35fc8d6735a2",
+    "version": "6.0.3"
+  },
+  "donfig": {
+    "copied": 16,
+    "record_sha256": "b5494f1f4b439752a8a4a126aa9c347146c4d7eafde9b3e8609880d960184e44",
+    "version": "0.8.1.post1"
+  },
+  "google-crc32c": {
+    "copied": 17,
+    "record_sha256": "fb168ae17789e1a6bf3ee0321a504eb0405406a5d0120a0457ed5d1e19dd5527",
+    "version": "1.9.0"
+  },
+  "llvmlite": {
+    "copied": 47,
+    "record_sha256": "5cb616a56c067d3c221452ffd394beea592e77aff735f161b3ee4e979ebbca43",
+    "version": "0.50.0"
+  },
+  "msgspec": {
+    "copied": 25,
+    "record_sha256": "7d751a0e95051d24396f1f6e9800f70442f267c150026b0e567826bf110a062c",
+    "version": "0.22.0"
+  },
+  "numba": {
+    "copied": 824,
+    "record_sha256": "702e46f7a40cdaa2ea58d79986c5773eef882d11ccd4d00d1f7b7a289089f63e",
+    "version": "0.68.1"
+  },
+  "numcodecs": {
+    "copied": 49,
+    "record_sha256": "7c2e2848c7fc05bedf3edfe1575c6369156bf6309ec0d3f86539e96f6802464a",
+    "version": "0.17.1"
+  },
+  "numpy": {
+    "copied": 928,
+    "record_sha256": "d66a3d2b67f231ea20a5a9901a49a55acdab422383eea9cb40fab42b0d8a0c3a",
+    "version": "2.5.4"
+  },
+  "packaging": {
+    "copied": 31,
+    "record_sha256": "1b8655965b0d83e9a067fd7f84b977bd1e117e0fb9f2874b2572781bdc9e2147",
+    "version": "26.3"
+  },
+  "python-flint": {
+    "copied": 115,
+    "record_sha256": "ac90a8a8a1341610c4e3b8abc568e338c21ec595a82fd9561fe68c29db432b3c",
+    "version": "0.9.0"
+  },
+  "rind3d": {
+    "copied": 9,
+    "record_sha256": "96953a0c212084a32d64c40b9f5db8384d04a35ea0bb3d05dbf9be73c9a7b714",
+    "version": "0.3.0"
+  },
+  "scipy": {
+    "copied": 1434,
+    "record_sha256": "cda958e21648ffe0b8528473532ef59f89db82bf1fa7d4a9a47161785046e979",
+    "version": "1.18.1"
+  },
+  "typing-extensions": {
+    "copied": 7,
+    "record_sha256": "9e07fea845cac76293d927afa7157a14ecba39b318bc8af236b8de530b7656c1",
+    "version": "4.16.0"
+  },
+  "z3-solver": {
+    "copied": 46,
+    "record_sha256": "c4afff246f9fc202752ebc681c4bdd1327c15fee96cff77156c90e8bdff7da3c",
+    "version": "5.4.1.0"
+  },
+  "zarr": {
+    "copied": 108,
+    "record_sha256": "f05e8692f9899f353f13e38174d973ac4e1a46d17fecb923eb50d5e63e886742",
+    "version": "3.4.2"
+  },
+  "zstandard": {
+    "copied": 13,
+    "record_sha256": "fb9caf2d2342f45f75aed7ee9a8d17b2d2245339fc6da1c9c1c059ec770d96c6",
+    "version": "0.25.0"
+  }
+}

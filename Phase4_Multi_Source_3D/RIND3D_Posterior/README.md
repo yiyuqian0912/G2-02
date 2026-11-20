@@ -33,6 +33,8 @@ This package is the maintained form of the tau-pencil engine (TPE), Phases 1–2
 
 The isolated CBC research entry point reads one v3 channel and writes a sparse 128³ posterior with a deterministic TV bound on its decoded bytes when the bound is established. It has an exact SOLID consistency check, a rational integration backend and an optional projected receiver-patch experiment. [Mathematics and usage](docs/ASTRA_XLF_CERTIFIED_INTERFACE.md) · [Matched results and limitations](docs/ASTRA_XLF_CERTIFIED_RESULTS.md)
 
+The hardened CPU candidate certified all 807 channels in the frozen v3 canary after bounded retries. The audit covers exact integration, atomic volume accounting, the bound on the serialized distribution and the remaining trusted assumptions. [Production-hardening report and evidence](docs/ASTRA_CBC_PRODUCTION_HARDENING.md)
+
 ## Engines
 
 | Engine | What it is |

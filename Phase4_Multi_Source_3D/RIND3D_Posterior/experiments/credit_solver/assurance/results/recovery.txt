@@ -1,0 +1,4 @@
+1 attempts committed
+0 attempts committed
+verified receipts for manifest of 1 channels
+{"key": "000001_w07_s0", "killed_active_children": 1, "interrupted": {"reason": "previous coordinator interrupted", "recovered": true, "status": "INTERRUPTED", "termination": "previous coordinator interrupted"}, "retries": 1, "wire_equal": true, "bound_equal": true, "committed_sha": "de2a465ea5b6d725c91c67ab59397da8d0a94a8991e746a64197e1902d65df27", "corrupt_copy_refused": true, "repeat_resume_new_attempts": 0, "parallel_owner_refused": true}

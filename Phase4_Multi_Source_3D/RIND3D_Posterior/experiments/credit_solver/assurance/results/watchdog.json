@@ -1,0 +1,15 @@
+{
+  "key": "000005_w11_s0",
+  "hard_seconds": 1,
+  "soft_seconds": 20,
+  "issued": 0,
+  "receipt": {
+    "cpu": 1.025987,
+    "exit": -9,
+    "reason": "hard watchdog",
+    "rss_kib": 428068,
+    "status": "INTERRUPTED",
+    "termination": "hard watchdog",
+    "wall": 1.0599754220020259
+  }
+}
