@@ -61,7 +61,7 @@ def test_deferred_snapshot_is_above_threshold_for_disjoint_single_cell_live():
     lo=Counter({i:1<<115 for i in range(4096)})
     live={i:Piece(within(Poly.cube(),cell_box_rows(0,0,i)+[(0,0,256,-(2*i+1))]))
           for i in range(3)}
-    state=SimpleNamespace(live=live,lower=lo,lower_units=sum(lo.values()))
+    state=SimpleNamespace(live=live,lower=lo,lower_units=sum(lo.values()),live_units=None)
     obj=SimpleNamespace(_state=state,stats=Counter())
     actual=dyadic_bound(encode_int(lo),lo,lo,3*CELL//2,{i:CELL//2 for i in live})
     for tolerance in (Fraction(1,20),Fraction(1,2),Fraction(1)):

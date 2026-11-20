@@ -13,7 +13,10 @@ import numpy as np
 
 
 HERE = Path(__file__).resolve().parent
-VERSION = "astra-xlf-cbc/1"
+VERSION = "astra-xlf-cbc/2"
+from fractions import Fraction
+MAX_TV = Fraction(1, 20)
+PROBLEM_KEYS = frozenset(("halfspaces_sha256","origin","side","resolution","observation_xyz_sha256"))
 WIRE = "sparse-128-xyz/little-u32-binary64/dyadic52/v1"
 
 
@@ -49,6 +52,8 @@ def problem(obs):
 
 @lru_cache(maxsize=1)
 def _build_bytes():
+    if not __debug__ or sys.float_info.radix!=2 or sys.float_info.mant_dig!=53:
+        raise RuntimeError("unsupported release runtime")
     from rind3d import geometry
     from rind3d.rendering import polyhedra
     import certificates, envelopes, interface_chart, kernel, ledger, penumbra, poly, raster, solver, whole
@@ -62,8 +67,18 @@ def _build_bytes():
         "cbc_search.py","cbc_run.py","run.py","shadow_facets.py","hull_proposals.py")}
     for module in (storage,contracts,geometry,polyhedra,certificates,envelopes,interface_chart,kernel,ledger,penumbra,poly,raster,solver,whole):
         files[module.__name__] = Path(module.__file__)
+    from importlib.metadata import distribution
+    from hashlib import sha256
+    import scipy.spatial._qhull as qhull
+    from zstandard import backend_c
+    import llvmlite.binding as llvm
+    packages={}
+    for name in ("numpy","numba","llvmlite","scipy","zstandard","rind3d"):
+        dist=distribution(name)
+        record=dist.read_text("RECORD")
+        packages[name]=[dist.version,sha256(record.encode()).hexdigest() if record else None]
     runtime = {}
-    for key, path in (("llvm", ffi.lib._name), ("numba", _helperlib.__file__),
+    for key, path in (("qhull",qhull.__file__),("zstd",backend_c.__file__),("llvm", ffi.lib._name), ("numba", _helperlib.__file__),
                       ("numpy", _multiarray_umath.__file__), ("python", sys.executable)):
         with open(path, "rb") as stream:
             runtime[key] = hashlib.file_digest(stream, "sha256").hexdigest()
@@ -73,6 +88,7 @@ def _build_bytes():
     return canonical(dict(kernel=VERSION,backend="python-integer-fraction", commit=result.stdout.strip(),
         source_sha256={k:digest(path.read_bytes()) for k,path in files.items()},
         python=sys.version, runtime_sha256=runtime,
+        packages=packages, cpu=llvm.get_host_cpu_name(),cpu_features=llvm.get_host_cpu_features().flatten(),
         machine=platform.machine(), numpy=np.__version__, numba=numba.__version__,
         llvmlite=llvmlite.__version__,zstandard=zstandard.__version__,
         semantics="binary64-nearest-even; no fastmath; signed int64 floor; exact Python int/Fraction"))
@@ -88,7 +104,9 @@ def check_seal(binding, payload, bound, tolerance, identity):
     if digest(canonical(binding["statement"])) != binding["statement_sha256"]:
         raise ArithmeticError("changed certificate statement")
     st=binding["statement"]
-    if (st["wire_format"]!=WIRE or st["wire_sha256"]!=digest(payload) or
+    if (set(st["problem"])!=PROBLEM_KEYS or st["build"]["kernel"]!=VERSION or
+        st["build"]["backend"]!="python-integer-fraction" or not 0<=Fraction(bound)<=Fraction(tolerance)<=MAX_TV or
+        st["wire_format"]!=WIRE or st["wire_sha256"]!=digest(payload) or
         st["tv"]!=str(bound) or st["tolerance"]!=str(tolerance) or
         any(identity[k]!=v for k,v in st["problem"].items())):
         raise ArithmeticError("certificate disagrees with problem, wire or bound")
@@ -98,7 +116,7 @@ def artifact_digest(identity, binding):
     return digest(canonical([identity, binding["statement_sha256"]]))
 
 
-def check_artifact(rec, expected_identity):
+def check_artifact(rec, expected_identity, *, expected_build=None, materialize=True):
     """Verify an extracted new-format envelope against independently expected input metadata."""
     import base64
     from fractions import Fraction
@@ -110,8 +128,21 @@ def check_artifact(rec, expected_identity):
     binding = rec["certificate"]
     bound, tolerance = Fraction(rec["tv"]), Fraction(rec["tolerance"])
     check_seal(binding, wire, bound, tolerance, expected_identity)
+    if expected_build is not None and binding["statement"]["build"] != expected_build:
+        raise ValueError("unexpected numerical build")
+    from grid_accounting import validate_payload
+    count=validate_payload(wire)
     if (rec["artifact_sha256"] != artifact_digest(expected_identity, binding)
-            or digest(wire) != rec["wire_sha256"] or not 0 <= bound <= tolerance <= 1
-            or len(decode(wire)) != rec["cells"]):
+            or digest(wire) != rec["wire_sha256"] or not 0 <= bound <= tolerance <= MAX_TV
+            or count != rec["cells"]):
         raise ArithmeticError("changed artifact binding or invalid output")
-    return decode(wire)
+    return decode(wire) if materialize else count
+
+def read_issued(path, identity, expected_build, expected_sha256):
+    """The expected digest comes from a separately trusted publisher/immutable receipt."""
+    raw=Path(path).read_bytes()
+    if digest(raw)!=expected_sha256:
+        raise ValueError("artifact differs from trusted issuance digest")
+    rec=json.loads(raw)
+    check_artifact(rec,identity,expected_build=expected_build,materialize=False)
+    return rec

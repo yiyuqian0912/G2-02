@@ -235,7 +235,7 @@ def test_invalid_structure_at_credit_time_taints(monkeypatch):
             r = k.screen(h)
             if r["outcome"] == "open" and r["ids"] is not None:
                 k.enforce(r["handle"], [int(i) for i in r["ids"][:96]])
-    rel = k.release(Fraction(1))
+    rel = k.release(Fraction(1, 20))
     assert rel.status == "ERROR" and rel.payload is None
     with pytest.raises(RuntimeError):
         k.screen(k.handles()[0])

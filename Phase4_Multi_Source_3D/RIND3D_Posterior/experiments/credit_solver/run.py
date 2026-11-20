@@ -68,7 +68,8 @@ def write_result(path, identity, tolerance, payload, details):
         raise ValueError("expected a current solver result")
     result = dict(format="astra-xlf-certified-interface/1", problem=identity, tolerance=str(tolerance), **details)
     if payload is not None:
-        result.update(cells=len(decode(payload)), wire=base64.b64encode(payload).decode("ascii"),
+        from grid_accounting import validate_payload
+        result.update(cells=validate_payload(payload), wire=base64.b64encode(payload).decode("ascii"),
                       wire_sha256=sha256(payload).hexdigest())
     if result["status"] == "CERTIFIED":
         evidence.check_seal(result["certificate"], payload, result["tv"], tolerance, identity)
@@ -91,12 +92,17 @@ def write_result(path, identity, tolerance, payload, details):
             raise ArithmeticError("serialized envelope changed")
         if rec["status"]=="CERTIFIED":
             restored = base64.b64decode(rec["wire"],validate=True)
-            evidence.check_artifact(rec, identity)
+            evidence.check_artifact(rec, identity, expected_build=json.loads(evidence._build_bytes()), materialize=False)
             if restored != payload:
                 raise ArithmeticError("wire mismatch")
         elif "wire" in rec:
             raise ArithmeticError("incomplete label cannot carry a distribution")
         os.replace(tmp,path)
+        directory=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
     finally:
         tmp.unlink(missing_ok=True)
 

@@ -1,0 +1,6 @@
+affine extrema unsat
+overlap denominator unsat
+atomic live total unsat
+tick bracket unsat
+one-dimensional simplex identity unsat
+overlap monotonicity unsat

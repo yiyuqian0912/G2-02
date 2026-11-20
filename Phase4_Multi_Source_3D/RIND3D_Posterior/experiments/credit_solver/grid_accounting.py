@@ -17,7 +17,7 @@ def coefficients(normal):
     n = len(widths)
     if not n:
         raise ArithmeticError("zero facet normal")
-    terms = [(sum(subset), (-1)**k) for k in range(n+1) for subset in combinations(widths,k)]
+    terms = tuple((sum(subset), (-1)**k) for k in range(n+1) for subset in combinations(widths,k))
     return sum(widths), n, factorial(n)*prod(widths), terms
 
 
@@ -52,13 +52,11 @@ def intersecting(rows,box):
     return active
 
 
-def dyadic_bound(payload,lower,upper,total_live,cell_live):
-    """Same lower overlap as wire_bound, specialized to the documented dyadic52 wire."""
-    if not lower or not payload or len(payload)%RECORD.size or len(payload)//RECORD.size>M:
-        raise ValueError("invalid payload or credit")
-    total=sum(upper.values())+total_live
+def wire_ticks(payload):
+    if not payload or len(payload)%RECORD.size or len(payload)//RECORD.size>M:
+        raise ValueError("invalid wire length")
     previous=-1
-    common=ticks=0
+    ticks=0
     for cid,value in RECORD.iter_unpack(payload):
         if not previous<cid<M or not 0<value<=1:
             raise ValueError("invalid record")
@@ -69,13 +67,27 @@ def dyadic_bound(payload,lower,upper,total_live,cell_live):
             raise ValueError("noncanonical tick")
         previous=cid
         ticks+=k
+        yield cid,k
+    if ticks!=TICKS:
+        raise ValueError("invalid normalization")
+
+
+def validate_payload(payload):
+    return sum(1 for _ in wire_ticks(payload))
+
+
+def dyadic_bound(payload,lower,upper,total_live,cell_live):
+    """Same lower overlap as wire_bound, specialized to the documented dyadic52 wire."""
+    if not lower or not payload or len(payload)%RECORD.size or len(payload)//RECORD.size>M:
+        raise ValueError("invalid payload or credit")
+    total=sum(upper.values())+total_live
+    common=0
+    for cid,k in wire_ticks(payload):
         l=lower.get(cid,0)
         outside=total-upper.get(cid,0)-cell_live.get(cid,0)
         if outside<0:
             raise ArithmeticError("negative outer mass")
         if l:
             common+=min(k*(COMMON//TICKS),l*COMMON//(l+outside))
-    if ticks!=TICKS:
-        raise ValueError("invalid normalization")
     return Fraction(COMMON-common,COMMON)
 

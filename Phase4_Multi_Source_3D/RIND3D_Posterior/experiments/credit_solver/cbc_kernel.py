@@ -130,12 +130,26 @@ def encode_int(lower):
     total = sum(lower.values())
     if total <= 0 or any(v <= 0 for v in lower.values()):
         raise ValueError("positive lower mass required")
-    qr = {c: divmod(TICKS * m, total) for c, m in lower.items()}
-    ticks = {c: q for c, (q, r) in qr.items()}
-    missing = TICKS - sum(ticks.values())
-    for c in sorted(qr, key=lambda c: (-qr[c][1], c))[:missing]:
-        ticks[c] += 1
-    return b"".join(RECORD.pack(c, n / TICKS) for c, n in sorted(ticks.items()) if n)
+    ticks = {}
+    remainders = []
+    for c,m in lower.items():
+        count, remainder = divmod(TICKS*m,total)
+        ticks[c] = count
+        if remainder:
+            remainders.append((-remainder,c))
+    missing = TICKS-sum(ticks.values())
+    if missing:
+        remainders.sort()
+        for i in range(missing):
+            ticks[remainders[i][1]] += 1
+    out = bytearray(RECORD.size*len(ticks))
+    offset = 0
+    for c in sorted(ticks):
+        n=ticks[c]
+        if n:
+            RECORD.pack_into(out,offset,c,n/TICKS)
+            offset+=RECORD.size
+    return bytes(memoryview(out)[:offset])
 
 
 def remap_masks(masks, rel):
@@ -258,6 +272,7 @@ class State:
     next_id: int
     outside_window: bool
     lower_units: int = 0
+    live_units: int | None = None
 
 
 def private_problem(observation, centroid_anchor=True):
@@ -362,7 +377,12 @@ class Kernel:
             hi = hi.copy()
             hi.update(upper)
         lower_units = old.lower_units + (sum(lower.values()) if lower else 0)
-        self._state = State(live, lo, hi, old.next_id + len(children), old.outside_window or exclude, lower_units)
+        live_units=old.live_units
+        if live_units is not None:
+            live_units += sum(ceil_mass(p.poly) for p in children) - sum(ceil_mass(old.live[h].poly) for h in remove)
+        elif len(lo)>=4096:
+            live_units = sum(ceil_mass(p.poly) for p in live.values())
+        self._state = State(live, lo, hi, old.next_id + len(children), old.outside_window or exclude, lower_units, live_units)
         self.stats["transitions"] += 1
         self.stats["peak_live"] = max(self.stats["peak_live"], len(live))
         return new_ids
@@ -724,13 +744,14 @@ class Kernel:
             return True
         # Single-cell live pieces have disjoint interiors. Each ceiling adds <1 unit.
         # Every overlap denominator is >= L + max(0, U - CELL_UNITS - n_live).
-        u = sum(ceil_mass(piece.poly) for piece in st.live.values())
+        u = st.live_units if st.live_units is not None else sum(ceil_mass(piece.poly) for piece in st.live.values())
         extra = max(0, u - CELL_UNITS - len(st.live))
         possible = extra*tolerance.denominator <= tolerance.numerator*(st.lower_units+extra)
         if not possible:
             self.stats["deferred_snapshots"] += 1
         return possible
 
+    @_transition
     def snapshot(self):
         state = self._state
         if not state.lower:
@@ -745,6 +766,10 @@ class Kernel:
             cid = single_cell(piece.poly)
             if cid is not None:
                 unknown_in[cid] += amount
+        if state.live_units is not None and state.live_units!=unknown_total:
+            raise ArithmeticError("inconsistent live mass cache")
+        if state.lower_units != sum(state.lower.values()) or not 0 < state.lower_units <= SCALE:
+            raise ArithmeticError("inconsistent accumulated lower volume")
         payload = encode_int(state.lower)
         bound = grid_accounting.dyadic_bound(payload, state.lower, state.upper_in, unknown_total, unknown_in)
         if self._best is None or bound < self._best[0]:
@@ -753,8 +778,8 @@ class Kernel:
 
     def release(self, tolerance):
         """The only source of a CERTIFIED status: the best bound the kernel itself computed."""
-        if type(tolerance) is not Fraction or not 0 <= tolerance <= 1:
-            raise ValueError("exact tolerance in [0, 1] required")
+        if type(tolerance) is not Fraction or not 0 <= tolerance <= evidence.MAX_TV:
+            raise ValueError("exact tolerance in [0, 1/20] required")
         if self._tainted is not None:
             return Release("ERROR", None, None, tolerance, self._tainted)
         try:
@@ -772,6 +797,8 @@ class Kernel:
     def unknown_volume(self):
         """Search hint: total live volume (binary64; exact Fraction sums over hundreds of
         pieces with large denominators cost ~1 s)."""
+        if self._state.live_units is not None:
+            return self._state.live_units / SCALE
         return sum(float(p.poly.volume) for p in self._state.live.values())
 
     def lower_total_float(self):
@@ -809,7 +836,7 @@ def certify(obs, tolerance, seconds, cap, search, centroid_anchor=True):
     with any exception: all three are abstentions of the search. Only kernel.release()
     decides the status, payload and bound of the result; diagnostics cannot override them.
     """
-    if type(tolerance) is not Fraction or not 0 <= tolerance <= 1 or not math.isfinite(seconds) or seconds <= 0 or type(cap) is not int or cap < 1:
+    if type(tolerance) is not Fraction or not 0 <= tolerance <= evidence.MAX_TV or not math.isfinite(seconds) or seconds <= 0 or type(cap) is not int or cap < 1:
         raise ValueError("invalid budget or tolerance")
     budget = Budget(seconds, cap)
     kernel = Kernel(obs, budget, centroid_anchor)

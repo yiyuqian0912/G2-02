@@ -1,13 +1,14 @@
 """Canonical v3 scene/channel inputs. The loader never reads source coordinates."""
 import hashlib
 import io
+from functools import lru_cache
 import json
 from pathlib import Path
 import sys
 
 import numpy as np
 import zstandard
-from rind3d.geometry import load_geometry
+from rind3d.geometry import load_geometry, pack_arrays
 from rind3d.rendering.polyhedra import decode_convex
 
 EXPERIMENTS = Path(__file__).resolve().parent.parent
@@ -25,9 +26,28 @@ def _adjacent_response(classes, axis):
     return bool(np.any((v[:-1] == 0) & (v[1:] == 1)) or np.any((v[:-1] == 1) & (v[1:] == 0)))
 
 
+@lru_cache(maxsize=2)
+def _geometry_rows(geometry):
+    # Immutable bytes key and an immutable tuple of integer rows as the only cached result.
+    bundle=load_geometry(io.BytesIO(geometry))
+    rebuilt=pack_arrays(bundle)
+    with np.load(io.BytesIO(geometry),allow_pickle=False) as encoded:
+        if len(encoded.files)!=len(rebuilt) or set(encoded.files)!=set(rebuilt):
+            raise ValueError("noncanonical geometry inventory")
+        for key,value in rebuilt.items():
+            raw=encoded[key]
+            if raw.dtype!=value.dtype or raw.shape!=value.shape or raw.tobytes()!=value.tobytes():
+                raise ValueError("noncanonical geometry field: "+key)
+    if len(bundle.geometries)!=1:
+        raise ValueError("expected exactly one canonical world geometry")
+    return tuple(tuple(integer_row(r) for r in c.rows) for c in decode_convex(bundle))
+
+
 def load(path, window, channel):
     window, channel = integer(window), integer(channel)
     with np.load(path, allow_pickle=False) as container:
+        if len(set(container.files))!=len(container.files):
+            raise ValueError("duplicate container entries")
         windows = container["windows"]
         if not 0 <= window < len(windows) or not 0 <= channel < 4:
             raise ValueError("invalid window/channel")
@@ -52,7 +72,7 @@ def load(path, window, channel):
             start,size = matches[0]
             if start < 0 or size <= 0 or start+size > len(blob):
                 raise ValueError("invalid crop extent")
-            packed = zstandard.ZstdDecompressor().decompress(blob[start:start+size],max_output_size=width)
+            packed = zstandard.ZstdDecompressor().decompress(blob[start:start+size],max_output_size=width,allow_extra_data=False)
             if len(packed) != width:
                 raise ValueError("incorrect crop length")
             return np.unpackbits(np.frombuffer(packed,np.uint8)).reshape((side,)*3)
@@ -66,10 +86,7 @@ def load(path, window, channel):
         if not any(_adjacent_response(cls, axis) for axis in range(3)):
             raise ValueError("crop lacks a direct FREE response interface")
         cls = cls.T
-    bundle = load_geometry(io.BytesIO(geometry))
-    if len(bundle.geometries) != 1:
-        raise ValueError("expected exactly one canonical world geometry")
-    bodies = tuple(tuple(integer_row(r) for r in c.rows) for c in decode_convex(bundle))
+    bodies = _geometry_rows(geometry)
     cls.flags.writeable = False
     obs = Observation(bodies,cls,origin,1024)
     identity = evidence.problem(obs)
