@@ -1,0 +1,100 @@
+{
+  "all": {
+    "natural": {
+      "windows": 8,
+      "swapped": 0,
+      "extra_proposals": 0,
+      "eligible_channels": 14,
+      "certified": 10,
+      "focal_certified": 6,
+      "incremental_plus_label_s": 59.35107816298114,
+      "marginal_s_per_certified": 5.935107816298114
+    },
+    "always": {
+      "windows": 8,
+      "swapped": 6,
+      "extra_proposals": 17,
+      "eligible_channels": 17,
+      "certified": 17,
+      "focal_certified": 8,
+      "incremental_plus_label_s": 33.14747399700718,
+      "marginal_s_per_certified": 1.9498514115886578
+    },
+    "reserve": {
+      "windows": 8,
+      "swapped": 2,
+      "extra_proposals": 4,
+      "eligible_channels": 14,
+      "certified": 12,
+      "focal_certified": 7,
+      "incremental_plus_label_s": 40.47468822999508,
+      "marginal_s_per_certified": 3.3728906858329233
+    },
+    "legacy_reserve": {
+      "windows": 8,
+      "swapped": 4,
+      "extra_proposals": 13,
+      "eligible_channels": 20,
+      "certified": 16,
+      "focal_certified": 6,
+      "incremental_plus_label_s": 67.40897784500703,
+      "marginal_s_per_certified": 4.213061115312939
+    },
+    "fair_coin": {
+      "incremental_plus_label_s": 46.24927607999416,
+      "certified": 13.5,
+      "eligible_channels": 15.5,
+      "focal_certified": 7.0,
+      "fraction_strictly_cheaper": 0.75390625
+    }
+  },
+  "held_out": {
+    "natural": {
+      "windows": 7,
+      "swapped": 0,
+      "extra_proposals": 0,
+      "eligible_channels": 10,
+      "certified": 8,
+      "focal_certified": 6,
+      "incremental_plus_label_s": 36.621756171974994,
+      "marginal_s_per_certified": 4.577719521496874
+    },
+    "always": {
+      "windows": 7,
+      "swapped": 5,
+      "extra_proposals": 16,
+      "eligible_channels": 15,
+      "certified": 15,
+      "focal_certified": 7,
+      "incremental_plus_label_s": 30.604221099005372,
+      "marginal_s_per_certified": 2.040281406600358
+    },
+    "reserve": {
+      "windows": 7,
+      "swapped": 2,
+      "extra_proposals": 4,
+      "eligible_channels": 10,
+      "certified": 10,
+      "focal_certified": 7,
+      "incremental_plus_label_s": 17.745366238988936,
+      "marginal_s_per_certified": 1.7745366238988936
+    },
+    "legacy_reserve": {
+      "windows": 7,
+      "swapped": 4,
+      "extra_proposals": 13,
+      "eligible_channels": 16,
+      "certified": 14,
+      "focal_certified": 6,
+      "incremental_plus_label_s": 44.679655854000885,
+      "marginal_s_per_certified": 3.1914039895714916
+    },
+    "fair_coin": {
+      "incremental_plus_label_s": 33.61298863549018,
+      "certified": 11.5,
+      "eligible_channels": 12.5,
+      "focal_certified": 6.5,
+      "fraction_strictly_cheaper": 0.5078125
+    }
+  }
+}

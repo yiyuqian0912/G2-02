@@ -1,0 +1,14 @@
+{
+  "artifact_sha256": "8fa53919cf08e82628b9143eee0bdbf984d7d4b9d62a7072f505d549161fa15e",
+  "wire_sha256": "58538c545654c4844e60dc850bcd539223f38d2223b34f47c9c20654f878fa04",
+  "bytes": 6472654,
+  "status": "CERTIFIED",
+  "bound": "990105501625378363027656785/19807040628566084398385987584",
+  "bound_float": 0.049987553425695996,
+  "cells": 404212,
+  "exact_sum": "1",
+  "crop": "9ed3585b1c546732dd18f52be8f5c95828a571f2817c28f4e7aec8ecae854c2d",
+  "geometry": "8e3dafa430d0eda3508ffddab1bf17fb314cb66745280044b5a441dfd0c58124",
+  "build_commit": "ddf29243c9e0222d0cc8d34cb31c51e46e314139",
+  "matching_runtime_and_source_fingerprints": true
+}

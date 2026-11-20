@@ -51,3 +51,21 @@ def test_bad_wire(p):
     with pytest.raises(ValueError):
         dyadic_bound(p,{0:1},{0:1},0,{})
 
+
+
+def test_deferred_snapshot_is_above_threshold_for_disjoint_single_cell_live():
+    from types import SimpleNamespace
+    from cbc_kernel import Kernel, Piece
+    # 4096 occupied cells activate the large-support scheduling path. A live piece in
+    # one of those cells exercises the subtraction of single-cell unknown mass.
+    lo=Counter({i:1<<115 for i in range(4096)})
+    live={i:Piece(within(Poly.cube(),cell_box_rows(0,0,i)+[(0,0,256,-(2*i+1))]))
+          for i in range(3)}
+    state=SimpleNamespace(live=live,lower=lo,lower_units=sum(lo.values()))
+    obj=SimpleNamespace(_state=state,stats=Counter())
+    actual=dyadic_bound(encode_int(lo),lo,lo,3*CELL//2,{i:CELL//2 for i in live})
+    for tolerance in (Fraction(1,20),Fraction(1,2),Fraction(1)):
+        if not Kernel.checkpoint_worthwhile(obj,tolerance):
+            assert actual>tolerance
+    assert not Kernel.checkpoint_worthwhile(obj,Fraction(1,20))
+    assert Kernel.checkpoint_worthwhile(obj,Fraction(1))

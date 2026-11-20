@@ -1,0 +1,34 @@
+{
+  "schema": "astra-observation-cost/v1",
+  "baseline_commit": "528b060076dd5558bbc699d497251cd7fbe15ae5",
+  "single_facet_commit": "19153b0decde3687dbfbc51afc17d3fa485de325",
+  "final_scientific_commit": "ddf29243c9e0222d0cc8d34cb31c51e46e314139",
+  "python": "3.12.14",
+  "numpy": "2.5.4",
+  "scipy": "1.18.1",
+  "numba": "0.68.1",
+  "archive": {
+    "sampling_impact/v3/records.jsonl": "ccc24e1e2ade302c4f1b70d2e58d658ba24d41ac1b709adb2b169ba3775111f1",
+    "sampling_impact/v3/run.json": "c057f82c4ee03a5d3479f67dec8a078d390ff16ce1f897e8d87016329704118f",
+    "xlf_cbc/v301_canary_10s/runs.jsonl": "28a38c0a5a676e16e2d0eda45c71fe7739b8c4e9bb9ac354555aa20bf8849b3d",
+    "xlf_cbc/v301_canary_10s/compare_canary.json": "5756ce7205d03fa52027b72fff5439c9f208e3a1e2245e064d0b8e7e3f9e7d50"
+  },
+  "72_scene_inventory_sha256": "8f9bdb5653e49810f9a80d28b4e21fd7060b2f99079fb0df76f08e1b6f3df332",
+  "807_archive_result_inventory_sha256": "6476160c9ff4d4c646b718d4081e560657b11456f917e7dffe6fe75b9142faee",
+  "inventory_algorithm": "sha256 of UTF-8 lines (file sha256, two spaces, lexically sorted relative path, LF)",
+  "fixed_slots": {
+    "training": [
+      0,
+      17
+    ],
+    "held_out": [
+      18,
+      35
+    ],
+    "population": [
+      0,
+      71
+    ]
+  },
+  "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics"
+}
