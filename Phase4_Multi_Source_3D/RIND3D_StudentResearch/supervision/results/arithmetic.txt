@@ -1,0 +1,37 @@
+S1a crossing point on the plane: PROVED
+S1b crossing point strictly inside the edge (positive weight, convex combination): PROVED
+S2a cap_hull orientation identity: PROVED
+S2b polycheck turn identity: PROVED
+S2c orientation signs are exact: PROVED
+S3 homogeneous comparison: PROVED
+C1 inverse-cone elimination (front, back, tangent): PROVED
+C2 redundant pair row: PROVED
+E1 tightest pair row (minimal ratio) implies the others: PROVED
+E2 loosest pair row (maximal ratio) contains the others: PROVED
+E3 separating plane bounds the shadow: PROVED
+Q1 directed integer square root: PROVED
+Q2 clearance distance > 2^-26: PROVED
+T1 frontier per-cell lower bound: PROVED
+T2 min monotone: PROVED
+T3 integer TV floors round the bound outward: PROVED
+ALL PROVED
+a>0 upper endpoint exact: PROVED
+a<0 lower endpoint exact: PROVED
+a=0 constant row: PROVED
+int64 range: PROVED
+fixed(up) shrinks guaranteed regions: PROVED
+fixed(down) grows possible regions: PROVED
+ALL PROVED
+closed contact and entry ordering PROVED
+segment with nonpositive endpoints PROVED
+reciprocal sign preservation PROVED
+extrema survive same-class convex combinations PROVED
+affine extrema unsat
+overlap denominator unsat
+atomic live total unsat
+tick bracket unsat
+one-dimensional simplex identity unsat
+overlap monotonicity unsat
+tick reconstruction unsat
+top digit fits binary32 exactly unsat
+int64 chunk addition unsat

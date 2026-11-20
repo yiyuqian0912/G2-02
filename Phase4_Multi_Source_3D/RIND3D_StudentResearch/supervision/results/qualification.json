@@ -1,0 +1,29 @@
+{
+  "archived_channels": 807,
+  "complete_shard_digest_reproduced": "13a0dacfe3141dc551c355ac51b9b1c743f292fac4fd98510d44d193ea1baaef",
+  "recovery": {
+    "key": "000001_w07_s0",
+    "killed_active_children": 1,
+    "interrupted": {
+      "reason": "previous coordinator interrupted",
+      "recovered": true,
+      "status": "INTERRUPTED",
+      "termination": "previous coordinator interrupted"
+    },
+    "retries": 1,
+    "wire_equal": true,
+    "bound_equal": true,
+    "committed_sha": "1520f35b54493d11f83dcbf0259381134c0f0be01bddf51c580e27928306150d",
+    "corrupt_copy_refused": true,
+    "repeat_resume_new_attempts": 0,
+    "parallel_owner_refused": true
+  },
+  "child_index": "9804542fd0cf6e93542b36464325518e98ff01322a35e29b6bd1602cd3cf08d4",
+  "reread_recovered_key": "000001_w07_s0",
+  "recovered_cells": 3069,
+  "uniform_model_loss": 14.556090791758846,
+  "scientific_regression": "801 passed in 54.29s",
+  "supervised_integration": "29 passed in 3.30s; two real Linux DataLoader workers; CPU",
+  "existing_arithmetic_checks": 32,
+  "new_arithmetic_checks": 3
+}

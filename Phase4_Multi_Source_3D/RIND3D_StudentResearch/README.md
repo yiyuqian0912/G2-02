@@ -26,6 +26,8 @@ with its addendum on cost-gated extreme responses. **Start with `I_EXECUTIVE_DEC
 | `s6/` | all-dark solid-interior fix prototype, its runs and validation |
 | `pilot/` | features, model, training, evaluation, analysis, tables |
 
+The [certified v3 supervision reader](supervision/README.md) pairs a local observation with its authenticated 128³ posterior. It includes an exact sparse target representation, a CPU loss reference and the bounded-shard acceptance procedure.
+
 **Data** (outside the repository, under `RIND3D_1K_data/`):
 
 | directory | contents |

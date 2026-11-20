@@ -1,0 +1,31 @@
+{
+  "channels": 807,
+  "exact_tensor_matches_each": 807,
+  "terms": 8417482,
+  "cells": 4223573,
+  "reference_count": 14,
+  "max_reference_tv": 5.850004512461103e-15,
+  "peak_rss_kib": 519960,
+  "wall_including_comparison_s": 103.71349908199954,
+  "cpu_including_comparison_s": 103.67026128,
+  "torch": "2.15.0+cpu",
+  "numpy": "2.5.4",
+  "binary64": {
+    "wall_sum_s": 50.369287149997035,
+    "cpu_sum_s": 50.34956865399989,
+    "wall_p50_p95_max_s": [
+      0.012869833999502589,
+      0.17548489049977428,
+      0.2780753899996853
+    ]
+  },
+  "float32_terms": {
+    "wall_sum_s": 50.32580317002248,
+    "cpu_sum_s": 50.30638290999979,
+    "wall_p50_p95_max_s": [
+      0.013060432999736804,
+      0.1840634307000072,
+      0.26439477599979
+    ]
+  }
+}
