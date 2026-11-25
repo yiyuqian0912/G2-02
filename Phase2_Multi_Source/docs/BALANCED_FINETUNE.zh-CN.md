@@ -7,7 +7,7 @@
 Mac本地：
 
 ```bash
-scp -P 10688 ~/Desktop/RIND_Phase2_Update.tar.gz test@58.199.162.221:/home/qq/yiyu/
+scp -P "$RIND_SSH_PORT" ~/Desktop/RIND_Phase2_Update.tar.gz "$RIND_SSH_HOST":/home/qq/yiyu/
 ```
 
 服务器：

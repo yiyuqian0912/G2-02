@@ -22,8 +22,8 @@ R是有效贡献层数，不是物理源数K。盘点不做逐层单源物理可
 Mac上传同名包：
 
 ```bash
-scp -P 10688 ~/Desktop/RIND_Phase2_Update.tar.gz \
-  test@58.199.162.221:/home/qq/yiyu/
+scp -P "$RIND_SSH_PORT" ~/Desktop/RIND_Phase2_Update.tar.gz \
+  "$RIND_SSH_HOST":/home/qq/yiyu/
 ```
 
 服务器解压并启动后台盘点：
@@ -80,8 +80,8 @@ tmux会话为`rind_masks_count_first`。启动后可断开SSH/VPN。若此前同
 
 ```bash
 mkdir -p ~/Desktop/G2-02/outputs/evaluation/complex_inventory
-scp -P 10688 \
-  test@58.199.162.221:/home/qq/yiyu/RIND_Phase2_Training_Minimal/Phase2_Multi_Source/outputs/masks_count_inventory_v4/inventory_report.json \
+scp -P "$RIND_SSH_PORT" \
+  "$RIND_SSH_HOST":/home/qq/yiyu/RIND_Phase2_Training_Minimal/Phase2_Multi_Source/outputs/masks_count_inventory_v4/inventory_report.json \
   ~/Desktop/G2-02/outputs/evaluation/complex_inventory/
 ```
 

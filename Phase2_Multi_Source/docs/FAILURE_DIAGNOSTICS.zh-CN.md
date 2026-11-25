@@ -84,8 +84,8 @@ rank0一次读取并冻结该checkpoint的模型快照，然后所有评价rank�
 Mac上传同名代码包：
 
 ```bash
-scp -P 10688 ~/Desktop/RIND_Phase2_Update.tar.gz \
-  test@58.199.162.221:/home/qq/yiyu/
+scp -P "$RIND_SSH_PORT" ~/Desktop/RIND_Phase2_Update.tar.gz \
+  "$RIND_SSH_HOST":/home/qq/yiyu/
 ```
 
 服务器：
@@ -144,8 +144,8 @@ unset RIND_MASKS_CONFIG RIND_DECOMPOSITION_CONFIG
 
 ```bash
 mkdir -p ~/Desktop/G2-02/outputs/evaluation/failure_diagnostics
-scp -P 10688 \
-  test@58.199.162.221:/home/qq/yiyu/RIND_Phase2_Training_Minimal/Phase2_Multi_Source/outputs/failure_diagnostics/latest_diagnostics.tar.gz \
+scp -P "$RIND_SSH_PORT" \
+  "$RIND_SSH_HOST":/home/qq/yiyu/RIND_Phase2_Training_Minimal/Phase2_Multi_Source/outputs/failure_diagnostics/latest_diagnostics.tar.gz \
   ~/Desktop/G2-02/outputs/evaluation/failure_diagnostics/
 
 tar -xzf ~/Desktop/G2-02/outputs/evaluation/failure_diagnostics/latest_diagnostics.tar.gz \
